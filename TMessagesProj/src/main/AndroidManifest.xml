@@ -325,6 +325,11 @@
             </intent-filter>
         </activity>
         <activity
+            android:name="org.telegram.wallet.ui.WalletManagerActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false" />
+        <activity
             android:name="org.telegram.ui.ExternalActionActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
             android:hardwareAccelerated="true"
