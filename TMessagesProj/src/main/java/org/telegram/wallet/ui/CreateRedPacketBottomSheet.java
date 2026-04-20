@@ -1,0 +1,622 @@
+package org.telegram.wallet.ui;
+
+import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.text.InputType;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLog;
+import org.telegram.messenger.SendMessagesHelper;
+import org.telegram.messenger.Utilities;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.BottomSheet;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.wallet.chain.RedPacketContractService;
+import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
+import org.telegram.wallet.redpacket.RedPacketMessageComposer;
+import org.telegram.wallet.redpacket.RedPacketRepository;
+import org.telegram.wallet.security.WalletKeyStore;
+import org.web3j.crypto.Credentials;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
+import android.view.MotionEvent;
+import android.view.Window;
+import android.view.WindowManager;
+
+import org.telegram.ui.Components.EditTextBoldCursor;
+public class CreateRedPacketBottomSheet extends BottomSheet {
+
+    private final BaseFragment parentFragment;
+    private final int account;
+    private final long dialogId;
+
+    private FrameLayout rootLayout;
+    private LinearLayout contentLayout;
+    private FrameLayout loadingOverlay;
+    private TextView loadingTextView;
+
+    private EditTextBoldCursor  totalAmountEdit;
+    private EditTextBoldCursor  countEdit;
+    private EditTextBoldCursor  expireHoursEdit;
+    private TextView errorView;
+    private TextView createButton;
+    private TextView cancelButton;
+
+    private volatile boolean submitting;
+
+    public CreateRedPacketBottomSheet(BaseFragment parentFragment, int account, long dialogId) {
+        super(parentFragment.getParentActivity(), false, parentFragment.getResourceProvider());
+        this.parentFragment = parentFragment;
+        this.account = account;
+        this.dialogId = dialogId;
+
+        fixNavigationBar();
+        setApplyTopPadding(false);
+        setApplyBottomPadding(false);
+        setCanDismissWithSwipe(false);
+
+        buildLayout(getContext());
+    }
+
+    private void buildLayout(Context context) {
+        rootLayout = new FrameLayout(context);
+        rootLayout.setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+
+        ScrollView scrollView = new ScrollView(context);
+        scrollView.setFillViewport(true);
+        scrollView.setVerticalScrollBarEnabled(false);
+        nestedScrollChild = scrollView;
+
+        contentLayout = new LinearLayout(context);
+        contentLayout.setOrientation(LinearLayout.VERTICAL);
+        contentLayout.setPadding(
+                AndroidUtilities.dp(20),
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(20),
+                AndroidUtilities.dp(20)
+        );
+
+        scrollView.addView(
+                contentLayout,
+                new ScrollView.LayoutParams(
+                        ScrollView.LayoutParams.MATCH_PARENT,
+                        ScrollView.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        rootLayout.addView(
+                scrollView,
+                LayoutHelper.createFrame(
+                        LayoutHelper.MATCH_PARENT,
+                        LayoutHelper.WRAP_CONTENT,
+                        Gravity.LEFT | Gravity.TOP
+                )
+        );
+
+        // containerView = rootLayout;
+        setCustomView(rootLayout);
+
+        TextView titleView = createText(context, 22, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT_BOLD);
+        titleView.setText("发 BNB 红包");
+        contentLayout.addView(titleView, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        TextView subtitleView = createText(context, 14, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
+        subtitleView.setPadding(0, AndroidUtilities.dp(8), 0, 0);
+        subtitleView.setText("先创建链上红包，再自动把红包消息发到当前聊天");
+        contentLayout.addView(subtitleView, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        addFieldLabel(context, "红包总额（BNB）");
+        totalAmountEdit = createInput(context, "例如 0.05");
+        totalAmountEdit.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        totalAmountEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
+        contentLayout.addView(totalAmountEdit, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, 48));
+
+        addFieldLabel(context, "份数");
+        countEdit = createInput(context, "例如 5");
+        countEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
+        countEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
+        contentLayout.addView(countEdit, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, 48));
+
+        addFieldLabel(context, "有效期（小时）");
+        expireHoursEdit = createInput(context, "例如 24");
+        expireHoursEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
+        expireHoursEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        contentLayout.addView(expireHoursEdit, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, 48));
+
+        TextView hintView = createText(context, 13, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
+        hintView.setPadding(0, AndroidUtilities.dp(12), 0, 0);
+        hintView.setText("为了保证链上金额精确，当前版本要求：总额 ÷ 份数 后能精确到 wei。");
+        contentLayout.addView(hintView, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        errorView = createText(context, 14, Theme.key_text_RedRegular, Typeface.DEFAULT);
+        errorView.setPadding(0, AndroidUtilities.dp(14), 0, 0);
+        errorView.setVisibility(View.GONE);
+        contentLayout.addView(errorView, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        createButton = createActionButton(
+                context,
+                "创建并发送",
+                getThemedColor(Theme.key_featuredStickers_addButton),
+                getThemedColor(Theme.key_featuredStickers_buttonText)
+        );
+        createButton.setOnClickListener(v -> onClickCreate());
+        contentLayout.addView(createButton, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, 48, 0, 18, 0, 0));
+
+        cancelButton = createActionButton(
+                context,
+                "取消",
+                adjustAlpha(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2), 0.16f),
+                getThemedColor(Theme.key_windowBackgroundWhiteBlackText)
+        );
+        cancelButton.setOnClickListener(v -> dismiss());
+        contentLayout.addView(cancelButton, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, 48, 0, 12, 0, 0));
+
+        loadingOverlay = new FrameLayout(context);
+        loadingOverlay.setBackgroundColor(adjustAlpha(Color.BLACK, 0.12f));
+        loadingOverlay.setVisibility(View.GONE);
+
+        LinearLayout overlayContent = new LinearLayout(context);
+        overlayContent.setOrientation(LinearLayout.VERTICAL);
+        overlayContent.setGravity(Gravity.CENTER_HORIZONTAL);
+        overlayContent.setPadding(
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(18)
+        );
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(getThemedColor(Theme.key_dialogBackground));
+        bg.setCornerRadius(AndroidUtilities.dp(14));
+        overlayContent.setBackground(bg);
+
+        ProgressBar progressBar = new ProgressBar(context);
+        overlayContent.addView(progressBar, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+
+        loadingTextView = createText(context, 14, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT);
+        loadingTextView.setGravity(Gravity.CENTER_HORIZONTAL);
+        loadingTextView.setPadding(0, AndroidUtilities.dp(10), 0, 0);
+        loadingTextView.setText("处理中…");
+        overlayContent.addView(loadingTextView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+
+        loadingOverlay.addView(
+                overlayContent,
+                LayoutHelper.createFrame(
+                        LayoutHelper.WRAP_CONTENT,
+                        LayoutHelper.WRAP_CONTENT,
+                        Gravity.CENTER
+                )
+        );
+
+        rootLayout.addView(
+                loadingOverlay,
+                LayoutHelper.createFrame(
+                        LayoutHelper.MATCH_PARENT,
+                        LayoutHelper.MATCH_PARENT
+                )
+        );
+    }
+
+    private void addFieldLabel(Context context, String text) {
+        TextView label = createText(context, 15, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT_BOLD);
+        label.setPadding(0, AndroidUtilities.dp(16), 0, AndroidUtilities.dp(8));
+        label.setText(text);
+        contentLayout.addView(label, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+    }
+
+    @Override
+    public void show() {
+        super.show();
+
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                Window window = getWindow();
+                if (window != null) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+                    window.setSoftInputMode(
+                            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                                    | WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                    );
+                }
+            } catch (Throwable ignore) {
+            }
+
+            focusInput(totalAmountEdit);
+        }, 80);
+    }
+
+    private EditTextBoldCursor createInput(Context context, String hint) {
+        EditTextBoldCursor editText = new EditTextBoldCursor(context);
+        editText.setTextSize(16);
+        editText.setSingleLine(true);
+        editText.setHint(hint);
+        editText.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        editText.setHintTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2));
+        editText.setBackground(createInputBackground());
+        editText.setPadding(
+                AndroidUtilities.dp(14),
+                AndroidUtilities.dp(12),
+                AndroidUtilities.dp(14),
+                AndroidUtilities.dp(12)
+        );
+
+        editText.setFocusable(true);
+        editText.setFocusableInTouchMode(true);
+        editText.setClickable(true);
+        editText.setLongClickable(true);
+        editText.setTextIsSelectable(true);
+
+        editText.setCursorColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        editText.setCursorWidth(1.5f);
+        editText.setCursorSize(AndroidUtilities.dp(20));
+
+        editText.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN
+                    || event.getAction() == MotionEvent.ACTION_UP) {
+                focusInput((EditTextBoldCursor) v);
+            }
+            return false;
+        });
+
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                AndroidUtilities.runOnUIThread(() ->
+                        AndroidUtilities.showKeyboard((EditTextBoldCursor) v), 60);
+            }
+        });
+
+        return editText;
+    }
+
+    private void focusInput(EditTextBoldCursor editText) {
+        if (editText == null) {
+            return;
+        }
+        editText.setFocusableInTouchMode(true);
+        editText.requestFocus();
+        editText.requestFocusFromTouch();
+
+        AndroidUtilities.runOnUIThread(() -> {
+            try {
+                AndroidUtilities.showKeyboard(editText);
+            } catch (Throwable ignore) {
+            }
+        }, 60);
+    }
+
+    private GradientDrawable createInputBackground() {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(adjustAlpha(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2), 0.08f));
+        drawable.setCornerRadius(AndroidUtilities.dp(12));
+        return drawable;
+    }
+
+    private void onClickCreate() {
+        if (submitting) {
+            return;
+        }
+        errorView.setVisibility(View.GONE);
+
+        if (!WalletConfig.isWalletSupportedOnThisDevice()) {
+            showError("当前设备暂不支持钱包功能");
+            return;
+        }
+
+        final String totalText = trim(totalAmountEdit.getText() == null ? null : totalAmountEdit.getText().toString());
+        final String countText = trim(countEdit.getText() == null ? null : countEdit.getText().toString());
+        final String hoursText = trim(expireHoursEdit.getText() == null ? null : expireHoursEdit.getText().toString());
+
+        if (TextUtils.isEmpty(totalText)) {
+            showError("请填写红包总额");
+            return;
+        }
+        if (TextUtils.isEmpty(countText)) {
+            showError("请填写份数");
+            return;
+        }
+        if (TextUtils.isEmpty(hoursText)) {
+            showError("请填写有效期");
+            return;
+        }
+
+        final BigDecimal totalAmountBnb;
+        final int count;
+        final int expireHours;
+        try {
+            totalAmountBnb = new BigDecimal(totalText);
+        } catch (Throwable t) {
+            showError("红包总额格式不正确");
+            return;
+        }
+
+        try {
+            count = Integer.parseInt(countText);
+        } catch (Throwable t) {
+            showError("份数格式不正确");
+            return;
+        }
+
+        try {
+            expireHours = Integer.parseInt(hoursText);
+        } catch (Throwable t) {
+            showError("有效期格式不正确");
+            return;
+        }
+
+        if (totalAmountBnb.signum() <= 0) {
+            showError("红包总额必须大于 0");
+            return;
+        }
+        if (count <= 0) {
+            showError("份数必须大于 0");
+            return;
+        }
+        if (expireHours <= 0) {
+            showError("有效期必须大于 0");
+            return;
+        }
+        if (count > 500) {
+            showError("当前版本单个红包最多 500 份");
+            return;
+        }
+
+        final BigInteger totalWei;
+        try {
+            totalWei = bnbToWei(totalAmountBnb);
+        } catch (Throwable t) {
+            showError("红包总额换算 wei 失败");
+            return;
+        }
+
+        if (totalWei.signum() <= 0) {
+            showError("红包总额太小");
+            return;
+        }
+
+        final BigInteger countBig = BigInteger.valueOf(count);
+        final BigInteger[] divRem = totalWei.divideAndRemainder(countBig);
+        if (divRem[1].signum() != 0) {
+            showError("当前金额不能被份数精确平均，请调整总额或份数");
+            return;
+        }
+        final BigInteger amountPerClaimWei = divRem[0];
+        if (amountPerClaimWei.signum() <= 0) {
+            showError("单份金额必须大于 0");
+            return;
+        }
+
+        final long nowSeconds = System.currentTimeMillis() / 1000L;
+        final long expiresAtSeconds = nowSeconds + expireHours * 3600L;
+
+        final String privateKeyHex;
+        try {
+            privateKeyHex = WalletKeyStore.loadPrivateKey(getContext());
+        } catch (Throwable t) {
+            FileLog.e(t);
+            showError("读取本地钱包失败：" + nonNullMessage(t));
+            return;
+        }
+
+        if (TextUtils.isEmpty(privateKeyHex)) {
+            showError("请先创建或导入钱包");
+            return;
+        }
+
+        final String creatorWallet;
+        try {
+            creatorWallet = Credentials.create(privateKeyHex).getAddress();
+        } catch (Throwable t) {
+            FileLog.e(t);
+            showError("本地钱包私钥格式错误");
+            return;
+        }
+
+        submitting = true;
+        setLoading(true, "正在创建红包…");
+
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                CreateRedPacketPrepareResponse prepare = RedPacketRepository.getInstance().prepareCreate(
+                        dialogId,
+                        creatorWallet,
+                        totalWei,
+                        count,
+                        expiresAtSeconds
+                );
+
+                if (TextUtils.isEmpty(prepare.packetIdHex)) {
+                    throw new IllegalStateException("prepareCreate must return packetIdHex");
+                }
+                String packetIdHex = prepare.packetIdHex;
+                String contractAddress = firstNonEmpty(
+                        prepare.contractAddress,
+                        WalletConfig.RED_PACKET_CONTRACT
+                );
+
+                String txHash = new RedPacketContractService().create(
+                        privateKeyHex,
+                        contractAddress,
+                        packetIdHex,
+                        count,
+                        amountPerClaimWei,
+                        expiresAtSeconds
+                );
+
+                RedPacketRepository.getInstance().confirmCreate(
+                        prepare.packetId,
+                        creatorWallet,
+                        txHash
+                );
+
+                final String finalMessage = RedPacketMessageComposer.compose(
+                        totalAmountBnb,
+                        "BNB",
+                        count,
+                        expireHours + " 小时内有效",
+                        firstNonEmpty(
+                                prepare.claimUrl,
+                                "https://" + WalletConfig.RED_PACKET_HOST + "/p/" + prepare.packetId
+                        )
+                );
+
+                AndroidUtilities.runOnUIThread(() -> {
+                    try {
+                        SendMessagesHelper.SendMessageParams params =
+                                SendMessagesHelper.SendMessageParams.of(finalMessage, dialogId);
+                        SendMessagesHelper.getInstance(account).sendMessage(params);
+
+                        showToast("红包已创建并发送");
+                        dismiss();
+                    } catch (Throwable sendError) {
+                        FileLog.e(sendError);
+                        showError("链上红包已创建，但发送聊天消息失败：" + nonNullMessage(sendError));
+                    } finally {
+                        submitting = false;
+                        setLoading(false, null);
+                    }
+                });
+            } catch (Throwable t) {
+                FileLog.e(t);
+                AndroidUtilities.runOnUIThread(() -> {
+                    submitting = false;
+                    setLoading(false, null);
+                    showError("创建失败：" + nonNullMessage(t));
+                });
+            }
+        });
+    }
+
+    private BigInteger bnbToWei(BigDecimal bnb) {
+        return bnb.multiply(new BigDecimal("1000000000000000000")).toBigIntegerExact();
+    }
+
+    private void setLoading(boolean show, String message) {
+        loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
+        loadingTextView.setText(TextUtils.isEmpty(message) ? "处理中…" : message);
+
+        setViewEnabled(createButton, !show);
+        setViewEnabled(cancelButton, !show);
+        setViewEnabled(totalAmountEdit, !show);
+        setViewEnabled(countEdit, !show);
+        setViewEnabled(expireHoursEdit, !show);
+    }
+
+    private void setViewEnabled(View view, boolean enabled) {
+        if (view == null) {
+            return;
+        }
+        view.setEnabled(enabled);
+        view.setAlpha(enabled ? 1f : 0.6f);
+    }
+
+    private TextView createText(Context context, int textSizeSp, int colorKey, Typeface typeface) {
+        TextView tv = new TextView(context);
+        tv.setTextSize(textSizeSp);
+        tv.setTextColor(getThemedColor(colorKey));
+        tv.setTypeface(typeface);
+        return tv;
+    }
+
+    private TextView createActionButton(Context context, String text, int bgColor, int textColor) {
+        TextView tv = new TextView(context);
+        tv.setText(text);
+        tv.setGravity(Gravity.CENTER);
+        tv.setTextSize(16);
+        tv.setTypeface(Typeface.DEFAULT_BOLD);
+        tv.setTextColor(textColor);
+        tv.setBackground(createRoundedButtonBackground(bgColor));
+        tv.setPadding(
+                AndroidUtilities.dp(16),
+                AndroidUtilities.dp(12),
+                AndroidUtilities.dp(16),
+                AndroidUtilities.dp(12)
+        );
+        return tv;
+    }
+
+    private RippleDrawable createRoundedButtonBackground(int bgColor) {
+        GradientDrawable content = new GradientDrawable();
+        content.setColor(bgColor);
+        content.setCornerRadius(AndroidUtilities.dp(12));
+        return new RippleDrawable(
+                ColorStateList.valueOf(0x22000000),
+                content,
+                null
+        );
+    }
+
+    private void showError(String msg) {
+        errorView.setVisibility(View.VISIBLE);
+        errorView.setText(msg);
+    }
+
+    private void showToast(String msg) {
+        Context context = getContext();
+        if (context == null || TextUtils.isEmpty(msg)) {
+            return;
+        }
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show();
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String nonNullMessage(Throwable t) {
+        if (t == null) {
+            return "未知错误";
+        }
+        if (!TextUtils.isEmpty(t.getMessage())) {
+            return t.getMessage();
+        }
+        return t.getClass().getSimpleName();
+    }
+
+    private String firstNonEmpty(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String v : values) {
+            if (!TextUtils.isEmpty(v)) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    private int adjustAlpha(int color, float factor) {
+        int alpha = Math.round(Color.alpha(color) * factor);
+        return (color & 0x00ffffff) | (alpha << 24);
+    }
+}

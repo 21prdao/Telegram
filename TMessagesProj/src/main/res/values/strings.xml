@@ -10654,4 +10654,8 @@
     <string name="AIEditorEmojify">emojify</string>
     <string name="TranslateCopy">Copy Translation</string>
     <string name="TranslateEntireChat">Translate Entire Chat</string>
+
+    <string name="CreateRedPacket">发红包</string>
+    <string name="OpenRedPacket">打开红包</string>
+    <string name="WalletUnsupportedApi">当前系统版本暂不支持钱包功能</string>
 </resources>

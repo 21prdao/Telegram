@@ -216,6 +216,9 @@ import java.util.Locale;
 import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
 
+import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.navigation.WalletNavigator;
+
 public class ChatActivityEnterView extends FrameLayout implements
     NotificationCenter.NotificationCenterDelegate,
     SizeNotifierFrameLayout.SizeNotifierFrameLayoutDelegate,
@@ -251,6 +254,7 @@ public class ChatActivityEnterView extends FrameLayout implements
 
     public boolean voiceOnce;
     public boolean onceVisible;
+
 
     public void drawRecordedPannel(Canvas canvas) {
         if (getAlpha() == 0 || recordedAudioPanel == null || recordedAudioPanel.getParent() == null || recordedAudioPanel.getVisibility() != View.VISIBLE) {
@@ -636,6 +640,8 @@ public class ChatActivityEnterView extends FrameLayout implements
     private ImageView scheduledButton;
     @Nullable
     private ImageView giftButton;
+    @Nullable
+    private ImageView redPacketButton;
     private boolean scheduleButtonHidden;
     private AnimatorSet scheduledButtonAnimation;
     @Nullable
@@ -2763,6 +2769,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                 delegate.didPressAttachButton();
             });
             attachButton.setContentDescription(getString(R.string.AccDescrAttachButton));
+            createRedPacketButton();
             updateFieldRight(1);
         }
 
@@ -3554,10 +3561,11 @@ public class ChatActivityEnterView extends FrameLayout implements
             public void setTranslationX(float translationX) {
                 innerTranslationX = translationX;
                 super.setTranslationX(
-                    dp(-DEFAULT_HEIGHT) +
-                    innerTranslationX + attachLayoutPaddingTranslationX + attachLayoutTranslationX +
-                    dp(giftButton != null && giftButton.getVisibility() == View.VISIBLE ? -DEFAULT_HEIGHT : 0) * (giftButton == null ? 0 : giftButton.getAlpha()) +
-                    dp(botButton != null && botButton.getVisibility() == VISIBLE ? -DEFAULT_HEIGHT : 0) * (botButton == null ? 0 : botButton.getAlpha())
+                        dp(-DEFAULT_HEIGHT) +
+                                innerTranslationX + attachLayoutPaddingTranslationX + attachLayoutTranslationX +
+                                dp(giftButton != null && giftButton.getVisibility() == View.VISIBLE ? -DEFAULT_HEIGHT : 0) * (giftButton == null ? 0 : giftButton.getAlpha()) +
+                                dp(redPacketButton != null && redPacketButton.getVisibility() == View.VISIBLE ? -DEFAULT_HEIGHT : 0) * (redPacketButton == null ? 0 : redPacketButton.getAlpha()) +
+                                dp(botButton != null && botButton.getVisibility() == VISIBLE ? -DEFAULT_HEIGHT : 0) * (botButton == null ? 0 : botButton.getAlpha())
                 );
             }
         };
@@ -3644,6 +3652,51 @@ public class ChatActivityEnterView extends FrameLayout implements
                 parentFragment.getConnectionsManager().cancelRequest(reqId, true);
             });
         });
+    }
+
+    private void createRedPacketButton() {
+        if (redPacketButton != null || attachLayout == null) {
+            return;
+        }
+        // 先不要做支持判断，先强制看按钮能不能出来
+        // if (!WalletConfig.isWalletSupportedOnThisDevice()) {
+        //     return;
+        // }
+
+        redPacketButton = new ImageView(getContext()) {
+            @Override
+            public void setAlpha(float alpha) {
+                super.setAlpha(alpha);
+                if (scheduledButton != null) {
+                    scheduledButton.setTranslationX(scheduledButton.getTranslationX());
+                }
+            }
+        };
+        redPacketButton.setScaleType(ImageView.ScaleType.CENTER);
+        redPacketButton.setColorFilter(new PorterDuffColorFilter(
+                getThemedColor(Theme.key_glass_defaultIcon),
+                PorterDuff.Mode.MULTIPLY
+        ));
+        redPacketButton.setImageResource(R.drawable.msg_input_redpacket);
+        redPacketButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));
+        redPacketButton.setContentDescription(getString(R.string.CreateRedPacket));
+
+        // 放在 attachLayout 左侧，和 bot/gift/suggest 一样的插入方式
+        attachLayout.addView(redPacketButton, 0, LayoutHelper.createLinear(DEFAULT_HEIGHT, DEFAULT_HEIGHT));
+
+        redPacketButton.setOnClickListener(v -> {
+            if ((adjustPanLayoutHelper != null && adjustPanLayoutHelper.animationInProgress()) || attachLayoutPaddingAlpha == 0f) {
+                return;
+            }
+            if (parentFragment == null) {
+                return;
+            }
+            WalletNavigator.openCreateRedPacket(parentFragment, currentAccount, dialog_id);
+        });
+
+        // 临时调试：强刷布局
+        attachLayout.requestLayout();
+        attachLayout.invalidate();
     }
 
     public void createSuggestionButton() {
@@ -8454,24 +8507,56 @@ public class ChatActivityEnterView extends FrameLayout implements
         }
     }
 
+    private int getExtraRightControlsCountForMessageField() {
+        int count = 0;
+
+        if (notifyButton != null && notifyButton.getVisibility() == VISIBLE) {
+            count++;
+        }
+        if (botButton != null && botButton.getVisibility() == VISIBLE) {
+            count++;
+        }
+        if (redPacketButton != null && redPacketButton.getVisibility() == VISIBLE) {
+            count++;
+        }
+        if (scheduledButton != null && scheduledButton.getTag() != null) {
+            count++;
+        }
+
+        return count;
+    }
+
     private int lastAttachVisible;
+
     private void updateFieldRight(int attachVisible) {
         lastAttachVisible = attachVisible;
         if (messageEditText == null || (editingMessageObject != null && !editingMessageObject.needResendWhenEdit())) {
             return;
         }
+
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) messageEditText.getLayoutParams();
         int oldRightMargin = layoutParams.rightMargin;
+
         if (isStories && isLiveComment) {
-            layoutParams.rightMargin = dp(suggestButtonVisible ? 50 : 2) + Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT));
-        } else if (attachVisible == 1 || attachVisible == 2/* && layoutParams.rightMargin != dp(2)*/) {
-            if (botButton != null && botButton.getVisibility() == VISIBLE && scheduledButton != null && scheduledButton.getVisibility() == VISIBLE && attachButton != null && attachButton.getVisibility() == VISIBLE) {
-                layoutParams.rightMargin = dp(146);
-            } else if (botButton != null && botButton.getVisibility() == VISIBLE || notifyButton != null && notifyButton.getVisibility() == VISIBLE || scheduledButton != null && scheduledButton.getTag() != null) {
-                layoutParams.rightMargin = dp(98);
-            } else {
-                layoutParams.rightMargin = dp(50);
+            layoutParams.rightMargin = dp(suggestButtonVisible ? 50 : 2)
+                    + Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT));
+        } else if (attachVisible == 1 || attachVisible == 2) {
+            int count = 1; // attachButton 自己
+
+            if (botButton != null && botButton.getVisibility() == VISIBLE) {
+                count++;
             }
+            if (notifyButton != null && notifyButton.getVisibility() == VISIBLE) {
+                count++;
+            }
+            if (scheduledButton != null && scheduledButton.getTag() != null) {
+                count++;
+            }
+            if (redPacketButton != null && redPacketButton.getVisibility() == VISIBLE) {
+                count++;
+            }
+
+            layoutParams.rightMargin = dp(2 + 48 * count);
         } else {
             if (scheduledButton != null && scheduledButton.getTag() != null) {
                 layoutParams.rightMargin = dp(50);
@@ -8479,16 +8564,28 @@ public class ChatActivityEnterView extends FrameLayout implements
                 layoutParams.rightMargin = dp(2);
             }
         }
-        layoutParams.rightMargin = Math.max(layoutParams.rightMargin, Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT)));
+
+        layoutParams.rightMargin = Math.max(
+                layoutParams.rightMargin,
+                Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT))
+        );
+
         if (doneButton != null && doneButton.getVisibility() == VISIBLE) {
-            layoutParams.rightMargin = Math.max(layoutParams.rightMargin, Math.max(0, doneButton.width() - dp(DEFAULT_HEIGHT)));
+            layoutParams.rightMargin = Math.max(
+                    layoutParams.rightMargin,
+                    Math.max(0, doneButton.width() - dp(DEFAULT_HEIGHT))
+            );
         }
+
         if (oldRightMargin != layoutParams.rightMargin) {
             messageEditText.setLayoutParams(layoutParams);
         }
+
         if (recordedAudioPanel != null) {
             FrameLayout.LayoutParams layoutParams2 = (FrameLayout.LayoutParams) recordedAudioPanel.getLayoutParams();
-            layoutParams2.rightMargin = editingMessageObject == null ? Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT)) : 0;
+            layoutParams2.rightMargin = editingMessageObject == null
+                    ? Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT))
+                    : 0;
             recordedAudioPanel.setLayoutParams(layoutParams2);
         }
     }
@@ -14788,4 +14885,6 @@ public class ChatActivityEnterView extends FrameLayout implements
         updateFieldRight(lastAttachVisible);
         checkSendButton(false);
     }
+
+
 }

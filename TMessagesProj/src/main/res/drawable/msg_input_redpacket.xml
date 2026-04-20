@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 红包主体 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,8
+                          C5,6.895 5.895,6 7,6
+                          H17
+                          C18.105,6 19,6.895 19,8
+                          V18
+                          C19,19.105 18.105,20 17,20
+                          H7
+                          C5.895,20 5,19.105 5,18
+                          Z" />
+
+    <!-- 中间绑带 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,11 H19 V13 H5 Z" />
+
+    <!-- 上部缺口/翻盖感 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,6
+                          C8,4.895 8.895,4 10,4
+                          H14
+                          C15.105,4 16,4.895 16,6
+                          H14.5
+                          C14.5,5.724 14.276,5.5 14,5.5
+                          H10
+                          C9.724,5.5 9.5,5.724 9.5,6
+                          Z" />
+
+    <!-- 中间圆钱位 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,16.2
+                          A2.2,2.2 0 1,1 12,11.8
+                          A2.2,2.2 0 1,1 12,16.2 Z" />
+</vector>

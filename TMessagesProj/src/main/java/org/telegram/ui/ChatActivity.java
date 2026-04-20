@@ -341,6 +341,9 @@ import me.vkryl.android.animator.FactorAnimator;
 import me.vkryl.core.BitwiseUtils;
 import me.vkryl.core.reference.ReferenceList;
 
+import org.telegram.wallet.navigation.WalletNavigator;
+import org.telegram.wallet.redpacket.RedPacketLinkParser;
+
 @SuppressWarnings("unchecked")
 public class ChatActivity extends BaseFragment implements
         NotificationCenter.NotificationCenterDelegate,
@@ -39527,6 +39530,13 @@ public class ChatActivity extends BaseFragment implements
             if (url == null) {
                 return;
             }
+
+            RedPacketLinkParser.Result redPacket = RedPacketLinkParser.parse(url);
+            if (redPacket != null) {
+                WalletNavigator.openClaimRedPacket(ChatActivity.this, redPacket.packetId);
+                return;
+            }
+
             Uri uri = Uri.parse(url);
             if (uri == null) {
                 return;
@@ -40886,12 +40896,32 @@ public class ChatActivity extends BaseFragment implements
         if (currentChat == null || urlFinal == null || chatMode != 0) {
             return false;
         }
+
+        RedPacketLinkParser.Result redPacket = RedPacketLinkParser.parse(urlFinal);
+        if (redPacket != null) {
+            WalletNavigator.openClaimRedPacket(ChatActivity.this, redPacket.packetId);
+            return true;
+        }
+
         Runnable setupProgressLoading = cell != null && (span != null || fromMessageProgressType != PROGRESS_LINK) ? () -> {
             progressDialogAtMessageId = fromMessageId;
             progressDialogAtMessageType = fromMessageProgressType;
             progressDialogLinkSpan = span;
             cell.invalidate();
         } : null;
+
+        RedPacketLinkParser.Result result = RedPacketLinkParser.parse(urlFinal);
+        if (result != null) {
+            org.telegram.wallet.navigation.WalletNavigator.openClaimRedPacket(
+                    ChatActivity.this,
+                    result.packetId
+            );
+            return true;
+        }
+
+        if (currentChat == null || urlFinal == null || chatMode != 0) {
+            return false;
+        }
         if (urlFinal.startsWith("tg:privatepost") || urlFinal.startsWith("tg://privatepost")) {
             String urlTmp = urlFinal.replace("tg:privatepost", "tg://telegram.org").replace("tg://privatepost", "tg://telegram.org");
             Uri data = Uri.parse(urlTmp);

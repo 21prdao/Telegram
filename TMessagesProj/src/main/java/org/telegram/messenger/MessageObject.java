@@ -388,6 +388,24 @@ public class MessageObject {
     private byte[] randomWaveform;
     public boolean drawServiceWithDefaultTypeface;
 
+    private transient org.telegram.wallet.redpacket.RedPacketLinkParser.Result walletRedPacketCache;
+    public boolean isWalletRedPacket() {
+        if (walletRedPacketCache != null) {
+            return true;
+        }
+        walletRedPacketCache =
+                org.telegram.wallet.redpacket.RedPacketMessageCodec.tryParse(this);
+        return walletRedPacketCache != null;
+    }
+
+    public org.telegram.wallet.redpacket.RedPacketLinkParser.Result getWalletRedPacket() {
+        if (walletRedPacketCache == null) {
+            walletRedPacketCache =
+                    org.telegram.wallet.redpacket.RedPacketMessageCodec.tryParse(this);
+        }
+        return walletRedPacketCache;
+    }
+
     public static boolean hasUnreadReactions(TLRPC.Message message) {
         if (message == null) {
             return false;

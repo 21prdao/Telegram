@@ -1855,6 +1855,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                         return true;
                     }
 
+                    if (org.telegram.wallet.navigation.WalletIntentDispatcher.tryHandle(this, data)) {
+                        return true;
+                    }
+
                     if (data != null) {
                         String username = null;
                         String referrer = null;

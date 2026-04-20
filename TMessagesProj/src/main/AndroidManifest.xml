@@ -394,7 +394,38 @@
 				  android:taskAffinity="${applicationId}.voip_feedback"
                   android:excludeFromRecents="true"
                 android:theme="@style/Theme.TMessages.TransparentWithAlerts"/>
+        <activity
+            android:name="com.acme.chatwallet.auth.TelegramOidcCallbackActivity"
+            android:exported="true"
+            android:theme="@style/Theme.TMessages.Transparent">
 
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- OIDC 回调地址，必须和 BotFather Allowed URLs 里登记的一致 -->
+                <data
+                    android:scheme="https"
+                    android:host="app.example.com"
+                    android:path="/auth/telegram/callback" />
+            </intent-filter>
+        </activity>
+<!--        <activity-->
+<!--            android:name="com.acme.chatwallet.links.AppLinkRouterActivity"-->
+<!--            android:exported="true"-->
+<!--            android:theme="@style/Theme.TMessages.Transparent">-->
+
+<!--            <intent-filter android:autoVerify="true">-->
+<!--                <action android:name="android.intent.action.VIEW" />-->
+<!--                <category android:name="android.intent.category.DEFAULT" />-->
+<!--                <category android:name="android.intent.category.BROWSABLE" />-->
+<!--                <data-->
+<!--                    android:scheme="https"-->
+<!--                    android:host="app.example.com"-->
+<!--                    android:pathPrefix="/p/" />-->
+<!--            </intent-filter>-->
+<!--        </activity>-->
         <receiver
             android:name=".AutoMessageHeardReceiver"
             android:exported="false">
