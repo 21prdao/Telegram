@@ -118,6 +118,7 @@ import org.telegram.ui.Components.TextHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalRecyclerView;
+import org.telegram.wallet.navigation.WalletNavigator;
 import org.telegram.ui.Components.blur3.DownscaleScrollableNoiseSuppressor;
 import org.telegram.ui.Components.blur3.ViewGroupPartRenderer;
 import org.telegram.ui.Components.blur3.capture.IBlur3Capture;
@@ -718,7 +719,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
         }
 
-//        items.add(SettingCell.Factory.of(14, 0, "Wallet"));
+        items.add(SettingCell.Factory.of(14, 0xFF1BA4ED, 0xFF1488E1, R.drawable.settings_wallet, "Web3 Wallet", "BNB Chain 钱包管理"));
         if (!getMessagesController().premiumFeaturesBlocked()) {
             items.add(SettingCell.Factory.of(15, 0xFFF45255, 0xFFDF3955, R.drawable.settings_business, getString(R.string.TelegramBusiness)));
         }
@@ -821,6 +822,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             case 13:
                 presentFragment(new TONIntroActivity());
+                break;
+            case 14:
+                WalletNavigator.openWalletManager(getParentActivity());
                 break;
             case 15:
                 presentFragment(new PremiumPreviewFragment(PremiumPreviewFragment.FEATURES_BUSINESS, "settings"));

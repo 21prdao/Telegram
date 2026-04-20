@@ -217,6 +217,7 @@ import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
 
 import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.navigation.WalletNavigator;
 
 public class ChatActivityEnterView extends FrameLayout implements
@@ -3689,6 +3690,15 @@ public class ChatActivityEnterView extends FrameLayout implements
                 return;
             }
             if (parentFragment == null) {
+                return;
+            }
+            if (!WalletStorage.hasAnyWallet(getContext())) {
+                org.telegram.ui.ActionBar.AlertDialog.Builder builder = new org.telegram.ui.ActionBar.AlertDialog.Builder(getContext());
+                builder.setTitle("需要先创建钱包");
+                builder.setMessage("发红包前请先创建或导入 Web3 钱包。\n\n点击“创建钱包”进入钱包管理。\n创建完成后即可继续发红包。");
+                builder.setPositiveButton("创建钱包", (dialog, which) -> WalletNavigator.openWalletManager(getContext()));
+                builder.setNegativeButton("取消", null);
+                parentFragment.showDialog(builder.create());
                 return;
             }
             WalletNavigator.openCreateRedPacket(parentFragment, currentAccount, dialog_id);
