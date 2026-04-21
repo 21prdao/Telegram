@@ -180,7 +180,7 @@ public final class WalletStorage {
     }
 
     private static String generatePrivateKeyHex() {
-        BigInteger curveN = Sign.CURVE.getN();
+        BigInteger curveN = Sign.CURVE_PARAMS.getN();
         SecureRandom random = new SecureRandom();
         BigInteger candidate;
         do {

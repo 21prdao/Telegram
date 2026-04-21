@@ -396,7 +396,7 @@ public class RedPacketRepository {
     }
 
     private static String defaultBaseUrl() {
-        return "https://" + WalletConfig.RED_PACKET_HOST + "/api/v1";
+        return "http://" + WalletConfig.RED_PACKET_HOST + "/api/v1";
     }
 
     private static String normalizeBaseUrl(String raw) {
