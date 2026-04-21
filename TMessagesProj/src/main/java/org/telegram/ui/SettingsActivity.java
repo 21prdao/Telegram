@@ -719,7 +719,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
         }
 
-        items.add(SettingCell.Factory.of(14, 0xFF1BA4ED, 0xFF1488E1, R.drawable.settings_wallet, "Web3 Wallet", "BNB Chain 钱包管理"));
+        items.add(SettingCell.Factory.of(14, 0xFF1BA4ED, 0xFF1488E1, R.drawable.settings_wallet, getString(R.string.Web3Wallet), getString(R.string.Web3WalletInfo)));
         if (!getMessagesController().premiumFeaturesBlocked()) {
             items.add(SettingCell.Factory.of(15, 0xFFF45255, 0xFFDF3955, R.drawable.settings_business, getString(R.string.TelegramBusiness)));
         }

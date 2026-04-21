@@ -10631,6 +10631,14 @@
     <string name="CreateManagedBotLimitTextTime">You can create another bot in %s.</string>
     <string name="CreateManagedBotLimitTextPremium">Subscribe to **Premium** to create up to %1$d bots, or delete one of your %2$d bots via @BotFather</string>
     <string name="CreateManagedBotLimitText">You can create up to %d bots, or delete your current ones via @BotFather</string>
+    <string name="Web3Wallet">Web3 Wallet</string>
+    <string name="Web3WalletInfo">BNB Chain 钱包管理</string>
+    <string name="WalletRequiredTitle">需要先创建钱包</string>
+    <string name="WalletRequiredMessage">发红包前请先创建或导入 Web3 钱包。
+
+点击“创建钱包”进入钱包管理。
+创建完成后即可继续发红包。</string>
+    <string name="WalletCreateNow">创建钱包</string>
     <string name="UnverifiedApp">Unverified App</string>
 
     <string name="AIEditor">AI Editor</string>

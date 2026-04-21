@@ -12,8 +12,12 @@ import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.model.WalletAccount;
 import org.telegram.wallet.security.WalletKeyStore;
 import org.web3j.crypto.Credentials;
+import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.Sign;
 
 import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,13 +54,12 @@ public final class WalletStorage {
     }
 
     public static void createWallet(Context context, @Nullable String walletName) throws GeneralSecurityException {
-        Credentials credentials = Credentials.create(org.web3j.crypto.Keys.createEcKeyPair());
-        String privateKeyHex = credentials.getEcKeyPair().getPrivateKey().toString(16);
+        String privateKeyHex = generatePrivateKeyHex();
         addWallet(context, privateKeyHex, walletName);
     }
 
     public static void importWallet(Context context, String privateKeyHex, @Nullable String walletName) throws GeneralSecurityException {
-        addWallet(context, privateKeyHex, walletName);
+        addWallet(context, normalizePrivateKey(privateKeyHex), walletName);
     }
 
     private static void addWallet(Context context, String privateKeyHex, @Nullable String walletName) throws GeneralSecurityException {
@@ -174,6 +177,36 @@ public final class WalletStorage {
             all.add(token);
         }
         persistTokens(context, all);
+    }
+
+    private static String generatePrivateKeyHex() {
+        BigInteger curveN = Sign.CURVE.getN();
+        SecureRandom random = new SecureRandom();
+        BigInteger candidate;
+        do {
+            candidate = new BigInteger(256, random);
+        } while (candidate.signum() <= 0 || candidate.compareTo(curveN) >= 0);
+        ECKeyPair ecKeyPair = ECKeyPair.create(candidate);
+        return normalizePrivateKey(ecKeyPair.getPrivateKey().toString(16));
+    }
+
+    private static String normalizePrivateKey(String privateKeyHex) {
+        if (privateKeyHex == null) {
+            return "";
+        }
+        String value = privateKeyHex.trim();
+        if (value.startsWith("0x") || value.startsWith("0X")) {
+            value = value.substring(2);
+        }
+        if (value.length() < 64) {
+            StringBuilder sb = new StringBuilder(64);
+            for (int i = value.length(); i < 64; i++) {
+                sb.append('0');
+            }
+            sb.append(value);
+            value = sb.toString();
+        }
+        return value;
     }
 
     private static void persistWallets(Context context, List<WalletAccount> wallets) {
