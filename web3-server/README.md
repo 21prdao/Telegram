@@ -86,3 +86,12 @@ curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/confirm \
 - 将 `BuildConfig.WEB3_RED_PACKET_HOST` 指向本地 API（如 `10.0.2.2:8787` / 局域网 IP）。
 - 将 `BuildConfig.RED_PACKET_CONTRACT` 配置为部署后的合约地址。
 - 生产环境请把内存存储替换成 DB，并用真实签名替换 mock 的 `signatureHex`。
+
+## 5) BNB Chain 文档列出的 BSC Testnet 公共 RPC
+
+  https://data-seed-prebsc-1-s1.bnbchain.org:8545
+  https://data-seed-prebsc-2-s1.bnbchain.org:8545
+  https://data-seed-prebsc-1-s2.bnbchain.org:8545
+  https://data-seed-prebsc-2-s2.bnbchain.org:8545
+  https://data-seed-prebsc-1-s3.bnbchain.org:8545
+  https://data-seed-prebsc-2-s3.bnbchain.org:8545
