@@ -2,6 +2,9 @@
 pragma solidity ^0.8.20;
 
 contract TelegramRedPacket {
+    uint32 public constant MAX_PACKET_COUNT = 500;
+    uint64 public constant MAX_EXPIRES_IN = 30 days;
+
     struct Packet {
         address creator;
         uint256 total;
@@ -20,9 +23,12 @@ contract TelegramRedPacket {
     event Refunded(bytes32 indexed packetId, address indexed creator, uint256 amount);
 
     function createPacket(bytes32 packetId, uint32 count, uint64 expiresAt) external payable {
-        require(count > 0, "count=0");
+        require(packetId != bytes32(0), "packetId=0");
+        require(count > 0 && count <= MAX_PACKET_COUNT, "invalid count");
         require(msg.value > 0, "value=0");
         require(expiresAt > block.timestamp, "expired");
+        require(expiresAt <= block.timestamp + MAX_EXPIRES_IN, "expires too far");
+
         Packet storage p = packets[packetId];
         require(p.creator == address(0), "exists");
         require(msg.value % count == 0, "not divisible");
@@ -46,7 +52,9 @@ contract TelegramRedPacket {
 
         p.claimed[msg.sender] = true;
         p.claimedCount += 1;
-        payable(msg.sender).transfer(p.amountPerClaim);
+
+        (bool sent, ) = payable(msg.sender).call{value: p.amountPerClaim}("");
+        require(sent, "claim transfer failed");
 
         emit Claimed(packetId, msg.sender, p.amountPerClaim);
     }
@@ -60,9 +68,39 @@ contract TelegramRedPacket {
         p.refunded = true;
         uint256 remaining = p.amountPerClaim * (p.totalCount - p.claimedCount);
         if (remaining > 0) {
-            payable(msg.sender).transfer(remaining);
+            (bool sent, ) = payable(msg.sender).call{value: remaining}("");
+            require(sent, "refund transfer failed");
         }
 
         emit Refunded(packetId, msg.sender, remaining);
+    }
+
+    function getPacket(bytes32 packetId)
+        external
+        view
+        returns (
+            address creator,
+            uint256 total,
+            uint256 amountPerClaim,
+            uint32 totalCount,
+            uint32 claimedCount,
+            uint64 expiresAt,
+            bool refunded,
+            bool ended
+        )
+    {
+        Packet storage p = packets[packetId];
+        creator = p.creator;
+        total = p.total;
+        amountPerClaim = p.amountPerClaim;
+        totalCount = p.totalCount;
+        claimedCount = p.claimedCount;
+        expiresAt = p.expiresAt;
+        refunded = p.refunded;
+        ended = p.creator == address(0) || p.refunded || p.claimedCount == p.totalCount || block.timestamp > p.expiresAt;
+    }
+
+    function hasClaimed(bytes32 packetId, address claimer) external view returns (bool) {
+        return packets[packetId].claimed[claimer];
     }
 }

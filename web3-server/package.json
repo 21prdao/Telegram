@@ -1,0 +1,14 @@
+{
+  "name": "telegram-web3-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local backend for Telegram Web3 red packet demo",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
