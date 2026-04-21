@@ -10,8 +10,8 @@ const express = require('express');
 const app = express();
 app.use(express.json({ limit: '256kb' }));
 
-const CHAIN_ID = Number(process.env.CHAIN_ID || 56);
-const CONTRACT_ADDRESS = process.env.RED_PACKET_CONTRACT || '0xYourContractAddress';
+const CHAIN_ID = Number(process.env.CHAIN_ID || 97);
+const CONTRACT_ADDRESS = process.env.RED_PACKET_CONTRACT || '0xd4A8912d72aECEa4748B92b608D0B89F05681f1a ';
 const HOST = process.env.PUBLIC_HOST || 'http://127.0.0.1:8787';
 const MAX_PACKET_COUNT = 500;
 

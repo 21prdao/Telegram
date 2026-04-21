@@ -139,10 +139,10 @@ android {
             buildConfigField "int", "VERSION_NUM", "0"
 
             buildConfigField "boolean", "WEB3_WALLET_ENABLED", "true"
-            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"rp.yourdomain.com\""
-            buildConfigField "String", "BSC_RPC_URL", "\"https://bsc-dataseed-public.bnbchain.org\""
-            buildConfigField "long", "BSC_CHAIN_ID", "56L"
-            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xYourContractAddress\""
+            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
+            buildConfigField "String", "BSC_RPC_URL", "\"https://data-seed-prebsc-1-s1.binance.org:8545\""
+            buildConfigField "long", "BSC_CHAIN_ID", "97L"
+            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xd4A8912d72aECEa4748B92b608D0B89F05681f1a\""
         }
 
         HA_private {
@@ -209,10 +209,10 @@ android {
             buildConfigField "int", "VERSION_NUM", "6"
 
             buildConfigField "boolean", "WEB3_WALLET_ENABLED", "true"
-            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"rp.yourdomain.com\""
-            buildConfigField "String", "BSC_RPC_URL", "\"https://bsc-dataseed-public.bnbchain.org\""
-            buildConfigField "long", "BSC_CHAIN_ID", "56L"
-            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xYourContractAddress\""
+            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
+            buildConfigField "String", "BSC_RPC_URL", "\"https://data-seed-prebsc-1-s1.binance.org:8545\""
+            buildConfigField "long", "BSC_CHAIN_ID", "97L"
+            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xd4A8912d72aECEa4748B92b608D0B89F05681f1a\""
         }
 
         release {
@@ -232,10 +232,10 @@ android {
             buildConfigField "int", "VERSION_NUM", "7"
 
             buildConfigField "boolean", "WEB3_WALLET_ENABLED", "true"
-            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"rp.yourdomain.com\""
-            buildConfigField "String", "BSC_RPC_URL", "\"https://bsc-dataseed-public.bnbchain.org\""
-            buildConfigField "long", "BSC_CHAIN_ID", "56L"
-            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xYourContractAddress\""
+            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
+            buildConfigField "String", "BSC_RPC_URL", "\"https://data-seed-prebsc-1-s1.binance.org:8545\""
+            buildConfigField "long", "BSC_CHAIN_ID", "97L"
+            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xd4A8912d72aECEa4748B92b608D0B89F05681f1a\""
         }
     }
 
