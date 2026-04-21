@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json({ limit: '256kb' }));
 
 const CHAIN_ID = Number(process.env.CHAIN_ID || 97);
-const CONTRACT_ADDRESS = process.env.RED_PACKET_CONTRACT || '0xd4A8912d72aECEa4748B92b608D0B89F05681f1a ';
+const CONTRACT_ADDRESS = (process.env.RED_PACKET_CONTRACT || '0xd4A8912d72aECEa4748B92b608D0B89F05681f1a').trim();
 const HOST = process.env.PUBLIC_HOST || 'http://127.0.0.1:8787';
 const MAX_PACKET_COUNT = 500;
 
@@ -67,7 +67,7 @@ function badRequest(res, message) {
 }
 
 app.get('/healthz', (_, res) => {
-  res.json({ ok: true, service: 'web3-red-packet', chainId: CHAIN_ID, ts: nowSeconds() });
+  res.json({ ok: true, service: 'web3-red-packet', chainId: CHAIN_ID, contractAddress: CONTRACT_ADDRESS, ts: nowSeconds() });
 });
 
 app.post('/api/v1/red-packets/create', (req, res) => {
@@ -160,7 +160,8 @@ app.post('/api/v1/red-packets/:packetId/confirm', (req, res) => {
   const packet = packets.get(req.params.packetId);
   if (!packet) return res.status(404).json({ ok: false, message: 'not found' });
 
-  const claimerAddress = normalizeAddress(req.body?.claimerAddress);
+  const walletAlias = req.body?.claimerAddress || req.body?.creatorWallet || req.body?.wallet;
+  const claimerAddress = normalizeAddress(walletAlias);
   const txHash = String(req.body?.txHash || '').trim();
   if (!claimerAddress) return badRequest(res, 'claimerAddress invalid');
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return badRequest(res, 'txHash invalid');
