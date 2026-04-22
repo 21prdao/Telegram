@@ -223,8 +223,6 @@ app.post('/api/v1/red-packets/prepare-create', (req, res) => {
   const countNum = parsePositiveInt(count);
   const totalWei = parsePositiveBigInt(totalAmountWei);
   const expiresAtNum = parsePositiveInt(expiresAt);
-  const tokenAddr = normalizeAddress(tokenAddress);
-  const tokenDecimalsNum = Number.isInteger(Number(tokenDecimals)) && Number(tokenDecimals) >= 0 ? Number(tokenDecimals) : null;
   const tokenSymbolClean = typeof tokenSymbol === 'string' ? tokenSymbol.trim() : '';
   const isNativeBnb = tokenSymbolClean.toUpperCase() === 'BNB';
   const tokenAddr = normalizeAddress(tokenAddress);
