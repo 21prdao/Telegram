@@ -62,6 +62,14 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         copyBtn.setOnClickListener(v -> copyAddress());
         assetCard.addView(copyBtn, topWrap(10));
 
+        LinearLayout walletOps = new LinearLayout(getActivity());
+        walletOps.setOrientation(LinearLayout.HORIZONTAL);
+        walletOps.setPadding(0, dp(8), 0, 0);
+        walletOps.addView(createQuickButton("创建", v -> coordinator().showCreateWalletDialog(this::refresh)), weightLp());
+        walletOps.addView(createQuickButton("导入", v -> coordinator().showImportWalletDialog(this::refresh)), weightLp());
+        walletOps.addView(createQuickButton("切换", v -> coordinator().showSwitchWalletDialog(this::refresh)), weightLp());
+        assetCard.addView(walletOps, matchWrap());
+
         chainNameView = createBodyText(13, false, String.valueOf(Theme.key_windowBackgroundWhiteGrayText2));
         chainNameView.setPadding(0, dp(10), 0, 0);
         assetCard.addView(chainNameView, matchWrap());
@@ -79,7 +87,8 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         actions.setPadding(0, dp(10), 0, 0);
         quickCard.addView(actions, matchWrap());
 
-        actions.addView(createQuickButton("发送", v -> ((WalletWorkflowCoordinator.Host) getActivity()).toast("请前往“转账”页操作")), weightLp());        actions.addView(createQuickButton("收款", v -> showReceiveAddress()), weightLp());
+        actions.addView(createQuickButton("发送", v -> ((WalletWorkflowCoordinator.Host) getActivity()).toast("请前往“转账”页操作")), weightLp());
+        actions.addView(createQuickButton("收款", v -> showReceiveAddress()), weightLp());
         actions.addView(createQuickButton("红包", v -> ((WalletManagerActivity) getActivity()).toast("请在聊天中发起红包")), weightLp());
         actions.addView(createQuickButton("添加代币", v -> coordinator().showAddTokenDialog(this::refresh)), weightLp());
 
