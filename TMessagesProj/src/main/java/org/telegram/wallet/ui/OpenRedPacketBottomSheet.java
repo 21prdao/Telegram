@@ -18,6 +18,8 @@ import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
@@ -30,6 +32,7 @@ import org.telegram.wallet.model.RedPacketInfo;
 import org.telegram.wallet.redpacket.RedPacketRepository;
 import org.telegram.wallet.security.WalletKeyStore;
 import org.web3j.crypto.Credentials;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -270,8 +273,8 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
 
         Utilities.globalQueue.postRunnable(() -> {
             try {
-                RedPacketInfo info = RedPacketRepository.getInstance().getPacket(packetId);
                 String localWallet = getLocalWalletAddressSafely();
+                RedPacketInfo info = RedPacketRepository.getInstance().getPacket(packetId, localWallet);
 
                 AndroidUtilities.runOnUIThread(() -> {
                     loadingInfo = false;
@@ -378,7 +381,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
         }
 
         if (TextUtils.isEmpty(privateKeyHex)) {
-            showToast("请先创建或导入钱包");
+            showToast("无钱包：请先创建或导入钱包");
             return;
         }
 
@@ -387,15 +390,15 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
             return;
         }
         if (currentInfo.hasClaimed) {
-            showToast("你已经领过这个红包");
+            showToast("已领取：你已经领过这个红包");
             return;
         }
         if (currentInfo.expired) {
-            showToast("这个红包已经过期");
+            showToast("已过期：这个红包已经过期");
             return;
         }
         if (currentInfo.remainingCount <= 0) {
-            showToast("红包已领完");
+            showToast("已抢完：红包已领完");
             return;
         }
         if (!currentInfo.canClaim) {
@@ -428,17 +431,34 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                 );
 
                 String finalPacketId = firstNonEmpty(prepare.packetIdHex, packetId);
-                String txHash = new RedPacketContractService().claim(
+                RedPacketContractService contractService = new RedPacketContractService();
+                String txHash = contractService.claim(
                         privateKeyHex,
                         contractAddress,
                         finalPacketId,
                         prepare.signatureHex
                 );
+                TransactionReceipt receipt = contractService.waitForReceipt(txHash);
+                if (receipt == null || !"0x1".equalsIgnoreCase(receipt.getStatus())) {
+                    throw new IllegalStateException("交易失败：链上执行未成功");
+                }
+
+                RedPacketRepository.getInstance().confirmClaim(packetId, walletAddress, txHash);
+                final String claimedDisplay = firstNonEmpty(
+                        currentInfo.amountPerClaimDisplay,
+                        currentInfo.totalAmountDisplay,
+                        "-"
+                );
+                final String symbol = firstNonEmpty(currentInfo.tokenSymbol, "BNB");
 
                 AndroidUtilities.runOnUIThread(() -> {
                     submitting = false;
                     setLoading(false, null);
-                    showToast("领取成功：" + safeShortHash(txHash));
+                    showToast("领取成功：" + claimedDisplay + " " + symbol);
+                    NotificationCenter.getInstance(currentAccount).postNotificationName(
+                            NotificationCenter.updateInterfaces,
+                            MessagesController.UPDATE_MASK_MESSAGE_TEXT
+                    );
                     loadPacketInfo();
                 });
             } catch (Throwable t) {
@@ -446,7 +466,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                 AndroidUtilities.runOnUIThread(() -> {
                     submitting = false;
                     setLoading(false, null);
-                    showError("领取失败：" + nonNullMessage(t));
+                    showError(resolveClaimErrorMessage(t));
                 });
             }
         });
@@ -686,6 +706,46 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
             return t.getMessage();
         }
         return t.getClass().getSimpleName();
+    }
+
+    private String resolveClaimErrorMessage(Throwable t) {
+        String raw = nonNullMessage(t);
+        String lower = raw == null ? "" : raw.toLowerCase(Locale.US);
+
+        if (containsAny(lower, "no wallet", "wallet is empty", "private key is empty")) {
+            return "无钱包：请先创建或导入钱包";
+        }
+        if (containsAny(lower, "insufficient funds", "intrinsic gas too low", "out of gas")) {
+            return "gas 不足：请补充 BNB 后重试";
+        }
+        if (containsAny(lower, "already claimed", "already", "claimed")) {
+            return "已领取：你已经领取过该红包";
+        }
+        if (containsAny(lower, "sold out", "empty", "no remaining", "remaining=0")) {
+            return "已抢完：红包已被抢完";
+        }
+        if (containsAny(lower, "expired")) {
+            return "已过期：红包已过期";
+        }
+        if (containsAny(lower, "timed out while waiting for receipt", "链上执行未成功", "execution reverted", "transaction failed")) {
+            return "交易失败：" + raw;
+        }
+        if (containsAny(lower, "http ", "unable to resolve host", "failed to connect", "timeout", "network")) {
+            return "网络失败：" + raw;
+        }
+        return "领取失败：" + raw;
+    }
+
+    private boolean containsAny(String source, String... words) {
+        if (TextUtils.isEmpty(source) || words == null) {
+            return false;
+        }
+        for (String word : words) {
+            if (!TextUtils.isEmpty(word) && source.contains(word)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String firstNonEmpty(String... values) {
