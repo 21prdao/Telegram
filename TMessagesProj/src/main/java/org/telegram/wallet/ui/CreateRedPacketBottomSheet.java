@@ -501,6 +501,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         creatorWallet,
                         selectedToken.symbol,
                         selectedToken.contractAddress,
+                        selectedToken.decimals,
                         "equal",
                         greeting,
                         amountRaw,

@@ -209,6 +209,7 @@ public class RedPacketRepository {
             String creatorWallet,
             String tokenSymbol,
             String tokenAddress,
+            int tokenDecimals,
             String packetType,
             String greeting,
             BigInteger totalAmountWei,
@@ -221,6 +222,9 @@ public class RedPacketRepository {
         if (TextUtils.isEmpty(tokenSymbol)) {
             throw new IllegalArgumentException("tokenSymbol is empty");
         }
+        if (tokenDecimals < 0) {
+            throw new IllegalArgumentException("tokenDecimals must be >= 0");
+        }
         if (totalAmountWei == null || totalAmountWei.signum() <= 0) {
             throw new IllegalArgumentException("totalAmountWei must be > 0");
         }
@@ -232,10 +236,13 @@ public class RedPacketRepository {
         }
 
         JSONObject body = new JSONObject();
+        String tokenSymbolClean = tokenSymbol.trim();
+        boolean isNativeBnb = "BNB".equalsIgnoreCase(tokenSymbolClean);
         body.put("dialogId", dialogId);
         body.put("creatorWallet", creatorWallet);
-        body.put("tokenSymbol", tokenSymbol);
-        if (!TextUtils.isEmpty(tokenAddress)) {
+        body.put("tokenSymbol", tokenSymbolClean);
+        body.put("tokenDecimals", tokenDecimals);
+        if (!isNativeBnb && !TextUtils.isEmpty(tokenAddress)) {
             body.put("tokenAddress", tokenAddress);
         }
         body.put("packetType", TextUtils.isEmpty(packetType) ? "equal" : packetType);
