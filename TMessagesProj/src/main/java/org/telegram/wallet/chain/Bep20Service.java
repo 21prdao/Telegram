@@ -20,6 +20,11 @@ import java.util.List;
 public class Bep20Service {
 
     public String getBalance(String owner, String contractAddress, int decimals) throws Exception {
+        BigInteger raw = getBalanceRaw(owner, contractAddress);
+        return new BigDecimal(raw).movePointLeft(Math.max(0, decimals)).stripTrailingZeros().toPlainString();
+    }
+
+    public BigInteger getBalanceRaw(String owner, String contractAddress) throws Exception {
         Function function = new Function(
                 "balanceOf",
                 Arrays.<Type>asList(new Address(owner)),
@@ -33,9 +38,8 @@ public class Bep20Service {
 
         List<Type> outputs = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
         if (outputs.isEmpty()) {
-            return "0";
+            return BigInteger.ZERO;
         }
-        BigInteger raw = (BigInteger) outputs.get(0).getValue();
-        return new BigDecimal(raw).movePointLeft(Math.max(0, decimals)).stripTrailingZeros().toPlainString();
+        return (BigInteger) outputs.get(0).getValue();
     }
 }
