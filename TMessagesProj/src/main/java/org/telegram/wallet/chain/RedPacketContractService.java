@@ -8,7 +8,6 @@ import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.datatypes.DynamicBytes;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.generated.Bytes32;
-import org.web3j.abi.datatypes.generated.Uint128;
 import org.web3j.abi.datatypes.generated.Uint32;
 import org.web3j.abi.datatypes.generated.Uint64;
 import org.web3j.crypto.Credentials;
@@ -29,7 +28,7 @@ import java.util.Collections;
 
 /**
  * 当前版本按“原生 BNB 红包合约”写：
- * - create(bytes32 packetId, uint32 count, uint128 amountPerClaim, uint64 expiresAt) payable
+ * - createNativePacket(bytes32 packetId, uint32 count, uint64 expiresAt) payable
  * - claim(bytes32 packetId, bytes signature)
  * - refund(bytes32 packetId)
  *
@@ -66,18 +65,16 @@ public class RedPacketContractService {
             throw new IllegalArgumentException("expiresAtSeconds must be > 0");
         }
 
+        BigInteger msgValue = amountPerClaimWei.multiply(BigInteger.valueOf(count));
         Function function = new Function(
-                "create",
+                "createNativePacket",
                 Arrays.asList(
                         toBytes32(packetIdHex),
                         new Uint32(BigInteger.valueOf(count)),
-                        new Uint128(amountPerClaimWei),
                         new Uint64(BigInteger.valueOf(expiresAtSeconds))
                 ),
                 Collections.emptyList()
         );
-
-        BigInteger msgValue = amountPerClaimWei.multiply(BigInteger.valueOf(count));
         return sendFunctionTransaction(
                 privateKeyHex,
                 contractAddress,

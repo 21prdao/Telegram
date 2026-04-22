@@ -30,7 +30,9 @@ const contractAddressNorm = normalizeAddress(CONTRACT_ADDRESS);
 
 const contractInterface = new Interface([
   'event PacketCreated(bytes32 indexed packetId, address indexed creator, uint256 total, uint32 count, uint64 expiresAt)',
+  'event PacketCreated(bytes32 indexed packetId, address indexed creator, address indexed token, uint256 total, uint32 count, uint64 expiresAt)',
   'event Claimed(bytes32 indexed packetId, address indexed claimer, uint256 amount)',
+  'event Claimed(bytes32 indexed packetId, address indexed claimer, address indexed token, uint256 amount)',
 ]);
 
 class JsonDB {
@@ -307,9 +309,12 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
 
   const eventPacketIdHex = String(event.args.packetId).toLowerCase();
   const eventCreator = normalizeAddress(String(event.args.creator));
-  const eventTotal = BigInt(event.args.total).toString();
-  const eventCount = Number(event.args.count);
-  const eventExpiresAt = Number(event.args.expiresAt);
+  const eventTotalRaw = event.args.total ?? event.args[3];
+  const eventCountRaw = event.args.count ?? event.args[4];
+  const eventExpiresAtRaw = event.args.expiresAt ?? event.args[5];
+  const eventTotal = BigInt(eventTotalRaw).toString();
+  const eventCount = Number(eventCountRaw);
+  const eventExpiresAt = Number(eventExpiresAtRaw);
 
   if (eventPacketIdHex !== packet.packetIdHex.toLowerCase()) return badRequest(res, 'PacketCreated packetId mismatch');
   if (eventCreator !== packet.creatorWallet) return badRequest(res, 'PacketCreated creator mismatch');
@@ -397,7 +402,8 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
 
   const eventPacketIdHex = String(event.args.packetId).toLowerCase();
   const eventClaimer = normalizeAddress(String(event.args.claimer));
-  const eventAmount = BigInt(event.args.amount).toString();
+  const eventAmountRaw = event.args.amount ?? event.args[3];
+  const eventAmount = BigInt(eventAmountRaw).toString();
 
   if (eventPacketIdHex !== packet.packetIdHex.toLowerCase()) return badRequest(res, 'Claimed packetId mismatch');
   if (eventClaimer !== claimerAddress) return badRequest(res, 'Claimed claimer mismatch');
