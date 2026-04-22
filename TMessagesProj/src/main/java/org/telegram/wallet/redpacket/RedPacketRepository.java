@@ -61,13 +61,22 @@ public class RedPacketRepository {
     }
 
     public RedPacketInfo getPacket(String packetId) throws Exception {
+        return getPacket(packetId, null);
+    }
+
+    public RedPacketInfo getPacket(String packetId, String walletAddress) throws Exception {
         if (TextUtils.isEmpty(packetId)) {
             throw new IllegalArgumentException("packetId is empty");
         }
 
+        String path = "/red-packets/" + Uri.encode(packetId);
+        if (!TextUtils.isEmpty(walletAddress)) {
+            path += "?wallet=" + Uri.encode(walletAddress);
+        }
+
         JSONObject root = requestJson(
                 "GET",
-                "/red-packets/" + Uri.encode(packetId),
+                path,
                 null
         );
         JSONObject data = unwrapData(root);
@@ -281,6 +290,28 @@ public class RedPacketRepository {
         );
     }
 
+
+    public void confirmClaim(String packetId, String claimerAddress, String txHash) throws Exception {
+        if (TextUtils.isEmpty(packetId)) {
+            throw new IllegalArgumentException("packetId is empty");
+        }
+        if (TextUtils.isEmpty(claimerAddress)) {
+            throw new IllegalArgumentException("claimerAddress is empty");
+        }
+        if (TextUtils.isEmpty(txHash)) {
+            throw new IllegalArgumentException("txHash is empty");
+        }
+
+        JSONObject body = new JSONObject();
+        body.put("claimerAddress", claimerAddress);
+        body.put("txHash", txHash);
+
+        requestJson(
+                "POST",
+                "/red-packets/" + Uri.encode(packetId) + "/confirm",
+                body
+        );
+    }
     private JSONObject requestJson(String method, String relativePath, JSONObject body) throws Exception {
         HttpURLConnection connection = null;
         InputStream stream = null;

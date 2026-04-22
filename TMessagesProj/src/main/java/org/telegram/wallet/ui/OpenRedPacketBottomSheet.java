@@ -18,6 +18,8 @@ import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
@@ -28,8 +30,10 @@ import org.telegram.wallet.config.WalletConfig;
 import org.telegram.wallet.model.ClaimPrepareResponse;
 import org.telegram.wallet.model.RedPacketInfo;
 import org.telegram.wallet.redpacket.RedPacketRepository;
+import org.telegram.wallet.redpacket.RedPacketCardStateStore;
 import org.telegram.wallet.security.WalletKeyStore;
 import org.web3j.crypto.Credentials;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -190,7 +194,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
         contentLayout.addView(divider2, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 1, 0, 18, 0, 18));
 
-        claimButton = createActionButton(context, "打开红包",
+        claimButton = createActionButton(context, "开",
                 getThemedColor(Theme.key_featuredStickers_addButton),
                 getThemedColor(Theme.key_featuredStickers_buttonText));
         claimButton.setOnClickListener(v -> onClickClaim());
@@ -270,8 +274,8 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
 
         Utilities.globalQueue.postRunnable(() -> {
             try {
-                RedPacketInfo info = RedPacketRepository.getInstance().getPacket(packetId);
                 String localWallet = getLocalWalletAddressSafely();
+                RedPacketInfo info = RedPacketRepository.getInstance().getPacket(packetId, localWallet);
 
                 AndroidUtilities.runOnUIThread(() -> {
                     loadingInfo = false;
@@ -284,7 +288,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                 AndroidUtilities.runOnUIThread(() -> {
                     loadingInfo = false;
                     setLoading(false, null);
-                    showError("加载红包失败：" + nonNullMessage(t));
+                    showError("网络失败：" + nonNullMessage(t));
                     bindEmptyState();
                 });
             }
@@ -343,7 +347,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
         } else if (info.remainingCount <= 0) {
             claimButton.setText("已领完");
         } else if (info.canClaim) {
-            claimButton.setText("打开红包");
+            claimButton.setText("开");
             claimButton.setEnabled(true);
             claimButton.setAlpha(1f);
         } else {
@@ -357,6 +361,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
         } else {
             refundButton.setVisibility(View.GONE);
         }
+        updateCardStateFromInfo(info);
     }
 
     private void onClickClaim() {
@@ -427,18 +432,41 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                         WalletConfig.RED_PACKET_CONTRACT
                 );
 
-                String finalPacketId = firstNonEmpty(prepare.packetIdHex, packetId);
-                String txHash = new RedPacketContractService().claim(
-                        privateKeyHex,
-                        contractAddress,
-                        finalPacketId,
-                        prepare.signatureHex
-                );
+                String finalPacketId = firstNonEmpty(prepare.packetIdHex, currentInfo.packetIdHex, packetId);
+                RedPacketContractService contractService = new RedPacketContractService();
+                String txHash;
+                if (TextUtils.isEmpty(prepare.signatureHex)) {
+                    txHash = contractService.claim(
+                            privateKeyHex,
+                            contractAddress,
+                            finalPacketId
+                    );
+                } else {
+                    txHash = contractService.claim(
+                            privateKeyHex,
+                            contractAddress,
+                            finalPacketId,
+                            prepare.signatureHex
+                    );
+                }
+
+                TransactionReceipt receipt = contractService.waitForReceipt(txHash);
+                if (receipt == null || !Boolean.TRUE.equals(receipt.isStatusOK())) {
+                    throw new IllegalStateException("交易失败");
+                }
+
+                RedPacketRepository.getInstance().confirmClaim(packetId, walletAddress, txHash);
+
+                String amountText = safeAmount(currentInfo.amountPerClaimDisplay,
+                        TextUtils.isEmpty(currentInfo.tokenSymbol) ? "BNB" : currentInfo.tokenSymbol);
+                RedPacketCardStateStore.put(packetId, "claimed", amountText);
+                NotificationCenter.getInstance(currentAccount)
+                        .postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_SEND_STATE);
 
                 AndroidUtilities.runOnUIThread(() -> {
                     submitting = false;
                     setLoading(false, null);
-                    showToast("领取成功：" + safeShortHash(txHash));
+                    showToast("领取成功：" + amountText);
                     loadPacketInfo();
                 });
             } catch (Throwable t) {
@@ -446,7 +474,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                 AndroidUtilities.runOnUIThread(() -> {
                     submitting = false;
                     setLoading(false, null);
-                    showError("领取失败：" + nonNullMessage(t));
+                    showError(mapClaimErrorMessage(t));
                 });
             }
         });
@@ -508,6 +536,51 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                 });
             }
         });
+    }
+
+
+    private void updateCardStateFromInfo(RedPacketInfo info) {
+        if (info == null || TextUtils.isEmpty(info.packetId)) {
+            return;
+        }
+        String status;
+        if (info.hasClaimed) {
+            status = "claimed";
+        } else if (info.expired) {
+            status = "expired";
+        } else if (info.remainingCount <= 0) {
+            status = "empty";
+        } else if (info.canClaim) {
+            status = "active";
+        } else {
+            status = "loading";
+        }
+        RedPacketCardStateStore.put(info.packetId, status, null);
+        NotificationCenter.getInstance(currentAccount)
+                .postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_SEND_STATE);
+    }
+
+    private String mapClaimErrorMessage(Throwable t) {
+        String msg = nonNullMessage(t).toLowerCase(Locale.US);
+        if (msg.contains("already claimed") || msg.contains("claimed")) {
+            return "已领取";
+        }
+        if (msg.contains("packet empty") || msg.contains("empty") || msg.contains("已领完")) {
+            return "已抢完";
+        }
+        if (msg.contains("expired") || msg.contains("过期")) {
+            return "已过期";
+        }
+        if (msg.contains("insufficient funds") || msg.contains("gas") || msg.contains("fee")) {
+            return "gas 不足";
+        }
+        if (msg.contains("http") || msg.contains("timeout") || msg.contains("network") || msg.contains("unable to resolve host")) {
+            return "网络失败";
+        }
+        if (msg.contains("private key") || msg.contains("钱包") || msg.contains("wallet")) {
+            return "无钱包";
+        }
+        return "交易失败：" + nonNullMessage(t);
     }
 
     private void setLoading(boolean show, String message) {

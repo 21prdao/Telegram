@@ -218,6 +218,8 @@ import org.telegram.ui.Components.poll.buttons.PollInstantButtonDrawable;
 import org.telegram.ui.Components.spoilers.SpoilerEffect;
 import org.telegram.ui.Components.spoilers.SpoilerEffect2;
 import org.telegram.ui.GradientClip;
+import org.telegram.wallet.model.RedPacketPayload;
+import org.telegram.wallet.redpacket.RedPacketCardStateStore;
 import org.telegram.ui.LinkManager;
 import org.telegram.ui.MultiLayoutTypingAnimator;
 import org.telegram.ui.PhotoViewer;
@@ -1495,6 +1497,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     public boolean isAvatarVisible;
     private boolean isThreadPost;
     private boolean drawBackground = true;
+    private final RectF web3RedPacketCardRect = new RectF();
+    private boolean web3RedPacketPressed;
+    private TextPaint web3RedPacketTitlePaint;
+    private TextPaint web3RedPacketSubtitlePaint;
     private int substractBackgroundHeight;
     private boolean allowAssistant;
     public Theme.MessageDrawable currentBackgroundDrawable;
@@ -4830,6 +4836,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         if (checkTextSelection(event)) {
+            return true;
+        }
+
+        if (checkWeb3RedPacketTouchEvent(event)) {
             return true;
         }
 
@@ -14037,6 +14047,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (preview != (currentMessageObject != null && currentMessageObject.preview)) {
             return;
         }
+        if (currentMessageObject != null && currentMessageObject.isWeb3RedPacket()) {
+            drawTime = true;
+            return;
+        }
         boolean newPart = needNewVisiblePart && currentMessageObject.type == MessageObject.TYPE_TEXT, hasSpoilers = hasSpoilers();
         if (newPart || hasSpoilers) {
             getLocalVisibleRect(scrollRect);
@@ -19875,7 +19889,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             canvas.translate(-getBoundsLeft(), 0);
         }
 
-        drawBackgroundInternal(canvas, false);
+        if (currentMessageObject != null && currentMessageObject.isWeb3RedPacket()) {
+            drawWeb3RedPacketCard(canvas);
+        } else {
+            drawBackgroundInternal(canvas, false);
+        }
         if (isHighlightedAnimated) {
             long newTime = System.currentTimeMillis();
             long dt = Math.abs(newTime - lastHighlightProgressTime);
@@ -25966,6 +25984,139 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         dimPaint.setAlpha((int) (oldAlpha2 * controlsAlpha * .4f));
         canvas.drawRoundRect(rect, rect.width() / 2f, rect.height() / 2f, dimPaint);
         dimPaint.setAlpha(oldAlpha2);
+    }
+
+    private boolean checkWeb3RedPacketTouchEvent(MotionEvent event) {
+        if (currentMessageObject == null || !currentMessageObject.isWeb3RedPacket()) {
+            return false;
+        }
+        final float x = getEventX(event);
+        final float y = getEventY(event);
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            if (web3RedPacketCardRect.contains(x, y)) {
+                web3RedPacketPressed = true;
+                invalidate();
+                return true;
+            }
+            return false;
+        }
+        if (!web3RedPacketPressed) {
+            return false;
+        }
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            web3RedPacketPressed = false;
+            if (web3RedPacketCardRect.contains(x, y) && delegate != null) {
+                RedPacketPayload payload = currentMessageObject.getWeb3RedPacketPayload();
+                if (payload != null && !TextUtils.isEmpty(payload.deepLink)) {
+                    delegate.didPressWebPage(this, null, payload.deepLink, false);
+                }
+            }
+            invalidate();
+            return true;
+        }
+        if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+            web3RedPacketPressed = false;
+            invalidate();
+            return true;
+        }
+        return true;
+    }
+
+    private void drawWeb3RedPacketCard(Canvas canvas) {
+        RedPacketPayload payload = currentMessageObject != null ? currentMessageObject.getWeb3RedPacketPayload() : null;
+        if (payload == null) {
+            return;
+        }
+
+        int left;
+        int top;
+        int right;
+        int bottom;
+        if (currentBackgroundDrawable != null) {
+            Rect b = currentBackgroundDrawable.getBounds();
+            left = b.left;
+            top = b.top;
+            right = b.right;
+            bottom = b.bottom;
+        } else {
+            int cardWidth = Math.min(dp(264), getMeasuredWidth() - dp(88));
+            left = currentMessageObject.isOutOwner() ? getMeasuredWidth() - cardWidth - dp(16) : dp(16);
+            right = left + cardWidth;
+            top = dp(6);
+            bottom = top + dp(108);
+        }
+        web3RedPacketCardRect.set(left, top, right, bottom);
+
+        RedPacketCardStateStore.State runtimeState = RedPacketCardStateStore.get(payload.packetId);
+        String status = runtimeState != null && !TextUtils.isEmpty(runtimeState.status)
+                ? runtimeState.status
+                : payload.normalizedStatus();
+
+        int cardColor;
+        switch (status) {
+            case RedPacketPayload.STATUS_ACTIVE:
+                cardColor = Color.parseColor("#F97316");
+                break;
+            case RedPacketPayload.STATUS_CLAIMED:
+                cardColor = Color.parseColor("#16A34A");
+                break;
+            case RedPacketPayload.STATUS_EMPTY:
+                cardColor = Color.parseColor("#6B7280");
+                break;
+            case RedPacketPayload.STATUS_EXPIRED:
+                cardColor = Color.parseColor("#9CA3AF");
+                break;
+            default:
+                cardColor = Color.parseColor("#3B82F6");
+                break;
+        }
+        if (web3RedPacketPressed) {
+            cardColor = ColorUtils.blendARGB(cardColor, Color.BLACK, 0.12f);
+        }
+
+        if (web3RedPacketTitlePaint == null) {
+            web3RedPacketTitlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            web3RedPacketTitlePaint.setTextSize(dp(16));
+            web3RedPacketTitlePaint.setTypeface(Typeface.DEFAULT_BOLD);
+            web3RedPacketTitlePaint.setColor(Color.WHITE);
+
+            web3RedPacketSubtitlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            web3RedPacketSubtitlePaint.setTextSize(dp(13));
+            web3RedPacketSubtitlePaint.setColor(0xE6FFFFFF);
+        }
+
+        Theme.chat_docBackPaint.setColor(cardColor);
+        canvas.drawRoundRect(web3RedPacketCardRect, dp(14), dp(14), Theme.chat_docBackPaint);
+
+        float tx = web3RedPacketCardRect.left + dp(14);
+        float ty = web3RedPacketCardRect.top + dp(34);
+        canvas.drawText(payload.titleText(), tx, ty, web3RedPacketTitlePaint);
+
+        String subtitle;
+        switch (status) {
+            case RedPacketPayload.STATUS_ACTIVE:
+                subtitle = "可领取";
+                break;
+            case RedPacketPayload.STATUS_CLAIMED:
+                subtitle = "已领取";
+                break;
+            case RedPacketPayload.STATUS_EMPTY:
+                subtitle = "已领完";
+                break;
+            case RedPacketPayload.STATUS_EXPIRED:
+                subtitle = "已过期";
+                break;
+            default:
+                subtitle = "加载中...";
+                break;
+        }
+        String amount;
+        if (runtimeState != null && !TextUtils.isEmpty(runtimeState.amountText)) {
+            amount = " · " + runtimeState.amountText;
+        } else {
+            amount = TextUtils.isEmpty(payload.totalAmount) ? "" : (" · " + payload.totalAmount + " " + payload.symbol);
+        }
+        canvas.drawText(subtitle + amount, tx, ty + dp(24), web3RedPacketSubtitlePaint);
     }
 
     @Override

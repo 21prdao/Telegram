@@ -87,6 +87,32 @@ public class RedPacketContractService {
         );
     }
 
+
+    public String claim(
+            String privateKeyHex,
+            String contractAddress,
+            String packetIdHex
+    ) throws Exception {
+        validatePrivateKey(privateKeyHex);
+        validateAddress(contractAddress);
+
+        Function function = new Function(
+                "claim",
+                Arrays.asList(
+                        toBytes32(packetIdHex)
+                ),
+                Collections.emptyList()
+        );
+
+        return sendFunctionTransaction(
+                privateKeyHex,
+                contractAddress,
+                function,
+                BigInteger.ZERO,
+                DEFAULT_GAS_LIMIT_CLAIM
+        );
+    }
+
     public String claim(
             String privateKeyHex,
             String contractAddress,

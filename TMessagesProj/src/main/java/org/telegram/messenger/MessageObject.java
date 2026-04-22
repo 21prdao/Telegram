@@ -389,6 +389,7 @@ public class MessageObject {
     public boolean drawServiceWithDefaultTypeface;
 
     private transient org.telegram.wallet.redpacket.RedPacketLinkParser.Result walletRedPacketCache;
+    private transient org.telegram.wallet.model.RedPacketPayload web3RedPacketPayloadCache;
     public boolean isWalletRedPacket() {
         if (walletRedPacketCache != null) {
             return true;
@@ -404,6 +405,18 @@ public class MessageObject {
                     org.telegram.wallet.redpacket.RedPacketMessageCodec.tryParse(this);
         }
         return walletRedPacketCache;
+    }
+
+    public boolean isWeb3RedPacket() {
+        return getWeb3RedPacketPayload() != null;
+    }
+
+    public org.telegram.wallet.model.RedPacketPayload getWeb3RedPacketPayload() {
+        if (web3RedPacketPayloadCache == null) {
+            web3RedPacketPayloadCache =
+                    org.telegram.wallet.redpacket.RedPacketPayloadParser.parseFromMessageText(messageText);
+        }
+        return web3RedPacketPayloadCache;
     }
 
     public static boolean hasUnreadReactions(TLRPC.Message message) {
