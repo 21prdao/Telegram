@@ -9,14 +9,18 @@ import android.graphics.drawable.RippleDrawable;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.view.View;
-import android.widget.EditText;
-import android.widget.FrameLayout;
+import android.view.MotionEvent;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.LinearLayout;
+import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
@@ -25,23 +29,26 @@ import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.wallet.chain.Bep20Service;
+import org.telegram.wallet.chain.BscRpcClient;
 import org.telegram.wallet.chain.RedPacketContractService;
 import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
+import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.redpacket.RedPacketMessageComposer;
 import org.telegram.wallet.redpacket.RedPacketRepository;
 import org.telegram.wallet.security.WalletKeyStore;
 import org.web3j.crypto.Credentials;
+import org.web3j.protocol.core.DefaultBlockParameterName;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 
-import android.view.MotionEvent;
-import android.view.Window;
-import android.view.WindowManager;
-
-import org.telegram.ui.Components.EditTextBoldCursor;
 public class CreateRedPacketBottomSheet extends BottomSheet {
 
     private final BaseFragment parentFragment;
@@ -53,12 +60,17 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
     private FrameLayout loadingOverlay;
     private TextView loadingTextView;
 
-    private EditTextBoldCursor  totalAmountEdit;
-    private EditTextBoldCursor  countEdit;
-    private EditTextBoldCursor  expireHoursEdit;
+    private TextView tokenSelectorView;
+    private EditTextBoldCursor totalAmountEdit;
+    private EditTextBoldCursor countEdit;
+    private EditTextBoldCursor greetingEdit;
+    private EditTextBoldCursor expiresAtEdit;
     private TextView errorView;
     private TextView createButton;
     private TextView cancelButton;
+
+    private final List<TokenOption> tokenOptions = new ArrayList<>();
+    private int selectedTokenIndex = 0;
 
     private volatile boolean submitting;
 
@@ -111,44 +123,62 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 )
         );
 
-        // containerView = rootLayout;
         setCustomView(rootLayout);
 
         TextView titleView = createText(context, 22, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT_BOLD);
-        titleView.setText("发 BNB 红包");
+        titleView.setText("发红包");
         contentLayout.addView(titleView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         TextView subtitleView = createText(context, 14, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
         subtitleView.setPadding(0, AndroidUtilities.dp(8), 0, 0);
-        subtitleView.setText("先创建链上红包，再自动把红包消息发到当前聊天");
+        subtitleView.setText("先创建链上红包，再自动把红包兼容消息发到当前聊天");
         contentLayout.addView(subtitleView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        addFieldLabel(context, "红包总额（BNB）");
+        addFieldLabel(context, "Token");
+        tokenSelectorView = createActionButton(
+                context,
+                "",
+                adjustAlpha(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2), 0.12f),
+                getThemedColor(Theme.key_windowBackgroundWhiteBlackText)
+        );
+        tokenSelectorView.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        tokenSelectorView.setOnClickListener(v -> showTokenSelectorDialog());
+        contentLayout.addView(tokenSelectorView, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, 48));
+
+        addFieldLabel(context, "total amount");
         totalAmountEdit = createInput(context, "例如 0.05");
         totalAmountEdit.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         totalAmountEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
         contentLayout.addView(totalAmountEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
-        addFieldLabel(context, "份数");
+        addFieldLabel(context, "count");
         countEdit = createInput(context, "例如 5");
         countEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
         countEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
         contentLayout.addView(countEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
-        addFieldLabel(context, "有效期（小时）");
-        expireHoursEdit = createInput(context, "例如 24");
-        expireHoursEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
-        expireHoursEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
-        contentLayout.addView(expireHoursEdit, LayoutHelper.createLinear(
+        addFieldLabel(context, "greeting");
+        greetingEdit = createInput(context, "恭喜发财，大吉大利");
+        greetingEdit.setInputType(InputType.TYPE_CLASS_TEXT);
+        greetingEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
+        contentLayout.addView(greetingEdit, LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT, 48));
+
+        addFieldLabel(context, "expiresAt（Unix 秒）");
+        expiresAtEdit = createInput(context, "例如 1767225600");
+        expiresAtEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
+        expiresAtEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        contentLayout.addView(expiresAtEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
         TextView hintView = createText(context, 13, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
         hintView.setPadding(0, AndroidUtilities.dp(12), 0, 0);
-        hintView.setText("为了保证链上金额精确，当前版本要求：总额 ÷ 份数 后能精确到 wei。");
+        hintView.setText("packetType 第一版固定 equal，要求 amountRaw % count == 0。");
         contentLayout.addView(hintView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
@@ -224,6 +254,8 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         LayoutHelper.MATCH_PARENT
                 )
         );
+
+        reloadTokenOptions();
     }
 
     private void addFieldLabel(Context context, String text) {
@@ -236,6 +268,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
     @Override
     public void show() {
+        reloadTokenOptions();
         super.show();
 
         AndroidUtilities.runOnUIThread(() -> {
@@ -333,91 +366,85 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             return;
         }
 
+        final TokenOption selectedToken = getSelectedToken();
         final String totalText = trim(totalAmountEdit.getText() == null ? null : totalAmountEdit.getText().toString());
         final String countText = trim(countEdit.getText() == null ? null : countEdit.getText().toString());
-        final String hoursText = trim(expireHoursEdit.getText() == null ? null : expireHoursEdit.getText().toString());
+        final String greeting = trim(greetingEdit.getText() == null ? null : greetingEdit.getText().toString());
+        final String expiresAtText = trim(expiresAtEdit.getText() == null ? null : expiresAtEdit.getText().toString());
 
         if (TextUtils.isEmpty(totalText)) {
-            showError("请填写红包总额");
+            showError("请填写 total amount");
             return;
         }
         if (TextUtils.isEmpty(countText)) {
-            showError("请填写份数");
+            showError("请填写 count");
             return;
         }
-        if (TextUtils.isEmpty(hoursText)) {
-            showError("请填写有效期");
+        if (TextUtils.isEmpty(expiresAtText)) {
+            showError("请填写 expiresAt");
             return;
         }
 
-        final BigDecimal totalAmountBnb;
+        final BigDecimal totalAmount;
         final int count;
-        final int expireHours;
+        final long expiresAtSeconds;
         try {
-            totalAmountBnb = new BigDecimal(totalText);
+            totalAmount = new BigDecimal(totalText);
         } catch (Throwable t) {
-            showError("红包总额格式不正确");
+            showError("total amount 格式不正确");
             return;
         }
 
         try {
             count = Integer.parseInt(countText);
         } catch (Throwable t) {
-            showError("份数格式不正确");
+            showError("count 格式不正确");
             return;
         }
 
         try {
-            expireHours = Integer.parseInt(hoursText);
+            expiresAtSeconds = Long.parseLong(expiresAtText);
         } catch (Throwable t) {
-            showError("有效期格式不正确");
+            showError("expiresAt 格式不正确");
             return;
         }
 
-        if (totalAmountBnb.signum() <= 0) {
+        if (totalAmount.signum() <= 0) {
             showError("红包总额必须大于 0");
             return;
         }
-        if (count <= 0) {
-            showError("份数必须大于 0");
+        if (count < 1 || count > 500) {
+            showError("count 必须在 1~500");
             return;
         }
-        if (expireHours <= 0) {
-            showError("有效期必须大于 0");
-            return;
-        }
-        if (count > 500) {
-            showError("当前版本单个红包最多 500 份");
+        if (expiresAtSeconds <= (System.currentTimeMillis() / 1000L)) {
+            showError("expiresAt 必须大于当前时间");
             return;
         }
 
-        final BigInteger totalWei;
+        final BigInteger amountRaw;
         try {
-            totalWei = bnbToWei(totalAmountBnb);
+            amountRaw = toRawAmount(totalAmount, selectedToken.decimals);
         } catch (Throwable t) {
-            showError("红包总额换算 wei 失败");
+            showError("金额换算失败");
             return;
         }
 
-        if (totalWei.signum() <= 0) {
-            showError("红包总额太小");
+        if (amountRaw.signum() <= 0) {
+            showError("amountRaw 必须大于 0");
             return;
         }
 
-        final BigInteger countBig = BigInteger.valueOf(count);
-        final BigInteger[] divRem = totalWei.divideAndRemainder(countBig);
+        final BigInteger[] divRem = amountRaw.divideAndRemainder(BigInteger.valueOf(count));
         if (divRem[1].signum() != 0) {
-            showError("当前金额不能被份数精确平均，请调整总额或份数");
+            showError("equal 红包要求 amountRaw % count == 0");
             return;
         }
-        final BigInteger amountPerClaimWei = divRem[0];
-        if (amountPerClaimWei.signum() <= 0) {
+        final BigInteger amountPerClaimRaw = divRem[0];
+        if (amountPerClaimRaw.signum() <= 0) {
             showError("单份金额必须大于 0");
             return;
         }
-
-        final long nowSeconds = System.currentTimeMillis() / 1000L;
-        final long expiresAtSeconds = nowSeconds + expireHours * 3600L;
 
         final String privateKeyHex;
         try {
@@ -447,10 +474,36 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         Utilities.globalQueue.postRunnable(() -> {
             try {
+                RedPacketContractService contractService = new RedPacketContractService();
+                BigInteger gasFeeWei = contractService.estimateCreateGasFeeWei();
+                BigInteger bnbBalanceWei = BscRpcClient.get()
+                        .ethGetBalance(creatorWallet, DefaultBlockParameterName.LATEST)
+                        .send()
+                        .getBalance();
+
+                if (selectedToken.isBnb()) {
+                    BigInteger required = amountRaw.add(gasFeeWei);
+                    if (bnbBalanceWei.compareTo(required) < 0) {
+                        throw new IllegalStateException("BNB 余额不足，需覆盖 amount + gas");
+                    }
+                } else {
+                    BigInteger tokenBalanceRaw = new Bep20Service().getBalanceRaw(creatorWallet, selectedToken.contractAddress);
+                    if (tokenBalanceRaw.compareTo(amountRaw) < 0) {
+                        throw new IllegalStateException(selectedToken.symbol + " 余额不足");
+                    }
+                    if (bnbBalanceWei.compareTo(gasFeeWei) < 0) {
+                        throw new IllegalStateException("BNB 余额不足，无法支付 gas");
+                    }
+                }
+
                 CreateRedPacketPrepareResponse prepare = RedPacketRepository.getInstance().prepareCreate(
                         dialogId,
                         creatorWallet,
-                        totalWei,
+                        selectedToken.symbol,
+                        selectedToken.contractAddress,
+                        "equal",
+                        greeting,
+                        amountRaw,
                         count,
                         expiresAtSeconds
                 );
@@ -464,12 +517,12 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         WalletConfig.RED_PACKET_CONTRACT
                 );
 
-                String txHash = new RedPacketContractService().create(
+                String txHash = contractService.create(
                         privateKeyHex,
                         contractAddress,
                         packetIdHex,
                         count,
-                        amountPerClaimWei,
+                        amountPerClaimRaw,
                         expiresAtSeconds
                 );
 
@@ -479,15 +532,18 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         txHash
                 );
 
-                final String finalMessage = RedPacketMessageComposer.compose(
-                        totalAmountBnb,
-                        "BNB",
+                final String finalMessage = RedPacketMessageComposer.composeCompatMessage(
+                        prepare.packetId,
+                        selectedToken.symbol,
+                        totalAmount.stripTrailingZeros().toPlainString(),
                         count,
-                        expireHours + " 小时内有效",
+                        expiresAtSeconds,
                         firstNonEmpty(
                                 prepare.claimUrl,
                                 "https://" + WalletConfig.RED_PACKET_HOST + "/p/" + prepare.packetId
-                        )
+                        ),
+                        greeting,
+                        "equal"
                 );
 
                 AndroidUtilities.runOnUIThread(() -> {
@@ -517,8 +573,8 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         });
     }
 
-    private BigInteger bnbToWei(BigDecimal bnb) {
-        return bnb.multiply(new BigDecimal("1000000000000000000")).toBigIntegerExact();
+    private BigInteger toRawAmount(BigDecimal amount, int decimals) {
+        return amount.movePointRight(Math.max(decimals, 0)).toBigIntegerExact();
     }
 
     private void setLoading(boolean show, String message) {
@@ -527,9 +583,11 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         setViewEnabled(createButton, !show);
         setViewEnabled(cancelButton, !show);
+        setViewEnabled(tokenSelectorView, !show);
         setViewEnabled(totalAmountEdit, !show);
         setViewEnabled(countEdit, !show);
-        setViewEnabled(expireHoursEdit, !show);
+        setViewEnabled(greetingEdit, !show);
+        setViewEnabled(expiresAtEdit, !show);
     }
 
     private void setViewEnabled(View view, boolean enabled) {
@@ -618,5 +676,93 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
     private int adjustAlpha(int color, float factor) {
         int alpha = Math.round(Color.alpha(color) * factor);
         return (color & 0x00ffffff) | (alpha << 24);
+    }
+
+    private void reloadTokenOptions() {
+        tokenOptions.clear();
+        tokenOptions.add(TokenOption.bnb());
+
+        Context context = getContext();
+        if (context != null) {
+            List<TokenAsset> customTokens = WalletStorage.getTokens(context);
+            for (TokenAsset token : customTokens) {
+                if (token == null || TextUtils.isEmpty(token.contractAddress)) {
+                    continue;
+                }
+                tokenOptions.add(TokenOption.custom(token.symbol, token.contractAddress, token.decimals));
+            }
+        }
+
+        if (selectedTokenIndex >= tokenOptions.size()) {
+            selectedTokenIndex = 0;
+        }
+        updateTokenSelectorText();
+    }
+
+    private TokenOption getSelectedToken() {
+        if (tokenOptions.isEmpty()) {
+            return TokenOption.bnb();
+        }
+        int index = Math.max(0, Math.min(selectedTokenIndex, tokenOptions.size() - 1));
+        return tokenOptions.get(index);
+    }
+
+    private void updateTokenSelectorText() {
+        if (tokenSelectorView == null) {
+            return;
+        }
+        TokenOption token = getSelectedToken();
+        tokenSelectorView.setText(token.symbol + "  ·  " + (token.isBnb() ? "原生币" : shortAddress(token.contractAddress)));
+    }
+
+    private void showTokenSelectorDialog() {
+        Context context = getContext();
+        if (context == null || tokenOptions.isEmpty()) {
+            return;
+        }
+
+        String[] labels = new String[tokenOptions.size()];
+        for (int i = 0; i < tokenOptions.size(); i++) {
+            TokenOption token = tokenOptions.get(i);
+            labels[i] = token.symbol + (token.isBnb() ? " (BNB)" : " (" + shortAddress(token.contractAddress) + ")");
+        }
+
+        new AlertDialog.Builder(context)
+                .setTitle("选择 Token")
+                .setSingleChoiceItems(labels, selectedTokenIndex, (dialog, which) -> selectedTokenIndex = which)
+                .setPositiveButton("确定", (dialog, which) -> updateTokenSelectorText())
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private String shortAddress(String address) {
+        if (TextUtils.isEmpty(address) || address.length() < 10) {
+            return address == null ? "" : address;
+        }
+        return address.substring(0, 6) + "..." + address.substring(address.length() - 4);
+    }
+
+    private static class TokenOption {
+        final String symbol;
+        final String contractAddress;
+        final int decimals;
+
+        private TokenOption(String symbol, String contractAddress, int decimals) {
+            this.symbol = TextUtils.isEmpty(symbol) ? "TOKEN" : symbol;
+            this.contractAddress = contractAddress;
+            this.decimals = decimals <= 0 ? 18 : decimals;
+        }
+
+        static TokenOption bnb() {
+            return new TokenOption("BNB", "", 18);
+        }
+
+        static TokenOption custom(String symbol, String contractAddress, int decimals) {
+            return new TokenOption(symbol, contractAddress, decimals);
+        }
+
+        boolean isBnb() {
+            return TextUtils.isEmpty(contractAddress);
+        }
     }
 }

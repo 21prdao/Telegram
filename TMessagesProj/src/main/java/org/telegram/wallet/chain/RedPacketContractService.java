@@ -147,6 +147,12 @@ public class RedPacketContractService {
         return waitForReceipt(txHash, 120_000L, 1_500L);
     }
 
+    public BigInteger estimateCreateGasFeeWei() {
+        Web3j web3j = BscRpcClient.get();
+        BigInteger gasPrice = resolveGasPrice(web3j);
+        return gasPrice.multiply(DEFAULT_GAS_LIMIT_CREATE);
+    }
+
     public TransactionReceipt waitForReceipt(String txHash, long timeoutMs, long pollIntervalMs) throws Exception {
         if (TextUtils.isEmpty(txHash)) {
             throw new IllegalArgumentException("txHash is empty");

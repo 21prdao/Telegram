@@ -204,9 +204,22 @@ public class RedPacketRepository {
         return response;
     }
 
-    public CreateRedPacketPrepareResponse prepareCreate( long dialogId, String creatorWallet, BigInteger totalAmountWei, int count, long expiresAtSeconds ) throws Exception {
+    public CreateRedPacketPrepareResponse prepareCreate(
+            long dialogId,
+            String creatorWallet,
+            String tokenSymbol,
+            String tokenAddress,
+            String packetType,
+            String greeting,
+            BigInteger totalAmountWei,
+            int count,
+            long expiresAtSeconds
+    ) throws Exception {
         if (TextUtils.isEmpty(creatorWallet)) {
             throw new IllegalArgumentException("creatorWallet is empty");
+        }
+        if (TextUtils.isEmpty(tokenSymbol)) {
+            throw new IllegalArgumentException("tokenSymbol is empty");
         }
         if (totalAmountWei == null || totalAmountWei.signum() <= 0) {
             throw new IllegalArgumentException("totalAmountWei must be > 0");
@@ -221,7 +234,12 @@ public class RedPacketRepository {
         JSONObject body = new JSONObject();
         body.put("dialogId", dialogId);
         body.put("creatorWallet", creatorWallet);
-        body.put("tokenSymbol", "BNB");
+        body.put("tokenSymbol", tokenSymbol);
+        if (!TextUtils.isEmpty(tokenAddress)) {
+            body.put("tokenAddress", tokenAddress);
+        }
+        body.put("packetType", TextUtils.isEmpty(packetType) ? "equal" : packetType);
+        body.put("greeting", greeting == null ? "" : greeting);
         body.put("totalAmountWei", totalAmountWei.toString());
         body.put("count", count);
         body.put("expiresAt", expiresAtSeconds);
