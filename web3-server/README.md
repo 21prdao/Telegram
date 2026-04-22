@@ -24,6 +24,8 @@ npm run dev
 - `CHAIN_ID`（默认 `56`）
 - `RED_PACKET_CONTRACT`（默认 `0xYourContractAddress`）
 - `PUBLIC_HOST`（默认 `http://127.0.0.1:8787`）
+- `RPC_URL`（默认 `https://data-seed-prebsc-1-s1.bnbchain.org:8545`）
+- `RED_PACKET_DB_FILE`（默认 `./data/red-packets.json`）
 
 ### 健康检查
 
@@ -33,18 +35,31 @@ curl http://127.0.0.1:8787/healthz
 
 ## 2) API 流程（本地联调）
 
-### 创建红包
+### 预创建红包（prepare-create）
 
 ```bash
-curl -X POST http://127.0.0.1:8787/api/v1/red-packets/create \
+curl -X POST http://127.0.0.1:8787/api/v1/red-packets/prepare-create \
   -H 'Content-Type: application/json' \
   -d '{
     "dialogId": "123456",
     "creatorWallet": "0x1111111111111111111111111111111111111111",
     "totalAmountWei": "100000000000000000",
     "count": 5,
-    "expiresAt": 1893456000
+    "expiresAt": 1893456000,
+    "tokenAddress": "0x0000000000000000000000000000000000000001",
+    "tokenSymbol": "BNB",
+    "tokenDecimals": 18,
+    "greeting": "恭喜发财",
+    "packetType": "normal"
   }'
+```
+
+### 创建确认（create-confirm，必须校验链上 PacketCreated）
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/create-confirm \
+  -H 'Content-Type: application/json' \
+  -d '{"txHash":"0x..."}'
 ```
 
 ### 查询红包状态
@@ -61,10 +76,10 @@ curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/claim/prepare \
   -d '{"claimerAddress":"0x2222222222222222222222222222222222222222"}'
 ```
 
-### 领取确认（链上交易成功后）
+### 领取确认（claim-confirm，必须校验链上 Claimed）
 
 ```bash
-curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/confirm \
+curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/claim-confirm \
   -H 'Content-Type: application/json' \
   -d '{
     "claimerAddress": "0x2222222222222222222222222222222222222222",
