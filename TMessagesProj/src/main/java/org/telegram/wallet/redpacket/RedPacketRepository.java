@@ -246,7 +246,7 @@ public class RedPacketRepository {
 
         JSONObject root = requestJson(
                 "POST",
-                "/red-packets/create",
+                "/red-packets/prepare-create",
                 body
         );
         JSONObject data = unwrapData(root);
@@ -301,11 +301,20 @@ public class RedPacketRepository {
         body.put("creatorWallet", creatorWallet);
         body.put("txHash", txHash);
 
-        requestJson(
-                "POST",
-                "/red-packets/" + Uri.encode(packetId) + "/confirm",
-                body
-        );
+        try {
+            requestJson(
+                    "POST",
+                    "/red-packets/" + Uri.encode(packetId) + "/create-confirm",
+                    body
+            );
+        } catch (Throwable firstError) {
+            // 兼容旧服务端：create confirm 可能复用 /confirm 路由
+            requestJson(
+                    "POST",
+                    "/red-packets/" + Uri.encode(packetId) + "/confirm",
+                    body
+            );
+        }
     }
 
     public void confirmClaim(String packetId, String claimerAddress, String txHash) throws Exception {
