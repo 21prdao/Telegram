@@ -79,8 +79,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         actions.setPadding(0, dp(10), 0, 0);
         quickCard.addView(actions, matchWrap());
 
-        actions.addView(createQuickButton("发送", v -> ((WalletManagerActivity) getActivity()).coordinator().toast("请前往“转账”页操作")), weightLp());
-        actions.addView(createQuickButton("收款", v -> showReceiveAddress()), weightLp());
+        actions.addView(createQuickButton("发送", v -> ((WalletWorkflowCoordinator.Host) getActivity()).toast("请前往“转账”页操作")), weightLp());        actions.addView(createQuickButton("收款", v -> showReceiveAddress()), weightLp());
         actions.addView(createQuickButton("红包", v -> ((WalletManagerActivity) getActivity()).toast("请在聊天中发起红包")), weightLp());
         actions.addView(createQuickButton("添加代币", v -> coordinator().showAddTokenDialog(this::refresh)), weightLp());
 
