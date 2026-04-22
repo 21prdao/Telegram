@@ -29,7 +29,7 @@ public class WalletWorkflowCoordinator {
     }
 
     public interface BalancesCallback {
-        void onResult(String selectedAddress, String summary, String favorites);
+        void onResult(String selectedAddress, String totalAsset, String chainName, List<String> tokenLines);
     }
 
     public interface StatusCallback {
@@ -147,20 +147,10 @@ public class WalletWorkflowCoordinator {
     public void loadBalances(BalancesCallback callback) {
         String selected = WalletStorage.getSelectedAddress(activity);
         if (TextUtils.isEmpty(selected)) {
-            callback.onResult(null, "资产总览：BNB -", "关注代币：暂无");
+            callback.onResult(null, "--", "BNB Smart Chain", new java.util.ArrayList<>());
             return;
         }
-        List<TokenAsset> favorites = WalletStorage.getFavoriteTokens(activity);
-        StringBuilder favSb = new StringBuilder();
-        if (favorites.isEmpty()) {
-            favSb.append("关注代币：暂无");
-        } else {
-            favSb.append("关注代币：\n");
-            for (TokenAsset token : favorites) {
-                favSb.append("• ").append(token.symbol).append(" ")
-                        .append(shortAddress(token.contractAddress)).append("\n");
-            }
-        }
+        List<TokenAsset> tokens = WalletStorage.getTokens(activity);
 
         new Thread(() -> {
             try {
@@ -169,16 +159,16 @@ public class WalletWorkflowCoordinator {
                                 .send().getBalance()),
                         Convert.Unit.ETHER
                 );
-                StringBuilder tokenBalances = new StringBuilder();
+                java.util.ArrayList<String> tokenLines = new java.util.ArrayList<>();
                 Bep20Service bep20Service = new Bep20Service();
-                for (TokenAsset token : favorites) {
+                tokenLines.add("BNB: " + bnb.toPlainString());
+                for (TokenAsset token : tokens) {
                     String bal = bep20Service.getBalance(selected, token.contractAddress, token.decimals);
-                    tokenBalances.append("\n").append(token.symbol).append(": ").append(bal);
+                    tokenLines.add(token.symbol + ": " + bal + "  (" + shortAddress(token.contractAddress) + ")");
                 }
-                String summary = "资产总览：BNB " + bnb.toPlainString() + tokenBalances;
-                activity.runOnUiThread(() -> callback.onResult(selected, summary, favSb.toString().trim()));
+                activity.runOnUiThread(() -> callback.onResult(selected, bnb.toPlainString() + " BNB", "BNB Smart Chain", tokenLines));
             } catch (Throwable t) {
-                activity.runOnUiThread(() -> callback.onResult(selected, "资产查询失败：" + t.getMessage(), favSb.toString().trim()));
+                activity.runOnUiThread(() -> callback.onResult(selected, "资产查询失败", "BNB Smart Chain", new java.util.ArrayList<>()));
             }
         }).start();
     }
