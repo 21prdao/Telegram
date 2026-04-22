@@ -517,6 +517,16 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         prepare.contractAddress,
                         WalletConfig.RED_PACKET_CONTRACT
                 );
+                if (!selectedToken.isBnb()) {
+                    Bep20Service bep20Service = new Bep20Service();
+                    bep20Service.ensureAllowance(
+                            privateKeyHex,
+                            creatorWallet,
+                            selectedToken.contractAddress,
+                            contractAddress,
+                            amountRaw
+                    );
+                }
 
                 String txHash = contractService.create(
                         privateKeyHex,
