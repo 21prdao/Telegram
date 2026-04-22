@@ -7,6 +7,8 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.wallet.ui.CreateRedPacketBottomSheet;
 import org.telegram.wallet.ui.OpenRedPacketBottomSheet;
 import org.telegram.wallet.ui.WalletManagerActivity;
+import org.telegram.wallet.ui.RedPacketDetailBottomSheet;
+import org.telegram.wallet.model.RedPacketPayload;
 
 public final class WalletNavigator {
 
@@ -37,6 +39,14 @@ public final class WalletNavigator {
         }
         OpenRedPacketBottomSheet sheet =
                 new OpenRedPacketBottomSheet(parent, packetId);
+        sheet.show();
+    }
+
+    public static void openRedPacketDetail(BaseFragment parent, RedPacketPayload payload) {
+        if (parent == null || parent.getParentActivity() == null || payload == null) {
+            return;
+        }
+        RedPacketDetailBottomSheet sheet = new RedPacketDetailBottomSheet(parent, payload);
         sheet.show();
     }
 }
