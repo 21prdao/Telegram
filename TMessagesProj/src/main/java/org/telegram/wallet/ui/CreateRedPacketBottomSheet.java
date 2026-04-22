@@ -43,6 +43,7 @@ import org.telegram.wallet.redpacket.RedPacketRepository;
 import org.telegram.wallet.security.WalletKeyStore;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -517,6 +518,26 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         prepare.contractAddress,
                         WalletConfig.RED_PACKET_CONTRACT
                 );
+                if (!selectedToken.isBnb()) {
+                    Bep20Service bep20Service = new Bep20Service();
+                    BigInteger allowanceRaw = bep20Service.getAllowanceRaw(
+                            creatorWallet,
+                            contractAddress,
+                            selectedToken.contractAddress
+                    );
+                    if (allowanceRaw.compareTo(amountRaw) < 0) {
+                        String approveTxHash = bep20Service.approve(
+                                privateKeyHex,
+                                selectedToken.contractAddress,
+                                contractAddress,
+                                amountRaw
+                        );
+                        TransactionReceipt approveReceipt = bep20Service.waitForReceipt(approveTxHash, 120_000L, 1_500L);
+                        if (approveReceipt == null || !"0x1".equalsIgnoreCase(approveReceipt.getStatus())) {
+                            throw new IllegalStateException("approve 交易失败");
+                        }
+                    }
+                }
 
                 String txHash = contractService.create(
                         privateKeyHex,
