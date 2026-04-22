@@ -12,10 +12,8 @@ contract TelegramRedPacketV2 is ReentrancyGuard {
     string public symbol;
 
     constructor(string memory name_, string memory symbol_) {
-        require(bytes(name_).length != 0, "name empty");
-        require(bytes(symbol_).length != 0, "symbol empty");
-        name = name_;
-        symbol = symbol_;
+        name = bytes(name_).length == 0 ? "ETZRedPacket" : name_;
+        symbol = bytes(symbol_).length == 0 ? "ETZRedPacket" : symbol_;
     }
 
     uint32 public constant MAX_PACKET_COUNT = 500;
