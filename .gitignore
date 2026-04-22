@@ -1,3 +1,5 @@
+.deps
+/web3-server/artifacts
 .idea/
 .gradle/
 build/

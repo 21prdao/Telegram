@@ -142,7 +142,7 @@ android {
             buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
             buildConfigField "String", "BSC_RPC_URL", "\"https://data-seed-prebsc-1-s1.bnbchain.org:8545\""
             buildConfigField "long", "BSC_CHAIN_ID", "97L"
-            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xd4A8912d72aECEa4748B92b608D0B89F05681f1a\""
+            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3\""
         }
 
         HA_private {
@@ -212,7 +212,7 @@ android {
             buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
             buildConfigField "String", "BSC_RPC_URL", "\"https://data-seed-prebsc-1-s1.bnbchain.org:8545\""
             buildConfigField "long", "BSC_CHAIN_ID", "97L"
-            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xd4A8912d72aECEa4748B92b608D0B89F05681f1a\""
+            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3\""
         }
 
         release {
@@ -235,7 +235,7 @@ android {
             buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
             buildConfigField "String", "BSC_RPC_URL", "\"https://data-seed-prebsc-1-s1.bnbchain.org:8545\""
             buildConfigField "long", "BSC_CHAIN_ID", "97L"
-            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xd4A8912d72aECEa4748B92b608D0B89F05681f1a\""
+            buildConfigField "String", "RED_PACKET_CONTRACT", "\"0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3\""
         }
     }
 
