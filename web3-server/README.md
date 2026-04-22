@@ -16,6 +16,8 @@ npm install
 npm run dev
 ```
 
+`npm run dev` 使用 Node.js watch 模式启动（`node --watch src/server.js`），修改 `src/server.js` 后会自动重启，便于开发联调及时生效。
+
 默认监听 `http://127.0.0.1:8787`。
 
 可选环境变量：
@@ -46,13 +48,14 @@ curl -X POST http://127.0.0.1:8787/api/v1/red-packets/prepare-create \
     "totalAmountWei": "100000000000000000",
     "count": 5,
     "expiresAt": 1893456000,
-    "tokenAddress": "0x0000000000000000000000000000000000000001",
     "tokenSymbol": "BNB",
     "tokenDecimals": 18,
     "greeting": "恭喜发财",
     "packetType": "normal"
   }'
 ```
+
+> 说明：发送 **BNB 原生红包** 时不需要传 `tokenAddress`；发送 BEP-20 代币红包时再传对应合约地址。
 
 ### 创建确认（create-confirm，必须校验链上 PacketCreated）
 

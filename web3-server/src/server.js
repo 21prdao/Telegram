@@ -12,6 +12,11 @@ const { JsonRpcProvider, Interface, getAddress, isAddress } = require('ethers');
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
+app.use((req, _res, next) => {
+  // eslint-disable-next-line no-console
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`, req.body || {});
+  next();
+});
 
 const CHAIN_ID = Number(process.env.CHAIN_ID || 97);
 const CONTRACT_ADDRESS = (process.env.RED_PACKET_CONTRACT || '0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3').trim();
@@ -61,6 +66,14 @@ class JsonDB {
   upsertPacket(packet) {
     this.data.packets[packet.packetId] = packet;
     this.save();
+    // eslint-disable-next-line no-console
+    console.log('[packet-upsert]', {
+      packetId: packet.packetId,
+      status: packet.status,
+      remainingCount: packet.remainingCount,
+      tokenSymbol: packet.tokenSymbol,
+      tokenAddress: packet.tokenAddress,
+    });
     return packet;
   }
 }
@@ -101,6 +114,8 @@ function packetIdToHex(packetId) {
 }
 
 function badRequest(res, message) {
+  // eslint-disable-next-line no-console
+  console.log('[badRequest]', message);
   return res.status(400).json({ ok: false, message });
 }
 
@@ -208,16 +223,19 @@ app.post('/api/v1/red-packets/prepare-create', (req, res) => {
   const countNum = parsePositiveInt(count);
   const totalWei = parsePositiveBigInt(totalAmountWei);
   const expiresAtNum = parsePositiveInt(expiresAt);
-  const tokenAddr = normalizeAddress(tokenAddress);
-  const tokenDecimalsNum = Number.isInteger(Number(tokenDecimals)) && Number(tokenDecimals) >= 0 ? Number(tokenDecimals) : null;
   const tokenSymbolClean = typeof tokenSymbol === 'string' ? tokenSymbol.trim() : '';
+  const isNativeBnb = tokenSymbolClean.toUpperCase() === 'BNB';
+  const tokenAddr = normalizeAddress(tokenAddress);
+  const tokenDecimalsNum = Number.isInteger(Number(tokenDecimals)) && Number(tokenDecimals) >= 0
+    ? Number(tokenDecimals)
+    : (isNativeBnb ? 18 : null);
 
   if (!creator) return badRequest(res, 'creatorWallet invalid');
   if (!countNum || countNum > MAX_PACKET_COUNT) return badRequest(res, `count must be 1-${MAX_PACKET_COUNT}`);
   if (!totalWei) return badRequest(res, 'totalAmountWei invalid');
   if (!expiresAtNum || expiresAtNum <= nowSeconds()) return badRequest(res, 'expiresAt must be in the future');
   if (totalWei % BigInt(countNum) !== 0n) return badRequest(res, 'totalAmountWei must be divisible by count');
-  if (!tokenAddr) return badRequest(res, 'tokenAddress invalid');
+  if (!isNativeBnb && !tokenAddr) return badRequest(res, 'tokenAddress invalid');
   if (!tokenSymbolClean) return badRequest(res, 'tokenSymbol invalid');
   if (tokenDecimalsNum === null) return badRequest(res, 'tokenDecimals invalid');
 
@@ -238,7 +256,7 @@ app.post('/api/v1/red-packets/prepare-create', (req, res) => {
     expiresAt: expiresAtNum,
     status: 'pending_create_confirm',
     onchainCreated: false,
-    tokenAddress: tokenAddr,
+    tokenAddress: tokenAddr || '0x0000000000000000000000000000000000000000',
     tokenSymbol: tokenSymbolClean,
     tokenDecimals: tokenDecimalsNum,
     greeting: typeof greeting === 'string' ? greeting : '',
@@ -304,6 +322,8 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
   packet.createTxHash = txHash;
   packet.updatedAt = nowSeconds();
   db.upsertPacket(packet);
+  // eslint-disable-next-line no-console
+  console.log('[create-confirmed]', { packetId: packet.packetId, txHash });
 
   return res.json({
     ok: true,
@@ -337,6 +357,12 @@ app.post('/api/v1/red-packets/:packetId/claim/prepare', (req, res) => {
 
   packet.updatedAt = nowSeconds();
   db.upsertPacket(packet);
+  // eslint-disable-next-line no-console
+  console.log('[claim-prepare]', {
+    packetId: packet.packetId,
+    claimerAddress,
+    remainingCount: packet.remainingCount,
+  });
 
   return res.json({
     ok: true,
@@ -384,6 +410,13 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
     packet.status = 'empty';
   }
   db.upsertPacket(packet);
+  // eslint-disable-next-line no-console
+  console.log('[claim-confirmed]', {
+    packetId: packet.packetId,
+    claimerAddress,
+    txHash,
+    remainingCount: packet.remainingCount,
+  });
 
   return res.json({
     ok: true,
