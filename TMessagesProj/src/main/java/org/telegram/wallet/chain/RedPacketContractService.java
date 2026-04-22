@@ -5,11 +5,14 @@ import android.text.TextUtils;
 import org.telegram.messenger.FileLog;
 import org.telegram.wallet.config.WalletConfig;
 import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.DynamicBytes;
 import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Bytes32;
 import org.web3j.abi.datatypes.generated.Uint32;
 import org.web3j.abi.datatypes.generated.Uint64;
+import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
@@ -29,6 +32,7 @@ import java.util.Collections;
 /**
  * 当前版本按“原生 BNB 红包合约”写：
  * - createNativePacket(bytes32 packetId, uint32 count, uint64 expiresAt) payable
+ * - createTokenPacket(bytes32 packetId, address token, uint256 totalAmount, uint32 count, uint64 expiresAt)
  * - claim(bytes32 packetId, bytes signature)
  * - refund(bytes32 packetId)
  *
@@ -50,7 +54,8 @@ public class RedPacketContractService {
             String packetIdHex,
             int count,
             BigInteger amountPerClaimWei,
-            long expiresAtSeconds
+            long expiresAtSeconds,
+            String tokenAddress
     ) throws Exception {
         validatePrivateKey(privateKeyHex);
         validateAddress(contractAddress);
@@ -65,21 +70,41 @@ public class RedPacketContractService {
             throw new IllegalArgumentException("expiresAtSeconds must be > 0");
         }
 
-        BigInteger msgValue = amountPerClaimWei.multiply(BigInteger.valueOf(count));
-        Function function = new Function(
-                "createNativePacket",
-                Arrays.asList(
-                        toBytes32(packetIdHex),
-                        new Uint32(BigInteger.valueOf(count)),
-                        new Uint64(BigInteger.valueOf(expiresAtSeconds))
-                ),
-                Collections.emptyList()
-        );
+        BigInteger totalAmount = amountPerClaimWei.multiply(BigInteger.valueOf(count));
+        boolean isNative = TextUtils.isEmpty(tokenAddress) || isZeroAddress(tokenAddress);
+        Function function;
+        BigInteger txValue;
+        if (isNative) {
+            function = new Function(
+                    "createNativePacket",
+                    Arrays.asList(
+                            toBytes32(packetIdHex),
+                            new Uint32(BigInteger.valueOf(count)),
+                            new Uint64(BigInteger.valueOf(expiresAtSeconds))
+                    ),
+                    Collections.emptyList()
+            );
+            txValue = totalAmount;
+        } else {
+            validateAddress(tokenAddress);
+            function = new Function(
+                    "createTokenPacket",
+                    Arrays.<Type>asList(
+                            toBytes32(packetIdHex),
+                            new Address(tokenAddress),
+                            new Uint256(totalAmount),
+                            new Uint32(BigInteger.valueOf(count)),
+                            new Uint64(BigInteger.valueOf(expiresAtSeconds))
+                    ),
+                    Collections.emptyList()
+            );
+            txValue = BigInteger.ZERO;
+        }
         return sendFunctionTransaction(
                 privateKeyHex,
                 contractAddress,
                 function,
-                msgValue,
+                txValue,
                 DEFAULT_GAS_LIMIT_CREATE
         );
     }
@@ -273,6 +298,11 @@ public class RedPacketContractService {
             s = "0x" + s;
         }
         return s;
+    }
+
+    private boolean isZeroAddress(String address) {
+        String normalized = address.trim();
+        return "0x0000000000000000000000000000000000000000".equalsIgnoreCase(normalized);
     }
 
     private void validatePrivateKey(String privateKeyHex) {
