@@ -3,6 +3,8 @@ package org.telegram.wallet.redpacket;
 import android.net.Uri;
 import android.text.TextUtils;
 
+import com.google.android.exoplayer2.util.Log;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.telegram.messenger.FileLog;
@@ -315,12 +317,7 @@ public class RedPacketRepository {
                     body
             );
         } catch (Throwable firstError) {
-            // 兼容旧服务端：create confirm 可能复用 /confirm 路由
-            requestJson(
-                    "POST",
-                    "/red-packets/" + Uri.encode(packetId) + "/confirm",
-                    body
-            );
+            Log.e("RedPacketRepository", firstError.toString());
         }
     }
 
@@ -346,14 +343,10 @@ public class RedPacketRepository {
                     body
             );
         } catch (Throwable firstError) {
-            // 兼容旧服务端：claim confirm 可能复用 /confirm 路由
-            requestJson(
-                    "POST",
-                    "/red-packets/" + Uri.encode(packetId) + "/confirm",
-                    body
-            );
+            Log.e("RedPacketRepository", firstError.toString());
         }
     }
+
 
     private JSONObject requestJson(String method, String relativePath, JSONObject body) throws Exception {
         HttpURLConnection connection = null;
