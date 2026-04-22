@@ -524,7 +524,8 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         packetIdHex,
                         count,
                         amountPerClaimRaw,
-                        expiresAtSeconds
+                        expiresAtSeconds,
+                        selectedToken.isBnb() ? null : selectedToken.contractAddress
                 );
 
                 RedPacketRepository.getInstance().confirmCreate(
