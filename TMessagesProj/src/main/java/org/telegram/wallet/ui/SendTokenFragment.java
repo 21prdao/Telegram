@@ -17,6 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.telegram.wallet.data.WalletStorage;
+import org.telegram.ui.ActionBar.Theme;
 
 public class SendTokenFragment extends Fragment implements WalletRefreshable {
 
@@ -71,7 +72,7 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
         Button submitButton = new Button(getActivity());
         submitButton.setText("预览并提交");
         submitButton.setTypeface(Typeface.DEFAULT_BOLD);
-        submitButton.setTextColor(0xFFFFFFFF);
+        submitButton.setTextColor(c(Theme.key_featuredStickers_buttonText));
         submitButton.setBackground(primaryBg());
         submitButton.setOnClickListener(v -> onSubmit());
 
@@ -124,15 +125,15 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
 
     private GradientDrawable inputBg() {
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFFF8FAFE);
+        bg.setColor(c(Theme.key_windowBackgroundWhite));
         bg.setCornerRadius(dp(10));
-        bg.setStroke(dp(1), 0xFFD9E2F0);
+        bg.setStroke(dp(1), c(Theme.key_divider));
         return bg;
     }
 
     private GradientDrawable primaryBg() {
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFF229ED9);
+        bg.setColor(c(Theme.key_featuredStickers_addButton));
         bg.setCornerRadius(dp(12));
         return bg;
     }
@@ -142,9 +143,9 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFFFFFFFF);
+        bg.setColor(c(Theme.key_windowBackgroundWhite));
         bg.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), 0xFFE7EDF5);
+        bg.setStroke(dp(1), c(Theme.key_divider));
         card.setBackground(bg);
         return card;
     }
@@ -152,7 +153,7 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
     private TextView createText(int size, boolean bold) {
         TextView tv = new TextView(getActivity());
         tv.setTextSize(size);
-        tv.setTextColor(0xFF1F2937);
+        tv.setTextColor(c(Theme.key_windowBackgroundWhiteBlackText));
         tv.setGravity(Gravity.START);
         if (bold) {
             tv.setTypeface(Typeface.DEFAULT_BOLD);
@@ -169,5 +170,9 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density);
+    }
+
+    private int c(String key) {
+        return Theme.getColor(key);
     }
 }

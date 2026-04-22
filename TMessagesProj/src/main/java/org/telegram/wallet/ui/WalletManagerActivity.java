@@ -7,11 +7,12 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.telegram.ui.ActionBar.Theme;
 
 public class WalletManagerActivity extends Activity implements WalletWorkflowCoordinator.Host {
 
@@ -43,49 +44,31 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         refreshCurrentFragment();
     }
 
-    private View buildRootLayout() {
+    private LinearLayout buildRootLayout() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFFF5F7FB);
+        root.setBackgroundColor(c(Theme.key_windowBackgroundGray));
 
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.VERTICAL);
-        header.setPadding(dp(18), dp(20), dp(18), dp(10));
-
-        TextView title = new TextView(this);
-        title.setText("Web3 Wallet");
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(0xFF1F2937);
-        title.setTextSize(24f);
-        header.addView(title);
-
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Telegram 风格 · TokenPocket 流程");
-        subtitle.setTextColor(0xFF6B7280);
-        subtitle.setTextSize(13f);
-        subtitle.setPadding(0, dp(6), 0, 0);
-        header.addView(subtitle);
-
-        root.addView(header, new LinearLayout.LayoutParams(
+        root.addView(buildActionBar(), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         ));
 
         FrameLayout container = new FrameLayout(this);
-        containerId = View.generateViewId();
+        containerId = android.view.View.generateViewId();
         container.setId(containerId);
         LinearLayout.LayoutParams containerLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1f
         );
-        containerLp.setMargins(dp(12), dp(4), dp(12), dp(8));
+        containerLp.setMargins(dp(12), dp(10), dp(12), dp(10));
         root.addView(container, containerLp);
 
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setPadding(dp(12), dp(6), dp(12), dp(12));
-        tabs.setBackgroundColor(0xFFF5F7FB);
+        tabs.setPadding(dp(12), dp(8), dp(12), dp(12));
+        tabs.setBackgroundColor(c(Theme.key_windowBackgroundGray));
 
         homeTab = createTab("资产");
         sendTab = createTab("转账");
@@ -107,6 +90,55 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         return root;
     }
 
+    private LinearLayout buildActionBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(12), dp(10), dp(12), dp(10));
+        bar.setBackgroundColor(c(Theme.key_windowBackgroundWhite));
+
+        TextView back = createActionButton("←");
+        back.setOnClickListener(v -> finish());
+        bar.addView(back, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        TextView title = new TextView(this);
+        title.setText("Web3 Wallet");
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(19f);
+        title.setTextColor(c(Theme.key_windowBackgroundWhiteBlackText));
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        bar.addView(title, titleLp);
+
+        TextView settings = createActionButton("⚙");
+        settings.setOnClickListener(v -> showDeveloperInfoDialog());
+        bar.addView(settings, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        return bar;
+    }
+
+    private TextView createActionButton(String text) {
+        TextView button = new TextView(this);
+        button.setText(text);
+        button.setGravity(Gravity.CENTER);
+        button.setTextSize(20f);
+        button.setTextColor(c(Theme.key_windowBackgroundWhiteBlackText));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(c(Theme.key_windowBackgroundWhite));
+        bg.setCornerRadius(dp(12));
+        bg.setStroke(dp(1), c(Theme.key_divider));
+        button.setBackground(bg);
+        return button;
+    }
+
+    private void showDeveloperInfoDialog() {
+        coordinator.checkConnectivity(status -> new android.app.AlertDialog.Builder(this)
+                .setTitle("开发者信息")
+                .setMessage(status)
+                .setPositiveButton("确定", null)
+                .show());
+    }
+
     private LinearLayout.LayoutParams tabLp() {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(44), 1f);
         lp.setMargins(dp(4), 0, dp(4), 0);
@@ -119,7 +151,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         tab.setGravity(Gravity.CENTER);
         tab.setTypeface(Typeface.DEFAULT_BOLD);
         tab.setTextSize(14f);
-        tab.setTextColor(0xFF334155);
+        tab.setTextColor(c(Theme.key_windowBackgroundWhiteGrayText));
         tab.setBackground(tabBg(false));
         return tab;
     }
@@ -127,8 +159,8 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private GradientDrawable tabBg(boolean active) {
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(12));
-        bg.setColor(active ? 0xFF229ED9 : 0xFFFFFFFF);
-        bg.setStroke(dp(1), active ? 0xFF229ED9 : 0xFFDCE5F1);
+        bg.setColor(active ? c(Theme.key_featuredStickers_addButton) : c(Theme.key_windowBackgroundWhite));
+        bg.setStroke(dp(1), active ? c(Theme.key_featuredStickers_addButton) : c(Theme.key_divider));
         return bg;
     }
 
@@ -157,13 +189,13 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
     private void updateTabState(String currentTag) {
         homeTab.setBackground(tabBg(TAG_HOME.equals(currentTag)));
-        homeTab.setTextColor(TAG_HOME.equals(currentTag) ? 0xFFFFFFFF : 0xFF334155);
+        homeTab.setTextColor(TAG_HOME.equals(currentTag) ? c(Theme.key_featuredStickers_buttonText) : c(Theme.key_windowBackgroundWhiteGrayText));
 
         sendTab.setBackground(tabBg(TAG_SEND.equals(currentTag)));
-        sendTab.setTextColor(TAG_SEND.equals(currentTag) ? 0xFFFFFFFF : 0xFF334155);
+        sendTab.setTextColor(TAG_SEND.equals(currentTag) ? c(Theme.key_featuredStickers_buttonText) : c(Theme.key_windowBackgroundWhiteGrayText));
 
         securityTab.setBackground(tabBg(TAG_SECURITY.equals(currentTag)));
-        securityTab.setTextColor(TAG_SECURITY.equals(currentTag) ? 0xFFFFFFFF : 0xFF334155);
+        securityTab.setTextColor(TAG_SECURITY.equals(currentTag) ? c(Theme.key_featuredStickers_buttonText) : c(Theme.key_windowBackgroundWhiteGrayText));
     }
 
     private String getCurrentTag() {
@@ -180,6 +212,10 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density);
+    }
+
+    private int c(String key) {
+        return Theme.getColor(key);
     }
 
     @Override
