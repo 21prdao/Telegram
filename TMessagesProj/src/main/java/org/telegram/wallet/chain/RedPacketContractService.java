@@ -18,6 +18,9 @@ import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.response.EthBlock;
+import org.web3j.protocol.core.methods.response.EthEstimateGas;
 import org.web3j.protocol.core.methods.response.EthGasPrice;
 import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
@@ -47,6 +50,10 @@ public class RedPacketContractService {
     private static final BigInteger MIN_GAS_PRICE_WEI = BigInteger.valueOf(3_000_000_000L); // 3 gwei
     private static final BigInteger GAS_PRICE_MULTIPLIER_NUM = BigInteger.valueOf(12L);
     private static final BigInteger GAS_PRICE_MULTIPLIER_DEN = BigInteger.TEN;
+    private static final BigInteger GAS_LIMIT_MULTIPLIER_NUM = BigInteger.valueOf(12L);
+    private static final BigInteger GAS_LIMIT_MULTIPLIER_DEN = BigInteger.TEN;
+    private static final BigInteger GAS_LIMIT_BLOCK_CAP_NUM = BigInteger.valueOf(95L);
+    private static final BigInteger GAS_LIMIT_BLOCK_CAP_DEN = BigInteger.valueOf(100L);
 
     public String create(
             String privateKeyHex,
@@ -216,11 +223,19 @@ public class RedPacketContractService {
         BigInteger nonce = nonceResponse.getTransactionCount();
         BigInteger gasPrice = resolveGasPrice(web3j);
         String data = FunctionEncoder.encode(function);
+        BigInteger resolvedGasLimit = resolveGasLimit(
+                web3j,
+                credentials.getAddress(),
+                contractAddress,
+                valueWei,
+                data,
+                gasLimit
+        );
 
         RawTransaction rawTransaction = RawTransaction.createTransaction(
                 nonce,
                 gasPrice,
-                gasLimit,
+                resolvedGasLimit,
                 contractAddress,
                 valueWei,
                 data
@@ -267,6 +282,60 @@ public class RedPacketContractService {
             FileLog.e(t);
             return MIN_GAS_PRICE_WEI;
         }
+    }
+
+    private BigInteger resolveGasLimit(
+            Web3j web3j,
+            String fromAddress,
+            String contractAddress,
+            BigInteger valueWei,
+            String data,
+            BigInteger fallbackGasLimit
+    ) {
+        BigInteger latestBlockCap = null;
+        try {
+            EthBlock blockResponse = web3j.ethGetBlockByNumber(DefaultBlockParameterName.LATEST, false).send();
+            EthBlock.Block latest = blockResponse != null ? blockResponse.getBlock() : null;
+            BigInteger latestGasLimit = latest != null ? latest.getGasLimit() : null;
+            if (latestGasLimit != null && latestGasLimit.signum() > 0) {
+                latestBlockCap = latestGasLimit.multiply(GAS_LIMIT_BLOCK_CAP_NUM).divide(GAS_LIMIT_BLOCK_CAP_DEN);
+            }
+        } catch (Throwable t) {
+            FileLog.e(t);
+        }
+
+        BigInteger estimatedWithMargin = null;
+        try {
+            Transaction txForEstimate = Transaction.createFunctionCallTransaction(
+                    fromAddress,
+                    null,
+                    null,
+                    null,
+                    contractAddress,
+                    valueWei,
+                    data
+            );
+            EthEstimateGas estimateResponse = web3j.ethEstimateGas(txForEstimate).send();
+            if (estimateResponse != null && !estimateResponse.hasError()) {
+                BigInteger estimated = estimateResponse.getAmountUsed();
+                if (estimated != null && estimated.signum() > 0) {
+                    estimatedWithMargin = estimated.multiply(GAS_LIMIT_MULTIPLIER_NUM).divide(GAS_LIMIT_MULTIPLIER_DEN);
+                }
+            }
+        } catch (Throwable t) {
+            FileLog.e(t);
+        }
+
+        BigInteger resolved = estimatedWithMargin != null ? estimatedWithMargin : fallbackGasLimit;
+        if (resolved == null || resolved.signum() <= 0) {
+            resolved = DEFAULT_GAS_LIMIT_CREATE;
+        }
+
+        if (latestBlockCap != null && latestBlockCap.signum() > 0 && resolved.compareTo(latestBlockCap) > 0) {
+            resolved = latestBlockCap;
+        }
+
+        return resolved;
     }
 
     private Bytes32 toBytes32(String packetIdHex) {
