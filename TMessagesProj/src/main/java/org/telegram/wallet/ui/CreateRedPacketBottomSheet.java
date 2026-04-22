@@ -43,6 +43,7 @@ import org.telegram.wallet.redpacket.RedPacketRepository;
 import org.telegram.wallet.security.WalletKeyStore;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
