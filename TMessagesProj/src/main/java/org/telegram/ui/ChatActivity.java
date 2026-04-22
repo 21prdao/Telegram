@@ -343,6 +343,8 @@ import me.vkryl.core.reference.ReferenceList;
 
 import org.telegram.wallet.navigation.WalletNavigator;
 import org.telegram.wallet.redpacket.RedPacketLinkParser;
+import org.telegram.wallet.redpacket.RedPacketPayloadParser;
+import org.telegram.wallet.model.RedPacketPayload;
 
 @SuppressWarnings("unchecked")
 public class ChatActivity extends BaseFragment implements
@@ -39531,6 +39533,12 @@ public class ChatActivity extends BaseFragment implements
                 return;
             }
 
+            RedPacketPayload web3Payload = RedPacketPayloadParser.parseFromUrl(url);
+            if (web3Payload != null) {
+                WalletNavigator.openRedPacketDetail(ChatActivity.this, web3Payload);
+                return;
+            }
+
             RedPacketLinkParser.Result redPacket = RedPacketLinkParser.parse(url);
             if (redPacket != null) {
                 WalletNavigator.openClaimRedPacket(ChatActivity.this, redPacket.packetId);
@@ -40895,6 +40903,12 @@ public class ChatActivity extends BaseFragment implements
     private boolean openLinkInternally(String urlFinal, ChatMessageCell cell, CharacterStyle span, int fromMessageId, int fromMessageProgressType) {
         if (currentChat == null || urlFinal == null || chatMode != 0) {
             return false;
+        }
+
+        RedPacketPayload web3Payload = RedPacketPayloadParser.parseFromUrl(urlFinal);
+        if (web3Payload != null) {
+            WalletNavigator.openRedPacketDetail(ChatActivity.this, web3Payload);
+            return true;
         }
 
         RedPacketLinkParser.Result redPacket = RedPacketLinkParser.parse(urlFinal);
