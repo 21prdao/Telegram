@@ -48,7 +48,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         Button backupButton = new Button(getActivity());
         backupButton.setText("查看当前钱包私钥");
         backupButton.setTypeface(Typeface.DEFAULT_BOLD);
-        backupButton.setTextColor(c(Theme.key_featuredStickers_buttonText));
+        backupButton.setTextColor(c(String.valueOf(Theme.key_featuredStickers_buttonText)));
         backupButton.setBackground(primaryBg());
         backupButton.setOnClickListener(v -> showPrivateKey());
 
@@ -83,7 +83,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
 
     private GradientDrawable primaryBg() {
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(Theme.key_featuredStickers_addButton));
+        bg.setColor(c(String.valueOf(Theme.key_featuredStickers_addButton)));
         bg.setCornerRadius(dp(12));
         return bg;
     }
@@ -93,9 +93,9 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(Theme.key_windowBackgroundWhite));
+        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
         bg.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), c(Theme.key_divider));
+        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
         card.setBackground(bg);
         return card;
     }
@@ -103,7 +103,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
     private TextView createText(int size, boolean bold) {
         TextView tv = new TextView(getActivity());
         tv.setTextSize(size);
-        tv.setTextColor(c(Theme.key_windowBackgroundWhiteBlackText));
+        tv.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
         if (bold) {
             tv.setTypeface(Typeface.DEFAULT_BOLD);
         }
@@ -122,6 +122,6 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
     }
 
     private int c(String key) {
-        return Theme.getColor(key);
+        return Theme.getColor(Integer.parseInt(key));
     }
 }

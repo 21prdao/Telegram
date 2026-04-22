@@ -36,7 +36,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         ScrollView scroll = new ScrollView(getActivity());
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(c(Theme.key_windowBackgroundGray));
+        scroll.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundGray)));
 
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
@@ -46,15 +46,15 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout assetCard = createCard();
         root.addView(assetCard, matchWrap());
 
-        TextView assetTitle = createBodyText(13, false, Theme.key_windowBackgroundWhiteGrayText2);
+        TextView assetTitle = createBodyText(13, false, String.valueOf(Theme.key_windowBackgroundWhiteGrayText2));
         assetTitle.setText("总资产");
         assetCard.addView(assetTitle, matchWrap());
 
-        totalAssetView = createBodyText(20, true, Theme.key_windowBackgroundWhiteBlackText);
+        totalAssetView = createBodyText(20, true, String.valueOf(Theme.key_windowBackgroundWhiteBlackText));
         totalAssetView.setPadding(0, dp(4), 0, 0);
         assetCard.addView(totalAssetView, matchWrap());
 
-        walletAddressView = createBodyText(14, false, Theme.key_windowBackgroundWhiteBlackText);
+        walletAddressView = createBodyText(14, false, String.valueOf(Theme.key_windowBackgroundWhiteBlackText));
         walletAddressView.setPadding(0, dp(10), 0, 0);
         assetCard.addView(walletAddressView, matchWrap());
 
@@ -62,14 +62,14 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         copyBtn.setOnClickListener(v -> copyAddress());
         assetCard.addView(copyBtn, topWrap(10));
 
-        chainNameView = createBodyText(13, false, Theme.key_windowBackgroundWhiteGrayText2);
+        chainNameView = createBodyText(13, false, String.valueOf(Theme.key_windowBackgroundWhiteGrayText2));
         chainNameView.setPadding(0, dp(10), 0, 0);
         assetCard.addView(chainNameView, matchWrap());
 
         LinearLayout quickCard = createCard();
         root.addView(quickCard, topWrap(10));
 
-        TextView quickTitle = createBodyText(15, true, Theme.key_windowBackgroundWhiteBlackText);
+        TextView quickTitle = createBodyText(15, true, String.valueOf(Theme.key_windowBackgroundWhiteBlackText));
         quickTitle.setText("快捷操作");
         quickCard.addView(quickTitle, matchWrap());
 
@@ -86,11 +86,11 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
 
         LinearLayout tokenCard = createCard();
         root.addView(tokenCard, topWrap(10));
-        TextView tokenTitle = createBodyText(15, true, Theme.key_windowBackgroundWhiteBlackText);
+        TextView tokenTitle = createBodyText(15, true, String.valueOf(Theme.key_windowBackgroundWhiteBlackText));
         tokenTitle.setText("Token 列表");
         tokenCard.addView(tokenTitle, matchWrap());
 
-        tokenListView = createBodyText(14, false, Theme.key_windowBackgroundWhiteBlackText);
+        tokenListView = createBodyText(14, false, String.valueOf(Theme.key_windowBackgroundWhiteBlackText));
         tokenListView.setPadding(0, dp(8), 0, 0);
         tokenCard.addView(tokenListView, matchWrap());
 
@@ -155,7 +155,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         b.setText(text);
         b.setTextSize(13f);
         b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setTextColor(c(Theme.key_windowBackgroundWhiteBlackText));
+        b.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
         b.setBackground(createButtonBackground());
         b.setOnClickListener(listener);
         b.setAllCaps(false);
@@ -168,9 +168,9 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         b.setTextSize(13f);
         b.setAllCaps(false);
         b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setTextColor(c(Theme.key_featuredStickers_buttonText));
+        b.setTextColor(c(String.valueOf(Theme.key_featuredStickers_buttonText)));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(Theme.key_featuredStickers_addButton));
+        bg.setColor(c(String.valueOf(Theme.key_featuredStickers_addButton)));
         bg.setCornerRadius(dp(10));
         b.setBackground(bg);
         return b;
@@ -179,8 +179,8 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     private GradientDrawable createButtonBackground() {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setCornerRadius(dp(10));
-        drawable.setColor(c(Theme.key_windowBackgroundWhite));
-        drawable.setStroke(dp(1), c(Theme.key_divider));
+        drawable.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
+        drawable.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
         return drawable;
     }
 
@@ -189,9 +189,9 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(Theme.key_windowBackgroundWhite));
+        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
         bg.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), c(Theme.key_divider));
+        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
         card.setBackground(bg);
         return card;
     }
@@ -230,6 +230,6 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     }
 
     private int c(String key) {
-        return Theme.getColor(key);
+        return Theme.getColor(Integer.parseInt(key));
     }
 }

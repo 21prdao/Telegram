@@ -47,7 +47,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private LinearLayout buildRootLayout() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(c(Theme.key_windowBackgroundGray));
+        root.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundGray)));
 
         root.addView(buildActionBar(), new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -68,7 +68,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setPadding(dp(12), dp(8), dp(12), dp(12));
-        tabs.setBackgroundColor(c(Theme.key_windowBackgroundGray));
+        tabs.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundGray)));
 
         homeTab = createTab("资产");
         sendTab = createTab("转账");
@@ -95,7 +95,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(12), dp(10), dp(12), dp(10));
-        bar.setBackgroundColor(c(Theme.key_windowBackgroundWhite));
+        bar.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
 
         TextView back = createActionButton("←");
         back.setOnClickListener(v -> finish());
@@ -105,7 +105,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         title.setText("Web3 Wallet");
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextSize(19f);
-        title.setTextColor(c(Theme.key_windowBackgroundWhiteBlackText));
+        title.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
         title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         bar.addView(title, titleLp);
@@ -122,11 +122,11 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         button.setText(text);
         button.setGravity(Gravity.CENTER);
         button.setTextSize(20f);
-        button.setTextColor(c(Theme.key_windowBackgroundWhiteBlackText));
+        button.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(Theme.key_windowBackgroundWhite));
+        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
         bg.setCornerRadius(dp(12));
-        bg.setStroke(dp(1), c(Theme.key_divider));
+        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
         button.setBackground(bg);
         return button;
     }
@@ -151,7 +151,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         tab.setGravity(Gravity.CENTER);
         tab.setTypeface(Typeface.DEFAULT_BOLD);
         tab.setTextSize(14f);
-        tab.setTextColor(c(Theme.key_windowBackgroundWhiteGrayText));
+        tab.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
         tab.setBackground(tabBg(false));
         return tab;
     }
@@ -159,8 +159,8 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private GradientDrawable tabBg(boolean active) {
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(12));
-        bg.setColor(active ? c(Theme.key_featuredStickers_addButton) : c(Theme.key_windowBackgroundWhite));
-        bg.setStroke(dp(1), active ? c(Theme.key_featuredStickers_addButton) : c(Theme.key_divider));
+        bg.setColor(active ? c(String.valueOf(Theme.key_featuredStickers_addButton)) : c(String.valueOf(Theme.key_windowBackgroundWhite)));
+        bg.setStroke(dp(1), active ? c(String.valueOf(Theme.key_featuredStickers_addButton)) : c(String.valueOf(Theme.key_divider)));
         return bg;
     }
 
@@ -189,13 +189,13 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
     private void updateTabState(String currentTag) {
         homeTab.setBackground(tabBg(TAG_HOME.equals(currentTag)));
-        homeTab.setTextColor(TAG_HOME.equals(currentTag) ? c(Theme.key_featuredStickers_buttonText) : c(Theme.key_windowBackgroundWhiteGrayText));
+        homeTab.setTextColor(TAG_HOME.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
 
         sendTab.setBackground(tabBg(TAG_SEND.equals(currentTag)));
-        sendTab.setTextColor(TAG_SEND.equals(currentTag) ? c(Theme.key_featuredStickers_buttonText) : c(Theme.key_windowBackgroundWhiteGrayText));
+        sendTab.setTextColor(TAG_SEND.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
 
         securityTab.setBackground(tabBg(TAG_SECURITY.equals(currentTag)));
-        securityTab.setTextColor(TAG_SECURITY.equals(currentTag) ? c(Theme.key_featuredStickers_buttonText) : c(Theme.key_windowBackgroundWhiteGrayText));
+        securityTab.setTextColor(TAG_SECURITY.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
     }
 
     private String getCurrentTag() {
@@ -215,7 +215,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     }
 
     private int c(String key) {
-        return Theme.getColor(key);
+        return Theme.getColor(Integer.parseInt(key));
     }
 
     @Override
