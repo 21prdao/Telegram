@@ -209,6 +209,7 @@ app.post('/api/v1/red-packets/prepare-create', (req, res) => {
   const totalWei = parsePositiveBigInt(totalAmountWei);
   const expiresAtNum = parsePositiveInt(expiresAt);
   const tokenAddr = normalizeAddress(tokenAddress);
+  console.log(tokenAddr);
   const tokenDecimalsNum = Number.isInteger(Number(tokenDecimals)) && Number(tokenDecimals) >= 0 ? Number(tokenDecimals) : null;
   const tokenSymbolClean = typeof tokenSymbol === 'string' ? tokenSymbol.trim() : '';
 
