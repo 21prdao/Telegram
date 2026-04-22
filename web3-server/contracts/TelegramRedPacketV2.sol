@@ -8,8 +8,15 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 contract TelegramRedPacketV2 is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    string public constant name = "ETZRedPacket";
-    string public constant symbol = "ETZRedPacket";
+    string public name;
+    string public symbol;
+
+    constructor(string memory name_, string memory symbol_) {
+        require(bytes(name_).length != 0, "name empty");
+        require(bytes(symbol_).length != 0, "symbol empty");
+        name = name_;
+        symbol = symbol_;
+    }
 
     uint32 public constant MAX_PACKET_COUNT = 500;
     uint64 public constant MAX_EXPIRES_IN = 30 days;
