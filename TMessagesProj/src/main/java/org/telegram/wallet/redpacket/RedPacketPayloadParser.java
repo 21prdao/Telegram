@@ -64,6 +64,7 @@ public final class RedPacketPayloadParser {
             payload.totalAmount = firstNonEmpty(optString(data, "totalAmount", "amount", "total"), "");
             payload.count = data.optInt("count", data.optInt("totalCount", 0));
             payload.expiresAt = data.optLong("expiresAt", data.optLong("expireAt", 0));
+            payload.greeting = firstNonEmpty(optString(data, "greeting", "blessing", "message"), "");
             payload.claimUrl = optString(data, "claimUrl", "claim_url", "url");
             payload.deepLink = url;
             if (TextUtils.isEmpty(payload.packetId)) {
