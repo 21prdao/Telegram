@@ -1499,6 +1499,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private final RectF web3RedPacketCardRect = new RectF();
     private boolean web3RedPacketPressed;
     private TextPaint web3RedPacketTitlePaint;
+    private TextPaint web3RedPacketGreetingPaint;
     private TextPaint web3RedPacketSubtitlePaint;
     private int substractBackgroundHeight;
     private boolean allowAssistant;
@@ -26042,70 +26043,117 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             left = currentMessageObject.isOutOwner() ? getMeasuredWidth() - cardWidth - dp(16) : dp(16);
             right = left + cardWidth;
             top = dp(6);
-            bottom = top + dp(108);
+            bottom = top + dp(136);
         }
         web3RedPacketCardRect.set(left, top, right, bottom);
 
-        int cardColor;
+        int topColor;
+        int bottomColor;
+        int dividerColor;
+        int badgeColor;
         switch (payload.normalizedStatus()) {
             case RedPacketPayload.STATUS_ACTIVE:
-                cardColor = Color.parseColor("#F97316");
+                topColor = Color.parseColor("#FA8C16");
+                bottomColor = Color.parseColor("#F97316");
+                dividerColor = 0x33FFFFFF;
+                badgeColor = 0x33FFFFFF;
                 break;
             case RedPacketPayload.STATUS_CLAIMED:
-                cardColor = Color.parseColor("#16A34A");
+                topColor = Color.parseColor("#22C55E");
+                bottomColor = Color.parseColor("#16A34A");
+                dividerColor = 0x33FFFFFF;
+                badgeColor = 0x33FFFFFF;
                 break;
             case RedPacketPayload.STATUS_EMPTY:
-                cardColor = Color.parseColor("#6B7280");
+                topColor = Color.parseColor("#6B7280");
+                bottomColor = Color.parseColor("#4B5563");
+                dividerColor = 0x29FFFFFF;
+                badgeColor = 0x29FFFFFF;
                 break;
             case RedPacketPayload.STATUS_EXPIRED:
-                cardColor = Color.parseColor("#9CA3AF");
+                topColor = Color.parseColor("#9CA3AF");
+                bottomColor = Color.parseColor("#6B7280");
+                dividerColor = 0x26FFFFFF;
+                badgeColor = 0x26FFFFFF;
                 break;
             default:
-                cardColor = Color.parseColor("#3B82F6");
+                topColor = Color.parseColor("#60A5FA");
+                bottomColor = Color.parseColor("#3B82F6");
+                dividerColor = 0x33FFFFFF;
+                badgeColor = 0x33FFFFFF;
                 break;
         }
         if (web3RedPacketPressed) {
-            cardColor = ColorUtils.blendARGB(cardColor, Color.BLACK, 0.12f);
+            topColor = ColorUtils.blendARGB(topColor, Color.BLACK, 0.12f);
+            bottomColor = ColorUtils.blendARGB(bottomColor, Color.BLACK, 0.12f);
         }
 
         if (web3RedPacketTitlePaint == null) {
             web3RedPacketTitlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-            web3RedPacketTitlePaint.setTextSize(dp(16));
+            web3RedPacketTitlePaint.setTextSize(dp(19));
             web3RedPacketTitlePaint.setTypeface(Typeface.DEFAULT_BOLD);
             web3RedPacketTitlePaint.setColor(Color.WHITE);
 
+            web3RedPacketGreetingPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            web3RedPacketGreetingPaint.setTextSize(dp(15));
+            web3RedPacketGreetingPaint.setTypeface(Typeface.DEFAULT_BOLD);
+            web3RedPacketGreetingPaint.setColor(0xFFFDF3D1);
+
             web3RedPacketSubtitlePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-            web3RedPacketSubtitlePaint.setTextSize(dp(13));
+            web3RedPacketSubtitlePaint.setTextSize(dp(12));
             web3RedPacketSubtitlePaint.setColor(0xE6FFFFFF);
         }
 
-        Theme.chat_docBackPaint.setColor(cardColor);
+        Theme.chat_docBackPaint.setShader(new LinearGradient(
+                web3RedPacketCardRect.left,
+                web3RedPacketCardRect.top,
+                web3RedPacketCardRect.left,
+                web3RedPacketCardRect.bottom,
+                topColor,
+                bottomColor,
+                Shader.TileMode.CLAMP
+        ));
         canvas.drawRoundRect(web3RedPacketCardRect, dp(14), dp(14), Theme.chat_docBackPaint);
+        Theme.chat_docBackPaint.setShader(null);
 
-        float tx = web3RedPacketCardRect.left + dp(14);
-        float ty = web3RedPacketCardRect.top + dp(34);
-        canvas.drawText(payload.titleText(), tx, ty, web3RedPacketTitlePaint);
+        float iconCx = web3RedPacketCardRect.left + dp(28);
+        float iconCy = web3RedPacketCardRect.top + dp(30);
+        Theme.chat_docBackPaint.setColor(badgeColor);
+        canvas.drawCircle(iconCx, iconCy, dp(14), Theme.chat_docBackPaint);
+        canvas.drawText("¥", iconCx - dp(5), iconCy + dp(6), web3RedPacketTitlePaint);
 
-        String subtitle;
+        float tx = web3RedPacketCardRect.left + dp(52);
+        float titleY = web3RedPacketCardRect.top + dp(36);
+        canvas.drawText(payload.titleText(), tx, titleY, web3RedPacketTitlePaint);
+
+        String greeting = TextUtils.isEmpty(payload.greeting) ? "恭喜发财，大吉大利" : payload.greeting;
+        String greetingText = TextUtils.ellipsize(greeting, web3RedPacketGreetingPaint, web3RedPacketCardRect.width() - dp(24), TextUtils.TruncateAt.END).toString();
+        canvas.drawText(greetingText, web3RedPacketCardRect.left + dp(12), web3RedPacketCardRect.top + dp(78), web3RedPacketGreetingPaint);
+
+        float dividerY = web3RedPacketCardRect.bottom - dp(32);
+        Theme.chat_docBackPaint.setColor(dividerColor);
+        canvas.drawRect(web3RedPacketCardRect.left + dp(12), dividerY, web3RedPacketCardRect.right - dp(12), dividerY + dp(1), Theme.chat_docBackPaint);
+
+        String statusText;
         switch (payload.normalizedStatus()) {
             case RedPacketPayload.STATUS_ACTIVE:
-                subtitle = "可领取";
+                statusText = "查看红包";
                 break;
             case RedPacketPayload.STATUS_CLAIMED:
-                subtitle = "已领取";
+                statusText = "已领取";
                 break;
             case RedPacketPayload.STATUS_EMPTY:
-                subtitle = "已领完";
+                statusText = "已领完";
                 break;
             case RedPacketPayload.STATUS_EXPIRED:
-                subtitle = "已过期";
+                statusText = "已过期";
                 break;
             default:
-                subtitle = "加载中...";
+                statusText = "加载中...";
                 break;
         }
         String amount = TextUtils.isEmpty(payload.totalAmount) ? "" : (" · " + payload.totalAmount + " " + payload.symbol);
-        canvas.drawText(subtitle + amount, tx, ty + dp(24), web3RedPacketSubtitlePaint);
+        canvas.drawText(statusText + amount, web3RedPacketCardRect.left + dp(12), web3RedPacketCardRect.bottom - dp(11), web3RedPacketSubtitlePaint);
     }
 
     @Override

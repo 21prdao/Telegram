@@ -2,6 +2,7 @@ package org.telegram.wallet.ui;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.app.DatePickerDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -47,8 +48,12 @@ import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class CreateRedPacketBottomSheet extends BottomSheet {
 
@@ -65,7 +70,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
     private EditTextBoldCursor totalAmountEdit;
     private EditTextBoldCursor countEdit;
     private EditTextBoldCursor greetingEdit;
-    private EditTextBoldCursor expiresAtEdit;
+    private TextView expiresAtSelectorView;
     private TextView errorView;
     private TextView createButton;
     private TextView cancelButton;
@@ -74,6 +79,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
     private int selectedTokenIndex = 0;
 
     private volatile boolean submitting;
+    private long selectedExpiresAtSeconds;
 
     public CreateRedPacketBottomSheet(BaseFragment parentFragment, int account, long dialogId) {
         super(parentFragment.getParentActivity(), false, parentFragment.getResourceProvider());
@@ -170,16 +176,23 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         contentLayout.addView(greetingEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
-        addFieldLabel(context, "expiresAt（Unix 秒）");
-        expiresAtEdit = createInput(context, "例如 1767225600");
-        expiresAtEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
-        expiresAtEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
-        contentLayout.addView(expiresAtEdit, LayoutHelper.createLinear(
+        addFieldLabel(context, "到期日期（最多 30 天）");
+        expiresAtSelectorView = createActionButton(
+                context,
+                "",
+                adjustAlpha(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2), 0.12f),
+                getThemedColor(Theme.key_windowBackgroundWhiteBlackText)
+        );
+        expiresAtSelectorView.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        expiresAtSelectorView.setOnClickListener(v -> showExpiresAtPickerDialog());
+        contentLayout.addView(expiresAtSelectorView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
+
+        setDefaultExpiresAt();
 
         TextView hintView = createText(context, 13, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
         hintView.setPadding(0, AndroidUtilities.dp(12), 0, 0);
-        hintView.setText("packetType 第一版固定 equal，要求 amountRaw % count == 0。");
+        hintView.setText("packetType 第一版固定 equal，要求 amountRaw % count == 0；到期日会自动转换为 Unix 秒。");
         contentLayout.addView(hintView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
@@ -371,7 +384,6 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         final String totalText = trim(totalAmountEdit.getText() == null ? null : totalAmountEdit.getText().toString());
         final String countText = trim(countEdit.getText() == null ? null : countEdit.getText().toString());
         final String greeting = trim(greetingEdit.getText() == null ? null : greetingEdit.getText().toString());
-        final String expiresAtText = trim(expiresAtEdit.getText() == null ? null : expiresAtEdit.getText().toString());
 
         if (TextUtils.isEmpty(totalText)) {
             showError("请填写 total amount");
@@ -381,14 +393,14 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             showError("请填写 count");
             return;
         }
-        if (TextUtils.isEmpty(expiresAtText)) {
-            showError("请填写 expiresAt");
+        if (selectedExpiresAtSeconds <= 0) {
+            showError("请选择到期日期");
             return;
         }
 
         final BigDecimal totalAmount;
         final int count;
-        final long expiresAtSeconds;
+        final long expiresAtSeconds = selectedExpiresAtSeconds;
         try {
             totalAmount = new BigDecimal(totalText);
         } catch (Throwable t) {
@@ -403,13 +415,6 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             return;
         }
 
-        try {
-            expiresAtSeconds = Long.parseLong(expiresAtText);
-        } catch (Throwable t) {
-            showError("expiresAt 格式不正确");
-            return;
-        }
-
         if (totalAmount.signum() <= 0) {
             showError("红包总额必须大于 0");
             return;
@@ -418,8 +423,14 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             showError("count 必须在 1~500");
             return;
         }
-        if (expiresAtSeconds <= (System.currentTimeMillis() / 1000L)) {
-            showError("expiresAt 必须大于当前时间");
+        long nowSeconds = System.currentTimeMillis() / 1000L;
+        long maxAllowed = nowSeconds + 30L * 24L * 60L * 60L;
+        if (expiresAtSeconds <= nowSeconds) {
+            showError("到期时间必须晚于当前时间");
+            return;
+        }
+        if (expiresAtSeconds > maxAllowed) {
+            showError("到期日期不能超过 30 天");
             return;
         }
 
@@ -610,7 +621,76 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         setViewEnabled(totalAmountEdit, !show);
         setViewEnabled(countEdit, !show);
         setViewEnabled(greetingEdit, !show);
-        setViewEnabled(expiresAtEdit, !show);
+        setViewEnabled(expiresAtSelectorView, !show);
+    }
+
+    private void setDefaultExpiresAt() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.DAY_OF_MONTH, 1);
+        calendar.set(Calendar.HOUR_OF_DAY, 23);
+        calendar.set(Calendar.MINUTE, 59);
+        calendar.set(Calendar.SECOND, 59);
+        calendar.set(Calendar.MILLISECOND, 0);
+        selectedExpiresAtSeconds = calendar.getTimeInMillis() / 1000L;
+        updateExpiresAtSelectorText();
+    }
+
+    private void showExpiresAtPickerDialog() {
+        Context context = getContext();
+        if (context == null || submitting) {
+            return;
+        }
+        Calendar initial = Calendar.getInstance();
+        if (selectedExpiresAtSeconds > 0) {
+            initial.setTimeInMillis(selectedExpiresAtSeconds * 1000L);
+        } else {
+            initial.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        DatePickerDialog dialog = new DatePickerDialog(
+                context,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(Calendar.YEAR, year);
+                    selected.set(Calendar.MONTH, month);
+                    selected.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    selected.set(Calendar.HOUR_OF_DAY, 23);
+                    selected.set(Calendar.MINUTE, 59);
+                    selected.set(Calendar.SECOND, 59);
+                    selected.set(Calendar.MILLISECOND, 0);
+                    selectedExpiresAtSeconds = selected.getTimeInMillis() / 1000L;
+                    updateExpiresAtSelectorText();
+                },
+                initial.get(Calendar.YEAR),
+                initial.get(Calendar.MONTH),
+                initial.get(Calendar.DAY_OF_MONTH)
+        );
+        Calendar min = Calendar.getInstance();
+        min.set(Calendar.HOUR_OF_DAY, 0);
+        min.set(Calendar.MINUTE, 0);
+        min.set(Calendar.SECOND, 0);
+        min.set(Calendar.MILLISECOND, 0);
+        Calendar max = Calendar.getInstance();
+        max.add(Calendar.DAY_OF_MONTH, 30);
+        max.set(Calendar.HOUR_OF_DAY, 23);
+        max.set(Calendar.MINUTE, 59);
+        max.set(Calendar.SECOND, 59);
+        max.set(Calendar.MILLISECOND, 999);
+        dialog.getDatePicker().setMinDate(min.getTimeInMillis());
+        dialog.getDatePicker().setMaxDate(max.getTimeInMillis());
+        dialog.show();
+    }
+
+    private void updateExpiresAtSelectorText() {
+        if (expiresAtSelectorView == null) {
+            return;
+        }
+        if (selectedExpiresAtSeconds <= 0) {
+            expiresAtSelectorView.setText("请选择日期");
+            return;
+        }
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String dayText = format.format(new Date(selectedExpiresAtSeconds * 1000L));
+        expiresAtSelectorView.setText(dayText + "（内部: " + selectedExpiresAtSeconds + "）");
     }
 
     private void setViewEnabled(View view, boolean enabled) {

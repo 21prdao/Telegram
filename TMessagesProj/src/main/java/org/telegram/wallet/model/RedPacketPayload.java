@@ -15,6 +15,7 @@ public class RedPacketPayload {
     public String totalAmount;
     public int count;
     public long expiresAt;
+    public String greeting;
     public String claimUrl;
     public String deepLink;
 
