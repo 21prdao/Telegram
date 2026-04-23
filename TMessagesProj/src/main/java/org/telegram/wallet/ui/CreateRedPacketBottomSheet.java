@@ -690,7 +690,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         }
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
         String dayText = format.format(new Date(selectedExpiresAtSeconds * 1000L));
-        expiresAtSelectorView.setText(dayText + "（内部: " + selectedExpiresAtSeconds + "）");
+        expiresAtSelectorView.setText(dayText);
     }
 
     private void setViewEnabled(View view, boolean enabled) {
