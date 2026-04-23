@@ -7547,7 +7547,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 giveawayMessageCell.setMessageContent(messageObject, getParentWidth(), forwardedNameWidth);
                 giveawayResultsMessageCell.setMessageContent(messageObject, getParentWidth(), forwardedNameWidth);
 
-                if (messageObject.isSponsored()) {
+                if (messageObject.isWeb3RedPacket()) {
+                    backgroundWidth = Math.min(maxWidth, dp(290));
+                    totalHeight = dp(120) + namesOffset;
+                    availableTimeWidth = backgroundWidth - dp(31);
+                } else if (messageObject.isSponsored()) {
                     if (AndroidUtilities.isTablet()) {
                         backgroundWidth = Math.min(AndroidUtilities.getMinTabletSide() - dp(50), dp(270));
                     } else {
