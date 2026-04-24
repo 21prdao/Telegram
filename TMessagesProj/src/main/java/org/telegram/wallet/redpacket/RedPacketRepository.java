@@ -335,7 +335,7 @@ public class RedPacketRepository {
         try {
             requestJson(
                     "POST",
-                    "/red-packets/" + Uri.encode(packetId) + "/claim/confirm",
+                    "/red-packets/" + Uri.encode(packetId) + "/claim-confirm",
                     body
             );
         } catch (Throwable firstError) {
