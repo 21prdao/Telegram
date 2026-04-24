@@ -3,8 +3,6 @@ package org.telegram.wallet.redpacket;
 import android.net.Uri;
 import android.text.TextUtils;
 
-import com.google.android.exoplayer2.util.Log;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.telegram.messenger.FileLog;
@@ -306,15 +304,11 @@ public class RedPacketRepository {
         body.put("creatorWallet", creatorWallet);
         body.put("txHash", txHash);
 
-        try {
-            requestJson(
-                    "POST",
-                    "/red-packets/" + Uri.encode(packetId) + "/create-confirm",
-                    body
-            );
-        } catch (Throwable firstError) {
-            Log.e("RedPacketRepository", firstError.toString());
-        }
+        requestJson(
+                "POST",
+                "/red-packets/" + Uri.encode(packetId) + "/create-confirm",
+                body
+        );
     }
 
     public void confirmClaim(String packetId, String claimerAddress, String txHash) throws Exception {
@@ -332,15 +326,11 @@ public class RedPacketRepository {
         body.put("claimerAddress", claimerAddress);
         body.put("txHash", txHash);
 
-        try {
-            requestJson(
-                    "POST",
-                    "/red-packets/" + Uri.encode(packetId) + "/claim/confirm",
-                    body
-            );
-        } catch (Throwable firstError) {
-            Log.e("RedPacketRepository", firstError.toString());
-        }
+        requestJson(
+                "POST",
+                "/red-packets/" + Uri.encode(packetId) + "/claim/confirm",
+                body
+        );
     }
 
 
