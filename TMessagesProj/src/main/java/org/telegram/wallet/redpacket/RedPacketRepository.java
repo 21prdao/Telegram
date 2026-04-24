@@ -199,10 +199,6 @@ public class RedPacketRepository {
                 claimerAddress
         );
 
-        if (TextUtils.isEmpty(response.signatureHex)) {
-            throw new IllegalStateException("prepareClaim succeeded but signatureHex is empty");
-        }
-
         return response;
     }
 
