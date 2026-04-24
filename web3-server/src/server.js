@@ -136,54 +136,6 @@ class MySqlDB {
     });
   }
 
-  async init() {
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS red_packets (
-        packet_id VARCHAR(64) PRIMARY KEY,
-        packet_id_hex VARCHAR(66) NOT NULL,
-        dialog_id VARCHAR(128) NOT NULL DEFAULT '',
-        creator_wallet VARCHAR(42) NOT NULL,
-        total_amount_wei VARCHAR(120) NOT NULL,
-        amount_per_claim_wei VARCHAR(120) NOT NULL,
-        count_total INT NOT NULL,
-        remaining_count INT NOT NULL,
-        expires_at INT NOT NULL,
-        status VARCHAR(32) NOT NULL,
-        onchain_created TINYINT(1) NOT NULL DEFAULT 0,
-        create_tx_hash VARCHAR(66) DEFAULT NULL,
-        token_address VARCHAR(42) NOT NULL,
-        token_symbol VARCHAR(32) NOT NULL,
-        token_decimals INT NOT NULL,
-        greeting VARCHAR(255) NOT NULL DEFAULT '',
-        packet_type VARCHAR(64) NOT NULL DEFAULT '',
-        chain_id INT NOT NULL,
-        contract_address VARCHAR(42) NOT NULL,
-        claim_url VARCHAR(255) NOT NULL,
-        legacy_claim_url VARCHAR(255) NOT NULL,
-        created_at INT NOT NULL,
-        updated_at INT NOT NULL,
-        INDEX idx_creator_wallet (creator_wallet),
-        INDEX idx_status (status),
-        INDEX idx_created_at (created_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS red_packet_claims (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        packet_id VARCHAR(64) NOT NULL,
-        claimer_address VARCHAR(42) NOT NULL,
-        tx_hash VARCHAR(66) NOT NULL,
-        amount_wei VARCHAR(120) NOT NULL,
-        created_at INT NOT NULL,
-        UNIQUE KEY uniq_packet_claimer (packet_id, claimer_address),
-        INDEX idx_packet_id (packet_id),
-        CONSTRAINT fk_claim_packet FOREIGN KEY (packet_id)
-          REFERENCES red_packets(packet_id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    `);
-  }
-
   async getPacket(packetId) {
     const [rows] = await this.pool.query('SELECT * FROM red_packets WHERE packet_id = ? LIMIT 1', [packetId]);
     if (!rows.length) return null;
@@ -720,7 +672,6 @@ app.use((err, _req, res, _next) => {
 const port = Number(process.env.PORT || 8787);
 
 (async () => {
-  await db.init();
   app.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`red-packet service listening on http://127.0.0.1:${port}`);
