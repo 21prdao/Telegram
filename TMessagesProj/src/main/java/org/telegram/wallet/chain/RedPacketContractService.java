@@ -125,18 +125,25 @@ public class RedPacketContractService {
         validatePrivateKey(privateKeyHex);
         validateAddress(contractAddress);
 
+        Function function;
         if (TextUtils.isEmpty(signatureHex)) {
-            throw new IllegalArgumentException("signatureHex is empty");
+            function = new Function(
+                    "claim",
+                    Arrays.asList(
+                            toBytes32(packetIdHex)
+                    ),
+                    Collections.emptyList()
+            );
+        } else {
+            function = new Function(
+                    "claim",
+                    Arrays.asList(
+                            toBytes32(packetIdHex),
+                            new DynamicBytes(hexToBytes(signatureHex))
+                    ),
+                    Collections.emptyList()
+            );
         }
-
-        Function function = new Function(
-                "claim",
-                Arrays.asList(
-                        toBytes32(packetIdHex),
-                        new DynamicBytes(hexToBytes(signatureHex))
-                ),
-                Collections.emptyList()
-        );
 
         return sendFunctionTransaction(
                 privateKeyHex,
