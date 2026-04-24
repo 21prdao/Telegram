@@ -387,7 +387,7 @@ app.get('/admin', async (_req, res) => {
     <td>${escapeHtml(packet.creator_wallet)}</td>
     <td>${escapeHtml(packet.token_symbol)}</td>
     <td>${escapeHtml(packet.total_amount_wei)}</td>
-    <td>${packet.remaining_count}/${packet.count_total}</td>
+    <td>${Number(packet.count_total) - Number(packet.remaining_count)}/${packet.count_total}</td>
     <td>${escapeHtml(packet.status)}${packet.onchain_created ? '' : ' (unconfirmed)'}</td>
     <td>${new Date(Number(packet.created_at) * 1000).toISOString()}</td>
   </tr>`).join('\n');
