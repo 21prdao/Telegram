@@ -26285,7 +26285,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 statusText = "已过期";
                 break;
             default:
-                statusText = "加载中...";
+                statusText = "查看红包";
                 break;
         }
         String amount = TextUtils.isEmpty(payload.totalAmount) ? "" : (" · " + payload.totalAmount + " " + payload.symbol);
