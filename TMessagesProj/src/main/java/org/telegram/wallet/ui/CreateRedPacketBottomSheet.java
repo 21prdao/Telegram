@@ -68,6 +68,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
     private TextView tokenSelectorView;
     private EditTextBoldCursor totalAmountEdit;
+    private TextView countLabelView;
     private EditTextBoldCursor countEdit;
     private EditTextBoldCursor greetingEdit;
     private TextView expiresAtSelectorView;
@@ -162,12 +163,13 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         contentLayout.addView(totalAmountEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
-        addFieldLabel(context, "count");
+        countLabelView = addFieldLabel(context, "count");
         countEdit = createInput(context, "例如 5");
         countEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
         countEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
         contentLayout.addView(countEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
+        updateCountInputVisibility();
 
         addFieldLabel(context, "greeting");
         greetingEdit = createInput(context, "恭喜发财，大吉大利");
@@ -272,12 +274,28 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         reloadTokenOptions();
     }
 
-    private void addFieldLabel(Context context, String text) {
+    private TextView addFieldLabel(Context context, String text) {
         TextView label = createText(context, 15, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT_BOLD);
         label.setPadding(0, AndroidUtilities.dp(16), 0, AndroidUtilities.dp(8));
         label.setText(text);
         contentLayout.addView(label, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        return label;
+    }
+
+    private boolean isPrivateDialog() {
+        return dialogId > 0;
+    }
+
+    private void updateCountInputVisibility() {
+        boolean showCountInput = !isPrivateDialog();
+        if (countLabelView != null) {
+            countLabelView.setVisibility(showCountInput ? View.VISIBLE : View.GONE);
+        }
+        if (countEdit != null) {
+            countEdit.setVisibility(showCountInput ? View.VISIBLE : View.GONE);
+            countEdit.setText(showCountInput ? "" : "1");
+        }
     }
 
     @Override
@@ -382,7 +400,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         final TokenOption selectedToken = getSelectedToken();
         final String totalText = trim(totalAmountEdit.getText() == null ? null : totalAmountEdit.getText().toString());
-        final String countText = trim(countEdit.getText() == null ? null : countEdit.getText().toString());
+        final String countText = isPrivateDialog() ? "1" : trim(countEdit.getText() == null ? null : countEdit.getText().toString());
         final String greeting = trim(greetingEdit.getText() == null ? null : greetingEdit.getText().toString());
 
         if (TextUtils.isEmpty(totalText)) {
@@ -717,11 +735,12 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         tv.setTypeface(Typeface.DEFAULT_BOLD);
         tv.setTextColor(textColor);
         tv.setBackground(createRoundedButtonBackground(bgColor));
+        tv.setMinHeight(AndroidUtilities.dp(52));
         tv.setPadding(
-                AndroidUtilities.dp(16),
-                AndroidUtilities.dp(12),
-                AndroidUtilities.dp(16),
-                AndroidUtilities.dp(12)
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(14),
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(14)
         );
         return tv;
     }
@@ -729,9 +748,9 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
     private RippleDrawable createRoundedButtonBackground(int bgColor) {
         GradientDrawable content = new GradientDrawable();
         content.setColor(bgColor);
-        content.setCornerRadius(AndroidUtilities.dp(12));
+        content.setCornerRadius(AndroidUtilities.dp(16));
         return new RippleDrawable(
-                ColorStateList.valueOf(0x22000000),
+                ColorStateList.valueOf(0x33FFFFFF),
                 content,
                 null
         );
