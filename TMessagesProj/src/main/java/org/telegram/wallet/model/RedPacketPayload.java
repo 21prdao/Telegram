@@ -22,13 +22,56 @@ public class RedPacketPayload {
     public String normalizedStatus() {
         String value = status == null ? "" : status.trim().toLowerCase();
         if (STATUS_ACTIVE.equals(value)
-                || STATUS_CLAIMED.equals(value)
-                || STATUS_EMPTY.equals(value)
-                || STATUS_EXPIRED.equals(value)
-                || STATUS_LOADING.equals(value)) {
-            return value;
+                || "claimable".equals(value)
+                || "open".equals(value)
+                || "opened".equals(value)
+                || "0".equals(value)) {
+            return STATUS_ACTIVE;
         }
-        return STATUS_LOADING;
+        if (STATUS_CLAIMED.equals(value)
+                || "received".equals(value)
+                || "claimed_by_me".equals(value)
+                || "already_claimed".equals(value)
+                || "done".equals(value)
+                || "completed".equals(value)
+                || "1".equals(value)) {
+            return STATUS_CLAIMED;
+        }
+        if (STATUS_EMPTY.equals(value)
+                || "soldout".equals(value)
+                || "all_claimed".equals(value)
+                || "finished".equals(value)
+                || "2".equals(value)) {
+            return STATUS_EMPTY;
+        }
+        if (STATUS_EXPIRED.equals(value)
+                || "timeout".equals(value)
+                || "past".equals(value)
+                || "history".equals(value)
+                || "closed".equals(value)
+                || "refunded".equals(value)
+                || "3".equals(value)
+                || "4".equals(value)) {
+            return STATUS_EXPIRED;
+        }
+
+        // 兼容老消息：若消息里没有 status 字段，不应长期显示“加载中”，按有效期推导默认状态。
+        if (TextUtils.isEmpty(value) || STATUS_LOADING.equals(value)) {
+            if (isExpiredByExpiresAt(expiresAt)) {
+                return STATUS_EXPIRED;
+            }
+            return STATUS_ACTIVE;
+        }
+        return STATUS_ACTIVE;
+    }
+
+    private static boolean isExpiredByExpiresAt(long expiresAt) {
+        if (expiresAt <= 0) {
+            return false;
+        }
+        // 后端有的返回秒，有的返回毫秒；这里统一兼容两种格式。
+        long expiresAtMs = expiresAt >= 1_000_000_000_000L ? expiresAt : expiresAt * 1000L;
+        return System.currentTimeMillis() >= expiresAtMs;
     }
 
     public String titleText() {

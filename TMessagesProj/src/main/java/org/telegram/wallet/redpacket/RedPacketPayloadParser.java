@@ -59,7 +59,10 @@ public final class RedPacketPayloadParser {
 
             RedPacketPayload payload = new RedPacketPayload();
             payload.packetId = optString(data, "packetId", "packet_id", "id");
-            payload.status = firstNonEmpty(optString(data, "status", "state"), RedPacketPayload.STATUS_LOADING);
+            payload.status = firstNonEmpty(
+                    optString(data, "status", "state", "packetStatus", "packet_status"),
+                    RedPacketPayload.STATUS_LOADING
+            );
             payload.symbol = firstNonEmpty(optString(data, "symbol", "tokenSymbol", "asset"), "BNB");
             payload.totalAmount = firstNonEmpty(optString(data, "totalAmount", "amount", "total"), "");
             payload.count = data.optInt("count", data.optInt("totalCount", 0));
