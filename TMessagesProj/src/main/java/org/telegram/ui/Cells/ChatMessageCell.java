@@ -26242,10 +26242,29 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         Theme.chat_docBackPaint.setShader(null);
 
         float contentTop = web3RedPacketCardRect.top + namesOffset + dp(WEB3_RED_PACKET_CARD_CONTENT_TOP_DP);
+        RectF headerRect = AndroidUtilities.rectTmp;
+        headerRect.set(web3RedPacketCardRect.left, web3RedPacketCardRect.top, web3RedPacketCardRect.right, Math.min(web3RedPacketCardRect.bottom, contentTop + dp(34)));
+        Theme.chat_docBackPaint.setShader(new LinearGradient(
+                headerRect.left,
+                headerRect.top,
+                headerRect.left,
+                headerRect.bottom,
+                0x26FFFFFF,
+                0x00FFFFFF,
+                Shader.TileMode.CLAMP
+        ));
+        canvas.drawRoundRect(headerRect, dp(14), dp(14), Theme.chat_docBackPaint);
+        Theme.chat_docBackPaint.setShader(null);
+
         float iconCx = web3RedPacketCardRect.left + dp(28);
         float iconCy = contentTop + dp(12);
-        Theme.chat_docBackPaint.setColor(badgeColor);
+        Theme.chat_docBackPaint.setColor(ColorUtils.setAlphaComponent(badgeColor, 0x66));
         canvas.drawCircle(iconCx, iconCy, dp(14), Theme.chat_docBackPaint);
+        Theme.chat_docBackPaint.setStyle(Paint.Style.STROKE);
+        Theme.chat_docBackPaint.setStrokeWidth(dp(1.2f));
+        Theme.chat_docBackPaint.setColor(0x66FFFFFF);
+        canvas.drawCircle(iconCx, iconCy, dp(14), Theme.chat_docBackPaint);
+        Theme.chat_docBackPaint.setStyle(Paint.Style.FILL);
         canvas.drawText("¥", iconCx - dp(5), iconCy + dp(6), web3RedPacketTitlePaint);
 
         float tx = web3RedPacketCardRect.left + dp(52);
@@ -26254,8 +26273,19 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (TextUtils.isEmpty(titleText)) {
             titleText = "HTL 红包";
         }
-        titleText = TextUtils.ellipsize(titleText, web3RedPacketTitlePaint, web3RedPacketCardRect.width() - dp(68), TextUtils.TruncateAt.END).toString();
+        String symbolLabel = TextUtils.isEmpty(payload.symbol) ? "" : payload.symbol.toUpperCase(Locale.US);
+        float symbolWidth = TextUtils.isEmpty(symbolLabel) ? 0 : web3RedPacketSubtitlePaint.measureText(symbolLabel) + dp(16);
+        titleText = TextUtils.ellipsize(titleText, web3RedPacketTitlePaint, web3RedPacketCardRect.width() - dp(68) - symbolWidth, TextUtils.TruncateAt.END).toString();
         canvas.drawText(titleText, tx, titleY, web3RedPacketTitlePaint);
+        if (!TextUtils.isEmpty(symbolLabel)) {
+            float pillLeft = Math.min(web3RedPacketCardRect.right - dp(12) - symbolWidth, tx + web3RedPacketTitlePaint.measureText(titleText) + dp(8));
+            float pillTop = contentTop + dp(3);
+            RectF symbolRect = AndroidUtilities.rectTmp;
+            symbolRect.set(pillLeft, pillTop, pillLeft + symbolWidth, pillTop + dp(18));
+            Theme.chat_docBackPaint.setColor(0x2EFFFFFF);
+            canvas.drawRoundRect(symbolRect, dp(9), dp(9), Theme.chat_docBackPaint);
+            canvas.drawText(symbolLabel, symbolRect.left + dp(8), symbolRect.bottom - dp(6), web3RedPacketSubtitlePaint);
+        }
 
         int greetingWidth = Math.max(dp(60), (int) web3RedPacketCardRect.width() - dp(WEB3_RED_PACKET_CARD_HORIZONTAL_PADDING_DP * 2));
         StaticLayout greetingLayout = createWeb3RedPacketGreetingLayout(greetingWidth);
