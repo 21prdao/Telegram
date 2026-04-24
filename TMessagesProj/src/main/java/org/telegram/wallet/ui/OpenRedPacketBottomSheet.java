@@ -138,7 +138,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
         setCustomView(rootLayout);
 
         titleView = createText(context, 22, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT_BOLD);
-        titleView.setText("🎁 BNB 红包");
+        titleView.setText("🎁 红包");
         contentLayout.addView(titleView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
@@ -295,6 +295,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
     }
 
     private void bindEmptyState() {
+        titleView.setText("🎁 红包");
         statusView.setText("红包信息不可用");
         statusView.setTextColor(getThemedColor(Theme.key_text_RedRegular));
         summaryView.setText("");
@@ -318,6 +319,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
         }
 
         String symbol = TextUtils.isEmpty(info.tokenSymbol) ? "BNB" : info.tokenSymbol;
+        titleView.setText("🎁 " + symbol + " 红包");
         packetIdView.setText("红包ID： " + safe(info.packetId));
         creatorView.setText("发送人： " + safeShortAddress(info.creatorWallet));
         amountView.setText("总额： " + safeAmount(info.totalAmountDisplay, symbol));
@@ -577,11 +579,12 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
         tv.setTypeface(Typeface.DEFAULT_BOLD);
         tv.setTextColor(textColor);
         tv.setBackground(createRoundedButtonBackground(bgColor));
+        tv.setMinHeight(AndroidUtilities.dp(52));
         tv.setPadding(
-                AndroidUtilities.dp(16),
-                AndroidUtilities.dp(12),
-                AndroidUtilities.dp(16),
-                AndroidUtilities.dp(12)
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(14),
+                AndroidUtilities.dp(18),
+                AndroidUtilities.dp(14)
         );
         return tv;
     }
@@ -589,9 +592,9 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
     private RippleDrawable createRoundedButtonBackground(int bgColor) {
         GradientDrawable content = new GradientDrawable();
         content.setColor(bgColor);
-        content.setCornerRadius(AndroidUtilities.dp(12));
+        content.setCornerRadius(AndroidUtilities.dp(16));
         return new RippleDrawable(
-                ColorStateList.valueOf(0x22000000),
+                ColorStateList.valueOf(0x33FFFFFF),
                 content,
                 null
         );

@@ -5,9 +5,16 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
+    <!-- 按钮底色 -->
+    <path
+        android:fillColor="#FFF45B69"
+        android:pathData="M12,2
+                          A10,10 0 1,1 12,22
+                          A10,10 0 1,1 12,2 Z" />
+
     <!-- 红包主体 -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#FFFFD76A"
         android:pathData="M5,8
                           C5,6.895 5.895,6 7,6
                           H17
@@ -20,12 +27,12 @@
 
     <!-- 中间绑带 -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#FFFFB938"
         android:pathData="M5,11 H19 V13 H5 Z" />
 
     <!-- 上部缺口/翻盖感 -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#FFFFC64D"
         android:pathData="M8,6
                           C8,4.895 8.895,4 10,4
                           H14
@@ -38,7 +45,7 @@
 
     <!-- 中间圆钱位 -->
     <path
-        android:fillColor="#FFFFFFFF"
+        android:fillColor="#FFF45B69"
         android:pathData="M12,16.2
                           A2.2,2.2 0 1,1 12,11.8
                           A2.2,2.2 0 1,1 12,16.2 Z" />

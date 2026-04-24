@@ -3674,10 +3674,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             }
         };
         redPacketButton.setScaleType(ImageView.ScaleType.CENTER);
-        redPacketButton.setColorFilter(new PorterDuffColorFilter(
-                getThemedColor(Theme.key_glass_defaultIcon),
-                PorterDuff.Mode.MULTIPLY
-        ));
+        redPacketButton.clearColorFilter();
         redPacketButton.setImageResource(R.drawable.msg_input_redpacket);
         redPacketButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));
         redPacketButton.setContentDescription(getString(R.string.CreateRedPacket));
