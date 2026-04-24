@@ -260,7 +260,7 @@ class MySqlDB {
 
   async getPacketsForAdmin(limit = 100) {
     const [rows] = await this.pool.query(
-      `SELECT packet_id, creator_wallet, token_symbol, total_amount_wei, count_total, remaining_count,
+      `SELECT packet_id, creator_wallet, token_symbol, total_amount_wei, count_total, remaining_count, greeting,
               status, onchain_created, expires_at, created_at
        FROM red_packets
        ORDER BY created_at DESC
@@ -387,7 +387,8 @@ app.get('/admin', async (_req, res) => {
     <td>${escapeHtml(packet.creator_wallet)}</td>
     <td>${escapeHtml(packet.token_symbol)}</td>
     <td>${escapeHtml(packet.total_amount_wei)}</td>
-    <td>${packet.remaining_count}/${packet.count_total}</td>
+    <td>${Number(packet.count_total) - Number(packet.remaining_count)}/${packet.count_total}</td>
+    <td>${escapeHtml(packet.greeting)}</td>
     <td>${escapeHtml(packet.status)}${packet.onchain_created ? '' : ' (unconfirmed)'}</td>
     <td>${new Date(Number(packet.created_at) * 1000).toISOString()}</td>
   </tr>`).join('\n');
@@ -423,7 +424,7 @@ app.get('/admin', async (_req, res) => {
     <table>
       <thead>
         <tr>
-          <th>Packet ID</th><th>创建者</th><th>代币</th><th>总额(wei)</th><th>领取进度</th><th>状态</th><th>创建时间</th>
+          <th>Packet ID</th><th>创建者</th><th>代币</th><th>总额(wei)</th><th>领取进度</th><th>祝福语</th><th>状态</th><th>创建时间</th>
         </tr>
       </thead>
       <tbody>${rows || '<tr><td colspan="7">暂无数据</td></tr>'}</tbody>
