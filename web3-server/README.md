@@ -27,7 +27,20 @@ npm run dev
 - `RED_PACKET_CONTRACT`（默认 `0xYourContractAddress`）
 - `PUBLIC_HOST`（默认 `http://127.0.0.1:8787`）
 - `RPC_URL`（默认 `https://data-seed-prebsc-1-s1.bnbchain.org:8545`）
-- `RED_PACKET_DB_FILE`（默认 `./data/red-packets.json`）
+- `MYSQL_HOST`（默认 `127.0.0.1`）
+- `MYSQL_PORT`（默认 `3306`）
+- `MYSQL_USER`（默认 `root`）
+- `MYSQL_PASSWORD`（默认空）
+- `MYSQL_DATABASE`（默认 `telegram_red_packet`）
+
+
+### 管理后台
+
+启动后访问：`http://127.0.0.1:8787/admin`
+
+提供：
+- 红包总览统计（总数、进行中、待确认、已领完、领取总次数）
+- 最近红包列表和快速跳转详情 API
 
 ### 健康检查
 
@@ -103,7 +116,7 @@ curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/claim-confirm \
 
 - 将 `BuildConfig.WEB3_RED_PACKET_HOST` 指向本地 API（如 `10.0.2.2:8787` / 局域网 IP）。
 - 将 `BuildConfig.RED_PACKET_CONTRACT` 配置为部署后的合约地址。
-- 生产环境请把内存存储替换成 DB，并用真实签名替换 mock 的 `signatureHex`。
+- 生产环境建议开启管理后台鉴权（如 Nginx BasicAuth / JWT），并用真实签名替换 mock 的 `signatureHex`。
 
 ## 5) BNB Chain 文档列出的 BSC Testnet 公共 RPC
 

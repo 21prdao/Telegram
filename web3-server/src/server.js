@@ -4,10 +4,11 @@
  *   npm i
  *   npm run dev
  */
+require('dotenv').config();
+
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
+const mysql = require('mysql2/promise');
 const { JsonRpcProvider, Interface, getAddress, isAddress } = require('ethers');
 
 const app = express();
@@ -22,8 +23,13 @@ const CHAIN_ID = Number(process.env.CHAIN_ID || 97);
 const CONTRACT_ADDRESS = (process.env.RED_PACKET_CONTRACT || '0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3').trim();
 const HOST = process.env.PUBLIC_HOST || 'http://127.0.0.1:8787';
 const MAX_PACKET_COUNT = 500;
-const DB_FILE = process.env.RED_PACKET_DB_FILE || path.join(__dirname, '../data/red-packets.json');
 const RPC_URL = process.env.RPC_URL || 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
+
+const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
+const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
+const MYSQL_USER = process.env.MYSQL_USER || 'root';
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || '';
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'telegram_red_packet';
 
 const provider = new JsonRpcProvider(RPC_URL, CHAIN_ID);
 const contractAddressNorm = normalizeAddress(CONTRACT_ADDRESS);
@@ -34,54 +40,6 @@ const contractInterface = new Interface([
   'event Claimed(bytes32 indexed packetId, address indexed claimer, uint256 amount)',
   'event Claimed(bytes32 indexed packetId, address indexed claimer, address indexed token, uint256 amount)',
 ]);
-
-class JsonDB {
-  constructor(filePath) {
-    this.filePath = filePath;
-    this.data = { packets: {} };
-  }
-
-  init() {
-    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-    if (!fs.existsSync(this.filePath)) {
-      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
-      return;
-    }
-    try {
-      const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
-      if (parsed && typeof parsed === 'object' && parsed.packets && typeof parsed.packets === 'object') {
-        this.data = parsed;
-      }
-    } catch (_) {
-      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
-    }
-  }
-
-  save() {
-    fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
-  }
-
-  getPacket(packetId) {
-    return this.data.packets[packetId] || null;
-  }
-
-  upsertPacket(packet) {
-    this.data.packets[packet.packetId] = packet;
-    this.save();
-    // eslint-disable-next-line no-console
-    console.log('[packet-upsert]', {
-      packetId: packet.packetId,
-      status: packet.status,
-      remainingCount: packet.remainingCount,
-      tokenSymbol: packet.tokenSymbol,
-      tokenAddress: packet.tokenAddress,
-    });
-    return packet;
-  }
-}
-
-const db = new JsonDB(DB_FILE);
-db.init();
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -154,8 +112,262 @@ function buildPacketResponse(packet, wallet) {
   };
 }
 
-function ensurePacket(packetId, res) {
-  const packet = db.getPacket(packetId);
+function escapeHtml(input) {
+  return String(input || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+class MySqlDB {
+  constructor() {
+    this.pool = mysql.createPool({
+      host: MYSQL_HOST,
+      port: MYSQL_PORT,
+      user: MYSQL_USER,
+      password: MYSQL_PASSWORD,
+      database: MYSQL_DATABASE,
+      waitForConnections: true,
+      connectionLimit: 10,
+      decimalNumbers: false,
+      charset: 'utf8mb4',
+    });
+  }
+
+  async init() {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS red_packets (
+        packet_id VARCHAR(64) PRIMARY KEY,
+        packet_id_hex VARCHAR(66) NOT NULL,
+        dialog_id VARCHAR(128) NOT NULL DEFAULT '',
+        creator_wallet VARCHAR(42) NOT NULL,
+        total_amount_wei VARCHAR(120) NOT NULL,
+        amount_per_claim_wei VARCHAR(120) NOT NULL,
+        count_total INT NOT NULL,
+        remaining_count INT NOT NULL,
+        expires_at INT NOT NULL,
+        status VARCHAR(32) NOT NULL,
+        onchain_created TINYINT(1) NOT NULL DEFAULT 0,
+        create_tx_hash VARCHAR(66) DEFAULT NULL,
+        token_address VARCHAR(42) NOT NULL,
+        token_symbol VARCHAR(32) NOT NULL,
+        token_decimals INT NOT NULL,
+        greeting VARCHAR(255) NOT NULL DEFAULT '',
+        packet_type VARCHAR(64) NOT NULL DEFAULT '',
+        chain_id INT NOT NULL,
+        contract_address VARCHAR(42) NOT NULL,
+        claim_url VARCHAR(255) NOT NULL,
+        legacy_claim_url VARCHAR(255) NOT NULL,
+        created_at INT NOT NULL,
+        updated_at INT NOT NULL,
+        INDEX idx_creator_wallet (creator_wallet),
+        INDEX idx_status (status),
+        INDEX idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS red_packet_claims (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        packet_id VARCHAR(64) NOT NULL,
+        claimer_address VARCHAR(42) NOT NULL,
+        tx_hash VARCHAR(66) NOT NULL,
+        amount_wei VARCHAR(120) NOT NULL,
+        created_at INT NOT NULL,
+        UNIQUE KEY uniq_packet_claimer (packet_id, claimer_address),
+        INDEX idx_packet_id (packet_id),
+        CONSTRAINT fk_claim_packet FOREIGN KEY (packet_id)
+          REFERENCES red_packets(packet_id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  }
+
+  async getPacket(packetId) {
+    const [rows] = await this.pool.query('SELECT * FROM red_packets WHERE packet_id = ? LIMIT 1', [packetId]);
+    if (!rows.length) return null;
+    const row = rows[0];
+    const [claims] = await this.pool.query(
+      'SELECT claimer_address FROM red_packet_claims WHERE packet_id = ? ORDER BY id ASC',
+      [packetId],
+    );
+    return this.mapPacket(row, claims);
+  }
+
+  async upsertPacket(packet) {
+    await this.pool.query(
+      `INSERT INTO red_packets (
+        packet_id, packet_id_hex, dialog_id, creator_wallet, total_amount_wei,
+        amount_per_claim_wei, count_total, remaining_count, expires_at, status,
+        onchain_created, create_tx_hash, token_address, token_symbol, token_decimals,
+        greeting, packet_type, chain_id, contract_address, claim_url,
+        legacy_claim_url, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        packet_id_hex = VALUES(packet_id_hex),
+        dialog_id = VALUES(dialog_id),
+        creator_wallet = VALUES(creator_wallet),
+        total_amount_wei = VALUES(total_amount_wei),
+        amount_per_claim_wei = VALUES(amount_per_claim_wei),
+        count_total = VALUES(count_total),
+        remaining_count = VALUES(remaining_count),
+        expires_at = VALUES(expires_at),
+        status = VALUES(status),
+        onchain_created = VALUES(onchain_created),
+        create_tx_hash = VALUES(create_tx_hash),
+        token_address = VALUES(token_address),
+        token_symbol = VALUES(token_symbol),
+        token_decimals = VALUES(token_decimals),
+        greeting = VALUES(greeting),
+        packet_type = VALUES(packet_type),
+        chain_id = VALUES(chain_id),
+        contract_address = VALUES(contract_address),
+        claim_url = VALUES(claim_url),
+        legacy_claim_url = VALUES(legacy_claim_url),
+        created_at = VALUES(created_at),
+        updated_at = VALUES(updated_at)`,
+      [
+        packet.packetId,
+        packet.packetIdHex,
+        packet.dialogId,
+        packet.creatorWallet,
+        packet.totalAmountWei,
+        packet.amountPerClaimWei,
+        packet.count,
+        packet.remainingCount,
+        packet.expiresAt,
+        packet.status,
+        packet.onchainCreated ? 1 : 0,
+        packet.createTxHash || null,
+        packet.tokenAddress,
+        packet.tokenSymbol,
+        packet.tokenDecimals,
+        packet.greeting,
+        packet.packetType,
+        packet.chainId,
+        packet.contractAddress,
+        packet.claimUrl,
+        packet.legacyClaimUrl,
+        packet.createdAt,
+        packet.updatedAt,
+      ],
+    );
+
+    // eslint-disable-next-line no-console
+    console.log('[packet-upsert]', {
+      packetId: packet.packetId,
+      status: packet.status,
+      remainingCount: packet.remainingCount,
+      tokenSymbol: packet.tokenSymbol,
+      tokenAddress: packet.tokenAddress,
+    });
+    return packet;
+  }
+
+  async confirmClaim(packet, claimerAddress, txHash) {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [packetRows] = await conn.query('SELECT * FROM red_packets WHERE packet_id = ? FOR UPDATE', [packet.packetId]);
+      if (!packetRows.length) throw new Error('packet not found');
+      const packetRow = packetRows[0];
+
+      const [existClaims] = await conn.query(
+        'SELECT id FROM red_packet_claims WHERE packet_id = ? AND claimer_address = ? LIMIT 1',
+        [packet.packetId, claimerAddress],
+      );
+      if (existClaims.length) throw new Error('already claimed');
+
+      await conn.query(
+        `INSERT INTO red_packet_claims (packet_id, claimer_address, tx_hash, amount_wei, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [packet.packetId, claimerAddress, txHash, packet.amountPerClaimWei, nowSeconds()],
+      );
+
+      const remainingCount = Number(packetRow.remaining_count) - 1;
+      const newStatus = remainingCount <= 0 ? 'empty' : packetRow.status;
+      await conn.query(
+        `UPDATE red_packets
+         SET remaining_count = ?, status = ?, updated_at = ?
+         WHERE packet_id = ?`,
+        [remainingCount, newStatus, nowSeconds(), packet.packetId],
+      );
+
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+
+    return this.getPacket(packet.packetId);
+  }
+
+  async getPacketsForAdmin(limit = 100) {
+    const [rows] = await this.pool.query(
+      `SELECT packet_id, creator_wallet, token_symbol, total_amount_wei, count_total, remaining_count,
+              status, onchain_created, expires_at, created_at
+       FROM red_packets
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      [Math.min(Number(limit) || 100, 500)],
+    );
+    return rows;
+  }
+
+  async getAdminStats() {
+    const [statsRows] = await this.pool.query(
+      `SELECT
+        COUNT(*) AS totalPackets,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS activePackets,
+        SUM(CASE WHEN status = 'empty' THEN 1 ELSE 0 END) AS emptyPackets,
+        SUM(CASE WHEN status = 'pending_create_confirm' THEN 1 ELSE 0 END) AS pendingPackets
+       FROM red_packets`,
+    );
+    const [claimRows] = await this.pool.query('SELECT COUNT(*) AS totalClaims FROM red_packet_claims');
+    return {
+      ...(statsRows[0] || {}),
+      totalClaims: claimRows[0]?.totalClaims || 0,
+    };
+  }
+
+  mapPacket(row, claims = []) {
+    return {
+      packetId: row.packet_id,
+      packetIdHex: row.packet_id_hex,
+      dialogId: row.dialog_id,
+      creatorWallet: row.creator_wallet,
+      totalAmountWei: row.total_amount_wei,
+      amountPerClaimWei: row.amount_per_claim_wei,
+      count: Number(row.count_total),
+      remainingCount: Number(row.remaining_count),
+      claimedWallets: claims.map((c) => c.claimer_address),
+      expiresAt: Number(row.expires_at),
+      status: row.status,
+      onchainCreated: Boolean(row.onchain_created),
+      createTxHash: row.create_tx_hash || '',
+      tokenAddress: row.token_address,
+      tokenSymbol: row.token_symbol,
+      tokenDecimals: Number(row.token_decimals),
+      greeting: row.greeting,
+      packetType: row.packet_type,
+      chainId: Number(row.chain_id),
+      contractAddress: row.contract_address,
+      claimUrl: row.claim_url,
+      legacyClaimUrl: row.legacy_claim_url,
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at),
+    };
+  }
+}
+
+const db = new MySqlDB();
+
+async function ensurePacket(packetId, res) {
+  const packet = await db.getPacket(packetId);
   if (!packet) {
     res.status(404).json({ ok: false, message: 'not found' });
     return null;
@@ -190,10 +402,17 @@ function parseExpectedLog(receipt, eventName) {
 
 app.get('/healthz', async (_, res) => {
   let rpcOk = true;
+  let dbOk = true;
   try {
     await provider.getBlockNumber();
   } catch (_) {
     rpcOk = false;
+  }
+
+  try {
+    await db.pool.query('SELECT 1');
+  } catch (_) {
+    dbOk = false;
   }
 
   res.json({
@@ -203,11 +422,66 @@ app.get('/healthz', async (_, res) => {
     contractAddress: CONTRACT_ADDRESS,
     rpcUrl: RPC_URL,
     rpcOk,
+    dbOk,
     ts: nowSeconds(),
   });
 });
 
-app.post('/api/v1/red-packets/prepare-create', (req, res) => {
+app.get('/admin', async (_req, res) => {
+  const [stats, packets] = await Promise.all([db.getAdminStats(), db.getPacketsForAdmin(200)]);
+
+  const rows = packets.map((packet) => `<tr>
+    <td><a href="/api/v1/red-packets/${escapeHtml(packet.packet_id)}">${escapeHtml(packet.packet_id)}</a></td>
+    <td>${escapeHtml(packet.creator_wallet)}</td>
+    <td>${escapeHtml(packet.token_symbol)}</td>
+    <td>${escapeHtml(packet.total_amount_wei)}</td>
+    <td>${packet.remaining_count}/${packet.count_total}</td>
+    <td>${escapeHtml(packet.status)}${packet.onchain_created ? '' : ' (unconfirmed)'}</td>
+    <td>${new Date(Number(packet.created_at) * 1000).toISOString()}</td>
+  </tr>`).join('\n');
+
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>红包管理后台</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 20px; }
+    .card { background:#f6f7f9; border-radius: 10px; padding: 16px; margin-bottom: 18px; }
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .stat { background: white; border-radius: 8px; padding: 12px; border: 1px solid #eee; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; text-align: left; padding: 10px 8px; font-size: 14px; }
+    th { background: #fafafa; }
+    a { color: #0b65d8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h1>Telegram 红包管理后台</h1>
+  <div class="card stats">
+    <div class="stat"><b>总红包</b><div>${stats.totalPackets || 0}</div></div>
+    <div class="stat"><b>进行中</b><div>${stats.activePackets || 0}</div></div>
+    <div class="stat"><b>待确认</b><div>${stats.pendingPackets || 0}</div></div>
+    <div class="stat"><b>已领完</b><div>${stats.emptyPackets || 0}</div></div>
+    <div class="stat"><b>总领取次数</b><div>${stats.totalClaims || 0}</div></div>
+  </div>
+  <div class="card">
+    <h3>最近红包</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Packet ID</th><th>创建者</th><th>代币</th><th>总额(wei)</th><th>领取进度</th><th>状态</th><th>创建时间</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="7">暂无数据</td></tr>'}</tbody>
+    </table>
+  </div>
+</body>
+</html>`);
+});
+
+app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
   const {
     dialogId,
     creatorWallet,
@@ -271,7 +545,7 @@ app.post('/api/v1/red-packets/prepare-create', (req, res) => {
     updatedAt: createdAt,
   };
 
-  db.upsertPacket(packet);
+  await db.upsertPacket(packet);
 
   return res.json({
     ok: true,
@@ -295,7 +569,7 @@ app.post('/api/v1/red-packets/prepare-create', (req, res) => {
 });
 
 app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
-  const packet = ensurePacket(req.params.packetId, res);
+  const packet = await ensurePacket(req.params.packetId, res);
   if (!packet) return;
 
   const txHash = String(req.body?.txHash || '').trim();
@@ -326,7 +600,7 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
   packet.status = 'active';
   packet.createTxHash = txHash;
   packet.updatedAt = nowSeconds();
-  db.upsertPacket(packet);
+  await db.upsertPacket(packet);
   // eslint-disable-next-line no-console
   console.log('[create-confirmed]', { packetId: packet.packetId, txHash });
 
@@ -341,14 +615,14 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
   });
 });
 
-app.get('/api/v1/red-packets/:packetId', (req, res) => {
-  const packet = ensurePacket(req.params.packetId, res);
+app.get('/api/v1/red-packets/:packetId', async (req, res) => {
+  const packet = await ensurePacket(req.params.packetId, res);
   if (!packet) return;
   return res.json({ ok: true, data: buildPacketResponse(packet, req.query.wallet) });
 });
 
-app.post('/api/v1/red-packets/:packetId/claim/prepare', (req, res) => {
-  const packet = ensurePacket(req.params.packetId, res);
+app.post('/api/v1/red-packets/:packetId/claim/prepare', async (req, res) => {
+  const packet = await ensurePacket(req.params.packetId, res);
   if (!packet) return;
 
   const claimerAddress = normalizeAddress(req.body?.claimerAddress);
@@ -361,7 +635,7 @@ app.post('/api/v1/red-packets/:packetId/claim/prepare', (req, res) => {
   if (packet.claimedWallets.includes(claimerAddress)) return badRequest(res, 'already claimed');
 
   packet.updatedAt = nowSeconds();
-  db.upsertPacket(packet);
+  await db.upsertPacket(packet);
   // eslint-disable-next-line no-console
   console.log('[claim-prepare]', {
     packetId: packet.packetId,
@@ -377,13 +651,12 @@ app.post('/api/v1/red-packets/:packetId/claim/prepare', (req, res) => {
       chainId: packet.chainId,
       claimerAddress,
       amountPerClaimWei: packet.amountPerClaimWei,
-      // 合约不需要签名时，不返回 signatureHex。
     },
   });
 });
 
 app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
-  const packet = ensurePacket(req.params.packetId, res);
+  const packet = await ensurePacket(req.params.packetId, res);
   if (!packet) return;
 
   const claimerAddress = normalizeAddress(req.body?.claimerAddress);
@@ -409,34 +682,49 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
   if (eventClaimer !== claimerAddress) return badRequest(res, 'Claimed claimer mismatch');
   if (eventAmount !== packet.amountPerClaimWei) return badRequest(res, 'Claimed amount mismatch');
 
-  packet.claimedWallets.push(claimerAddress);
-  packet.remainingCount -= 1;
-  packet.updatedAt = nowSeconds();
-  if (packet.remainingCount <= 0) {
-    packet.status = 'empty';
+  let updated;
+  try {
+    updated = await db.confirmClaim(packet, claimerAddress, txHash);
+  } catch (error) {
+    if (String(error.message).includes('already claimed')) {
+      return badRequest(res, 'already claimed');
+    }
+    throw error;
   }
-  db.upsertPacket(packet);
+
   // eslint-disable-next-line no-console
   console.log('[claim-confirmed]', {
     packetId: packet.packetId,
     claimerAddress,
     txHash,
-    remainingCount: packet.remainingCount,
+    remainingCount: updated.remainingCount,
   });
 
   return res.json({
     ok: true,
     data: {
-      packetId: packet.packetId,
+      packetId: updated.packetId,
       txHash,
-      remainingCount: packet.remainingCount,
-      status: getPacketStatus(packet),
+      remainingCount: updated.remainingCount,
+      status: getPacketStatus(updated),
     },
   });
 });
 
-const port = Number(process.env.PORT || 8787);
-app.listen(port, () => {
+app.use((err, _req, res, _next) => {
   // eslint-disable-next-line no-console
-  console.log(`red-packet service listening on http://127.0.0.1:${port}`);
+  console.error('[server-error]', err);
+  res.status(500).json({ ok: false, message: 'internal error' });
 });
+
+const port = Number(process.env.PORT || 8787);
+
+(async () => {
+  await db.init();
+  app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`red-packet service listening on http://127.0.0.1:${port}`);
+    // eslint-disable-next-line no-console
+    console.log(`admin console available at http://127.0.0.1:${port}/admin`);
+  });
+})();
