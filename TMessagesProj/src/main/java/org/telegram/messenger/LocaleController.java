@@ -34,7 +34,6 @@ import androidx.annotation.RequiresApi;
 import androidx.annotation.StringRes;
 
 import org.telegram.messenger.time.FastDateFormat;
-import org.telegram.tgnet.Vector;
 import org.telegram.ui.Components.TypefaceSpan;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.tgnet.ConnectionsManager;
@@ -552,6 +551,33 @@ public class LocaleController {
 
     private ArrayList<LocaleInfo> otherLanguages = new ArrayList<>();
 
+    private void addBuiltInLanguage(String name, String nameEnglish, String shortName, boolean isRtl) {
+        LocaleInfo localeInfo = new LocaleInfo();
+        localeInfo.name = name;
+        localeInfo.nameEnglish = nameEnglish;
+        localeInfo.shortName = localeInfo.pluralLangCode = shortName;
+        localeInfo.pathToFile = null;
+        localeInfo.builtIn = true;
+        localeInfo.isRtl = isRtl;
+        languages.add(localeInfo);
+        languagesDict.put(localeInfo.getKey(), localeInfo);
+    }
+
+    private void resetToBuiltInSupportedLanguages() {
+        languages.clear();
+        languagesDict.clear();
+        otherLanguages.clear();
+        unofficialLanguages.clear();
+        remoteLanguages.clear();
+        remoteLanguagesDict.clear();
+
+        addBuiltInLanguage("English", "English", "en", false);
+        addBuiltInLanguage("Deutsch", "German", "de", false);
+        addBuiltInLanguage("日本語", "Japanese", "ja", false);
+        addBuiltInLanguage("简体中文", "Chinese (Simplified)", "zh_cn", false);
+        addBuiltInLanguage("繁體中文", "Chinese (Traditional)", "zh_tw", false);
+    }
+
     private static volatile LocaleController Instance = null;
     public static LocaleController getInstance() {
         LocaleController localInstance = Instance;
@@ -592,135 +618,7 @@ public class LocaleController {
         addRules(new String[]{"az", "bm", "fa", "ig", "hu", "ja", "kde", "kea", "ko", "my", "ses", "sg", "to",
                 "tr", "vi", "wo", "yo", "zh", "bo", "dz", "id", "jv", "jw", "ka", "km", "kn", "ms", "th", "in"}, new PluralRules_None());
 
-        LocaleInfo localeInfo = new LocaleInfo();
-        localeInfo.name = "English";
-        localeInfo.nameEnglish = "English";
-        localeInfo.shortName = localeInfo.pluralLangCode = "en";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "Italiano";
-        localeInfo.nameEnglish = "Italian";
-        localeInfo.shortName = localeInfo.pluralLangCode = "it";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "Español";
-        localeInfo.nameEnglish = "Spanish";
-        localeInfo.shortName = localeInfo.pluralLangCode = "es";
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "Deutsch";
-        localeInfo.nameEnglish = "German";
-        localeInfo.shortName = localeInfo.pluralLangCode = "de";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "Nederlands";
-        localeInfo.nameEnglish = "Dutch";
-        localeInfo.shortName = localeInfo.pluralLangCode = "nl";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "العربية";
-        localeInfo.nameEnglish = "Arabic";
-        localeInfo.shortName = localeInfo.pluralLangCode = "ar";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        localeInfo.isRtl = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "Português (Brasil)";
-        localeInfo.nameEnglish = "Portuguese (Brazil)";
-        localeInfo.shortName = localeInfo.pluralLangCode = "pt_br";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "한국어";
-        localeInfo.nameEnglish = "Korean";
-        localeInfo.shortName = localeInfo.pluralLangCode = "ko";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "Українська";
-        localeInfo.nameEnglish = "Ukrainian";
-        localeInfo.shortName = localeInfo.pluralLangCode = "uk";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        localeInfo = new LocaleInfo();
-        localeInfo.name = "Русский";
-        localeInfo.nameEnglish = "Russian";
-        localeInfo.shortName = localeInfo.pluralLangCode = "ru";
-        localeInfo.pathToFile = null;
-        localeInfo.builtIn = true;
-        languages.add(localeInfo);
-        languagesDict.put(localeInfo.shortName, localeInfo);
-
-        loadOtherLanguages();
-        if (remoteLanguages.isEmpty()) {
-            AndroidUtilities.runOnUIThread(() -> loadRemoteLanguages(UserConfig.selectedAccount));
-        }
-
-        for (int a = 0; a < otherLanguages.size(); a++) {
-            LocaleInfo locale = otherLanguages.get(a);
-            languages.add(locale);
-            languagesDict.put(locale.getKey(), locale);
-        }
-
-        for (int a = 0; a < remoteLanguages.size(); a++) {
-            LocaleInfo locale = remoteLanguages.get(a);
-            LocaleInfo existingLocale = getLanguageFromDict(locale.getKey());
-            if (existingLocale != null) {
-                existingLocale.pathToFile = locale.pathToFile;
-                existingLocale.version = locale.version;
-                existingLocale.baseVersion = locale.baseVersion;
-                existingLocale.serverIndex = locale.serverIndex;
-                remoteLanguages.set(a, existingLocale);
-            } else {
-                languages.add(locale);
-                languagesDict.put(locale.getKey(), locale);
-            }
-        }
-
-        for (int a = 0; a < unofficialLanguages.size(); a++) {
-            LocaleInfo locale = unofficialLanguages.get(a);
-            LocaleInfo existingLocale = getLanguageFromDict(locale.getKey());
-            if (existingLocale != null) {
-                existingLocale.pathToFile = locale.pathToFile;
-                existingLocale.version = locale.version;
-                existingLocale.baseVersion = locale.baseVersion;
-                existingLocale.serverIndex = locale.serverIndex;
-                unofficialLanguages.set(a, existingLocale);
-            } else {
-                languagesDict.put(locale.getKey(), locale);
-            }
-        }
+        resetToBuiltInSupportedLanguages();
 
         systemDefaultLocale = Locale.getDefault();
         is24HourFormat = DateFormat.is24HourFormat(ApplicationLoader.applicationContext);
@@ -3180,78 +3078,7 @@ public class LocaleController {
     }
 
     public void loadRemoteLanguages(final int currentAccount, boolean applyCurrent) {
-        if (loadingRemoteLanguages) {
-            return;
-        }
-        loadingRemoteLanguages = true;
-        TLRPC.TL_langpack_getLanguages req = new TLRPC.TL_langpack_getLanguages();
-        ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> {
-            if (response instanceof Vector) {
-                AndroidUtilities.runOnUIThread(() -> {
-                    loadingRemoteLanguages = false;
-                    Vector res = (Vector) response;
-                    for (int a = 0, size = remoteLanguages.size(); a < size; a++) {
-                        remoteLanguages.get(a).serverIndex = Integer.MAX_VALUE;
-                    }
-                    for (int a = 0, size = res.objects.size(); a < size; a++) {
-                        TLRPC.TL_langPackLanguage language = (TLRPC.TL_langPackLanguage) res.objects.get(a);
-                        if (BuildVars.LOGS_ENABLED) {
-                            FileLog.d("loaded lang " + language.name);
-                        }
-                        LocaleInfo localeInfo = new LocaleInfo();
-                        localeInfo.nameEnglish = language.name;
-                        localeInfo.name = language.native_name;
-                        localeInfo.shortName = language.lang_code.replace('-', '_').toLowerCase();
-                        if (language.base_lang_code != null) {
-                            localeInfo.baseLangCode = language.base_lang_code.replace('-', '_').toLowerCase();
-                        } else {
-                            localeInfo.baseLangCode = "";
-                        }
-                        localeInfo.pluralLangCode = language.plural_code.replace('-', '_').toLowerCase();
-                        localeInfo.isRtl = language.rtl;
-                        localeInfo.pathToFile = "remote";
-                        localeInfo.serverIndex = a;
-
-                        LocaleInfo existing = getLanguageFromDict(localeInfo.getKey());
-                        if (existing == null) {
-                            languages.add(localeInfo);
-                            languagesDict.put(localeInfo.getKey(), localeInfo);
-                        } else {
-                            existing.nameEnglish = localeInfo.nameEnglish;
-                            existing.name = localeInfo.name;
-                            existing.baseLangCode = localeInfo.baseLangCode;
-                            existing.pluralLangCode = localeInfo.pluralLangCode;
-                            existing.pathToFile = localeInfo.pathToFile;
-                            existing.serverIndex = localeInfo.serverIndex;
-                            localeInfo = existing;
-                        }
-                        if (!remoteLanguagesDict.containsKey(localeInfo.getKey())) {
-                            remoteLanguages.add(localeInfo);
-                            remoteLanguagesDict.put(localeInfo.getKey(), localeInfo);
-                        }
-                    }
-                    for (int a = 0; a < remoteLanguages.size(); a++) {
-                        LocaleInfo info = remoteLanguages.get(a);
-                        if (info.serverIndex != Integer.MAX_VALUE || info == currentLocaleInfo) {
-                            continue;
-                        }
-                        if (BuildVars.LOGS_ENABLED) {
-                            FileLog.d("remove lang " + info.getKey());
-                        }
-                        remoteLanguages.remove(a);
-                        remoteLanguagesDict.remove(info.getKey());
-                        languages.remove(info);
-                        languagesDict.remove(info.getKey());
-                        a--;
-                    }
-                    saveOtherLanguages();
-                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.suggestedLangpack);
-                    if (applyCurrent) {
-                        applyLanguage(currentLocaleInfo, true, false, currentAccount);
-                    }
-                });
-            }
-        }, ConnectionsManager.RequestFlagWithoutLogin);
+        // Runtime remote language packs are intentionally disabled.
     }
 
     private int applyRemoteLanguage(LocaleInfo localeInfo, String langCode, boolean force, final int currentAccount, Runnable onDone) {
