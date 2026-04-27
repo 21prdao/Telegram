@@ -8089,7 +8089,6 @@
     <string name="NoChannelsTitle">No channels yet…</string>
     <string name="CallAvailableIn2">ETZone can call you in %1$d:%2$02d</string>
     <string name="AnimatedEffectPremium">Subscribe to **ETZone Premium** to add this animated effect.</string>
-    <string name="NumberNotOnTelegram">This number is not on ETZone</string>
     <string name="NoUsernameFound2">This user doesn’t exist on ETZone</string>
     <string name="UnlockToUse">Unlock to use ETZone</string>
     <string name="AppLocked">ETZone Locked</string>
