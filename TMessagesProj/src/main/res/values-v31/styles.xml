@@ -22,7 +22,8 @@
         <item name="android:colorPrimary">#2A2118</item>
         <item name="android:navigationBarColor">#17120D</item>
         <item name="android:forceDarkAllowed">false</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tg_splash_320</item>
+<!--        <item name="android:windowSplashScreenAnimatedIcon">@drawable/tg_splash_320</item>-->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/icon_splash</item>
         <item name="android:windowSplashScreenAnimationDuration">@integer/splash_screen_duration</item>
         <item name="android:windowSplashScreenBackground">#1F1A14</item>
     </style>
