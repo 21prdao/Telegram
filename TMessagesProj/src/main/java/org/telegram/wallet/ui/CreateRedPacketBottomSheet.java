@@ -549,23 +549,13 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 );
                 if (!selectedToken.isBnb()) {
                     Bep20Service bep20Service = new Bep20Service();
-                    BigInteger allowanceRaw = bep20Service.getAllowanceRaw(
+                    bep20Service.ensureAllowance(
+                            privateKeyHex,
                             creatorWallet,
+                            selectedToken.contractAddress,
                             contractAddress,
-                            selectedToken.contractAddress
+                            amountRaw
                     );
-                    if (allowanceRaw.compareTo(amountRaw) < 0) {
-                        String approveTxHash = bep20Service.approve(
-                                privateKeyHex,
-                                selectedToken.contractAddress,
-                                contractAddress,
-                                amountRaw
-                        );
-                        TransactionReceipt approveReceipt = bep20Service.waitForReceipt(approveTxHash, 120_000L, 1_500L);
-                        if (approveReceipt == null || !"0x1".equalsIgnoreCase(approveReceipt.getStatus())) {
-                            throw new IllegalStateException("approve 交易失败");
-                        }
-                    }
                 }
 
                 String txHash = contractService.create(

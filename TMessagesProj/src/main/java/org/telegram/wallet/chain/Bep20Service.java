@@ -30,7 +30,7 @@ import java.util.Collections;
 import java.util.List;
 
 public class Bep20Service {
-    private static final BigInteger DEFAULT_GAS_LIMIT_APPROVE = BigInteger.valueOf(120_000L);
+    private static final BigInteger DEFAULT_GAS_LIMIT_APPROVE = BigInteger.valueOf(200_000L);
     private static final BigInteger MIN_GAS_PRICE_WEI = BigInteger.valueOf(3_000_000_000L); // 3 gwei
 
 
@@ -152,6 +152,42 @@ public class Bep20Service {
         throw new IllegalStateException("Timed out while waiting for receipt: " + txHash);
     }
 
+    public void ensureAllowance(
+            String privateKeyHex,
+            String owner,
+            String tokenContractAddress,
+            String spender,
+            BigInteger requiredAmount
+    ) throws Exception {
+        validateAddress(owner, "owner");
+        validateAddress(tokenContractAddress, "tokenContractAddress");
+        validateAddress(spender, "spender");
+        if (requiredAmount == null || requiredAmount.signum() <= 0) {
+            throw new IllegalArgumentException("requiredAmount must be > 0");
+        }
+
+        BigInteger currentAllowance = getAllowanceRaw(owner, spender, tokenContractAddress);
+        if (currentAllowance.compareTo(requiredAmount) >= 0) {
+            return;
+        }
+
+        // 部分代币（如 USDT 风格）要求从非 0 allowance 变更时，必须先清零再设置新值。
+        if (currentAllowance.signum() > 0) {
+            String resetTxHash = approve(privateKeyHex, tokenContractAddress, spender, BigInteger.ZERO);
+            TransactionReceipt resetReceipt = waitForReceipt(resetTxHash, 120_000L, 1_500L);
+            ensureReceiptSuccess(resetReceipt, "approve(0)");
+        }
+
+        String approveTxHash = approve(privateKeyHex, tokenContractAddress, spender, requiredAmount);
+        TransactionReceipt approveReceipt = waitForReceipt(approveTxHash, 120_000L, 1_500L);
+        ensureReceiptSuccess(approveReceipt, "approve(requiredAmount)");
+
+        BigInteger finalAllowance = getAllowanceRaw(owner, spender, tokenContractAddress);
+        if (finalAllowance.compareTo(requiredAmount) < 0) {
+            throw new IllegalStateException("allowance still insufficient after approve");
+        }
+    }
+
     private BigInteger resolveGasPrice() {
         try {
             EthGasPrice gasPriceResponse = BscRpcClient.get().ethGasPrice().send();
@@ -184,5 +220,15 @@ public class Bep20Service {
             s = "0x" + s;
         }
         return s;
+    }
+
+    private void ensureReceiptSuccess(TransactionReceipt receipt, String action) {
+        if (receipt == null) {
+            throw new IllegalStateException(action + " receipt is null");
+        }
+        String status = receipt.getStatus();
+        if (!"0x1".equalsIgnoreCase(status)) {
+            throw new IllegalStateException(action + " transaction failed");
+        }
     }
 }
