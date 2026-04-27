@@ -109,9 +109,9 @@ public class DarkThemeResourceProvider implements Theme.ResourcesProvider {
         sparseIntArray.put(Theme.key_graySectionText, -8158332);
       //  sparseIntArray.put(Theme.key_windowBackgroundGray, 0xFF1F1F1F);
         sparseIntArray.put(Theme.key_windowBackgroundGray, Color.BLACK);
-        sparseIntArray.put(Theme.key_windowBackgroundWhiteBlueHeader, 0xFF1A9CFF);
-        sparseIntArray.put(Theme.key_windowBackgroundWhiteInputFieldActivated, -10177041);
-        sparseIntArray.put(Theme.key_windowBackgroundWhiteInputField, -10177041);
+        sparseIntArray.put(Theme.key_windowBackgroundWhiteBlueHeader, 0xFFCF701D);
+        sparseIntArray.put(Theme.key_windowBackgroundWhiteInputFieldActivated, 0xFFF08C22);
+        sparseIntArray.put(Theme.key_windowBackgroundWhiteInputField, 0xFFF08C22);
         sparseIntArray.put(Theme.key_windowBackgroundWhiteGrayText3, ColorUtils.blendARGB(Color.WHITE, Color.BLACK, 0.3f));
         sparseIntArray.put(Theme.key_undo_background, 0xFF212426);
         sparseIntArray.put(Theme.key_undo_cancelColor, 0xFF8BC8F5);
@@ -127,10 +127,10 @@ public class DarkThemeResourceProvider implements Theme.ResourcesProvider {
         sparseIntArray.put(Theme.key_chat_serviceBackground, -2110438831);
 
         sparseIntArray.put(Theme.key_switchTrack, 0xFF636363);
-        sparseIntArray.put(Theme.key_switchTrackChecked, 0xFF1A9CFF);
-        sparseIntArray.put(Theme.key_dialogRoundCheckBox, 0xFF1A9CFF);
-        sparseIntArray.put(Theme.key_dialogRadioBackgroundChecked, 0xFF1A9CFF);
-        sparseIntArray.put(Theme.key_dialogTextBlue2, 0xFF1A9CFF);
+        sparseIntArray.put(Theme.key_switchTrackChecked, 0xFFF08C22);
+        sparseIntArray.put(Theme.key_dialogRoundCheckBox, 0xFFF08C22);
+        sparseIntArray.put(Theme.key_dialogRadioBackgroundChecked, 0xFFF08C22);
+        sparseIntArray.put(Theme.key_dialogTextBlue2, 0xFFE37F1C);
         sparseIntArray.put(Theme.key_color_red, -832444);
         sparseIntArray.put(Theme.key_checkbox, -12692893);
         sparseIntArray.put(Theme.key_checkboxDisabled, 0xff626262);
