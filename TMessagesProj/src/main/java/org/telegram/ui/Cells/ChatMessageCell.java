@@ -26185,36 +26185,44 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         int bottomColor;
         int dividerColor;
         int badgeColor;
+        boolean darkTheme = isDark();
         switch (payload.normalizedStatus()) {
             case RedPacketPayload.STATUS_ACTIVE:
-                topColor = Color.parseColor("#FA8C16");
-                bottomColor = Color.parseColor("#F97316");
-                dividerColor = 0x33FFFFFF;
-                badgeColor = 0x33FFFFFF;
+                if (darkTheme) {
+                    topColor = Color.parseColor("#FA8C16");
+                    bottomColor = Color.parseColor("#F97316");
+                    dividerColor = 0x33FFFFFF;
+                    badgeColor = 0x33FFFFFF;
+                } else {
+                    topColor = Color.parseColor("#F05A24");
+                    bottomColor = Color.parseColor("#D9480F");
+                    dividerColor = 0x40FFFFFF;
+                    badgeColor = 0x44FFFFFF;
+                }
                 break;
             case RedPacketPayload.STATUS_CLAIMED:
-                topColor = Color.parseColor("#22C55E");
-                bottomColor = Color.parseColor("#16A34A");
-                dividerColor = 0x33FFFFFF;
-                badgeColor = 0x33FFFFFF;
+                topColor = Color.parseColor(darkTheme ? "#22C55E" : "#16A34A");
+                bottomColor = Color.parseColor(darkTheme ? "#16A34A" : "#15803D");
+                dividerColor = darkTheme ? 0x33FFFFFF : 0x3DFFFFFF;
+                badgeColor = darkTheme ? 0x33FFFFFF : 0x40FFFFFF;
                 break;
             case RedPacketPayload.STATUS_EMPTY:
-                topColor = Color.parseColor("#6B7280");
-                bottomColor = Color.parseColor("#4B5563");
-                dividerColor = 0x29FFFFFF;
-                badgeColor = 0x29FFFFFF;
+                topColor = Color.parseColor(darkTheme ? "#6B7280" : "#4B5563");
+                bottomColor = Color.parseColor(darkTheme ? "#4B5563" : "#374151");
+                dividerColor = darkTheme ? 0x29FFFFFF : 0x33FFFFFF;
+                badgeColor = darkTheme ? 0x29FFFFFF : 0x33FFFFFF;
                 break;
             case RedPacketPayload.STATUS_EXPIRED:
-                topColor = Color.parseColor("#9CA3AF");
-                bottomColor = Color.parseColor("#6B7280");
-                dividerColor = 0x26FFFFFF;
-                badgeColor = 0x26FFFFFF;
+                topColor = Color.parseColor(darkTheme ? "#9CA3AF" : "#6B7280");
+                bottomColor = Color.parseColor(darkTheme ? "#6B7280" : "#4B5563");
+                dividerColor = darkTheme ? 0x26FFFFFF : 0x30FFFFFF;
+                badgeColor = darkTheme ? 0x26FFFFFF : 0x30FFFFFF;
                 break;
             default:
-                topColor = Color.parseColor("#60A5FA");
-                bottomColor = Color.parseColor("#3B82F6");
-                dividerColor = 0x33FFFFFF;
-                badgeColor = 0x33FFFFFF;
+                topColor = Color.parseColor(darkTheme ? "#60A5FA" : "#3B82F6");
+                bottomColor = Color.parseColor(darkTheme ? "#3B82F6" : "#2563EB");
+                dividerColor = darkTheme ? 0x33FFFFFF : 0x40FFFFFF;
+                badgeColor = darkTheme ? 0x33FFFFFF : 0x40FFFFFF;
                 break;
         }
         if (web3RedPacketPressed) {
@@ -26223,6 +26231,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         ensureWeb3RedPacketPaints();
+        web3RedPacketTitlePaint.setColor(Color.WHITE);
+        web3RedPacketGreetingPaint.setColor(darkTheme ? 0xFFFDF3D1 : 0xFFFFF4E5);
+        web3RedPacketSubtitlePaint.setColor(darkTheme ? 0xE6FFFFFF : 0xF2FFFFFF);
 
         Theme.chat_docBackPaint.setShader(new LinearGradient(
                 web3RedPacketCardRect.left,
