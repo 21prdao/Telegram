@@ -32,6 +32,10 @@ npm run dev
 - `MYSQL_USER`（默认 `root`）
 - `MYSQL_PASSWORD`（默认空）
 - `MYSQL_DATABASE`（默认 `telegram_red_packet`）
+- `DEFAULT_PROXY_ADDRESS`（客户端默认代理地址）
+- `DEFAULT_PROXY_PORT`（客户端默认代理端口）
+- `DEFAULT_PROXY_USERNAME` / `DEFAULT_PROXY_PASSWORD` / `DEFAULT_PROXY_SECRET`
+- `APP_VERSION_CODE` / `APP_VERSION_NAME` / `APP_DOWNLOAD_URL` / `APP_VERSION_MESSAGE`
 
 
 ### 管理后台
@@ -84,6 +88,12 @@ curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/create-confirm 
 curl "http://127.0.0.1:8787/api/v1/red-packets/<packetId>?wallet=0x2222222222222222222222222222222222222222"
 ```
 
+### 查询某钱包的红包发送记录
+
+```bash
+curl "http://127.0.0.1:8787/api/v1/red-packets/send-records?creatorWallet=0x1111111111111111111111111111111111111111&limit=50"
+```
+
 ### 领取预处理
 
 ```bash
@@ -101,6 +111,18 @@ curl -X POST http://127.0.0.1:8787/api/v1/red-packets/<packetId>/claim-confirm \
     "claimerAddress": "0x2222222222222222222222222222222222222222",
     "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   }'
+```
+
+### 客户端代理配置（新增）
+
+```bash
+curl "http://127.0.0.1:8787/api/v1/client/proxy"
+```
+
+### 客户端版本检查（新增）
+
+```bash
+curl "http://127.0.0.1:8787/api/v1/client/version/check?platform=android&versionCode=100"
 ```
 
 ## 3) 合约说明

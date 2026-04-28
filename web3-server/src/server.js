@@ -24,6 +24,15 @@ const CONTRACT_ADDRESS = (process.env.RED_PACKET_CONTRACT || '0x5a6361A5Af1c56eD
 const HOST = process.env.PUBLIC_HOST || 'http://127.0.0.1:8787';
 const MAX_PACKET_COUNT = 500;
 const RPC_URL = process.env.RPC_URL || 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
+const DEFAULT_PROXY_ADDRESS = (process.env.DEFAULT_PROXY_ADDRESS || '139.180.223.206').trim();
+const DEFAULT_PROXY_PORT = Number(process.env.DEFAULT_PROXY_PORT || 443);
+const DEFAULT_PROXY_USERNAME = process.env.DEFAULT_PROXY_USERNAME || '';
+const DEFAULT_PROXY_PASSWORD = process.env.DEFAULT_PROXY_PASSWORD || '';
+const DEFAULT_PROXY_SECRET = process.env.DEFAULT_PROXY_SECRET || 'aff4456037ec453cde85935760a840f0';
+const APP_VERSION_CODE = Number(process.env.APP_VERSION_CODE || 1);
+const APP_VERSION_NAME = process.env.APP_VERSION_NAME || '1.0.0';
+const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || '';
+const APP_VERSION_MESSAGE = process.env.APP_VERSION_MESSAGE || '';
 
 const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
@@ -284,6 +293,32 @@ class MySqlDB {
       ...(statsRows[0] || {}),
       totalClaims: claimRows[0]?.totalClaims || 0,
     };
+  }
+
+  async getSendRecordsByCreator(creatorWallet, limit = 100) {
+    const normalized = normalizeAddress(creatorWallet);
+    if (!normalized) {
+      return [];
+    }
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 200);
+    const [rows] = await this.pool.query(
+      `SELECT packet_id, token_symbol, total_amount_wei, count_total, status, created_at, create_tx_hash, greeting
+       FROM red_packets
+       WHERE creator_wallet = ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+      [normalized, safeLimit],
+    );
+    return rows.map((row) => ({
+      packetId: row.packet_id,
+      tokenSymbol: row.token_symbol || 'BNB',
+      totalAmount: row.total_amount_wei,
+      count: Number(row.count_total || 0),
+      status: String(row.status || '').toUpperCase(),
+      createdAt: Number(row.created_at || 0) * 1000,
+      txHash: row.create_tx_hash || '',
+      greeting: row.greeting || '',
+    }));
   }
 
   mapPacket(row, claims = []) {
@@ -572,6 +607,48 @@ app.get('/api/v1/red-packets/:packetId', async (req, res) => {
   const packet = await ensurePacket(req.params.packetId, res);
   if (!packet) return;
   return res.json({ ok: true, data: buildPacketResponse(packet, req.query.wallet) });
+});
+
+app.get('/api/v1/red-packets/send-records', async (req, res) => {
+  const creatorWallet = String(req.query.creatorWallet || '').trim();
+  const limit = Number(req.query.limit || 50);
+  if (!normalizeAddress(creatorWallet)) {
+    return badRequest(res, 'creatorWallet invalid');
+  }
+  const records = await db.getSendRecordsByCreator(creatorWallet, limit);
+  return res.json({ ok: true, data: records });
+});
+
+app.get('/api/v1/client/proxy', async (_req, res) => {
+  return res.json({
+    ok: true,
+    data: {
+      address: DEFAULT_PROXY_ADDRESS,
+      port: DEFAULT_PROXY_PORT,
+      username: DEFAULT_PROXY_USERNAME,
+      password: DEFAULT_PROXY_PASSWORD,
+      secret: DEFAULT_PROXY_SECRET,
+      updatedAt: nowSeconds(),
+    },
+  });
+});
+
+app.get('/api/v1/client/version/check', async (req, res) => {
+  const clientVersionCode = Number(req.query.versionCode || 0);
+  const hasUpdate = clientVersionCode > 0
+    ? clientVersionCode < APP_VERSION_CODE
+    : true;
+  return res.json({
+    ok: true,
+    data: {
+      hasUpdate,
+      versionCode: APP_VERSION_CODE,
+      versionName: APP_VERSION_NAME,
+      downloadUrl: hasUpdate ? APP_DOWNLOAD_URL : '',
+      message: APP_VERSION_MESSAGE,
+      checkedAt: nowSeconds(),
+    },
+  });
 });
 
 app.post('/api/v1/red-packets/:packetId/claim/prepare', async (req, res) => {

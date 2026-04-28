@@ -79,6 +79,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.ServerApiManager;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
@@ -722,6 +723,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(18, IconBackgroundColors.BLUE_LIGHT.top, IconBackgroundColors.BLUE_LIGHT.bottom, R.drawable.settings_faq, getString(R.string.TelegramFAQ)));
         items.add(SettingCell.Factory.of(23, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_features, getString(R.string.TelegramFeatures)));
         items.add(SettingCell.Factory.of(19, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_policy, getString(R.string.PrivacyPolicy)));
+        items.add(SettingCell.Factory.of(24, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_power, getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate)));
 
         if (BuildVars.LOGS_ENABLED || BuildVars.DEBUG_PRIVATE_VERSION) {
             items.add(UItem.asShadow(null));
@@ -846,6 +848,33 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 } else {
                     Browser.openUrl(getContext(), LocaleController.getString(R.string.TelegramFeaturesUrl));
                 }
+                break;
+            }
+            case 24: {
+                if (getParentActivity() instanceof LaunchActivity) {
+                    ((LaunchActivity) getParentActivity()).checkAppUpdate(true, null);
+                }
+                ServerApiManager.checkVersion(new ServerApiManager.VersionCheckCallback() {
+                    @Override
+                    public void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String message) {
+                        if (getParentActivity() == null) {
+                            return;
+                        }
+                        if (hasUpdate && !TextUtils.isEmpty(updateUrl)) {
+                            Browser.openUrl(getParentActivity(), updateUrl);
+                            return;
+                        }
+                        BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.YourVersionIsLatest)).show();
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        if (getParentActivity() == null) {
+                            return;
+                        }
+                        BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, TextUtils.isEmpty(error) ? LocaleController.getString(R.string.UnknownError) : error).show();
+                    }
+                });
                 break;
             }
         }

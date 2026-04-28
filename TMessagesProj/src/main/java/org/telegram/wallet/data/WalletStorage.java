@@ -302,6 +302,23 @@ public final class WalletStorage {
         }
     }
 
+    public static void replaceRedPacketSendRecords(Context context, List<RedPacketSendRecord> records) {
+        if (records == null) {
+            return;
+        }
+        List<RedPacketSendRecord> safe = new ArrayList<>();
+        for (RedPacketSendRecord record : records) {
+            if (record == null || TextUtils.isEmpty(record.packetId)) {
+                continue;
+            }
+            safe.add(record);
+            if (safe.size() >= 100) {
+                break;
+            }
+        }
+        persistRedPacketRecords(context, safe);
+    }
+
     private static void persistRedPacketRecords(Context context, List<RedPacketSendRecord> records) {
         JSONArray arr = new JSONArray();
         for (RedPacketSendRecord record : records) {

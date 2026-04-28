@@ -427,11 +427,17 @@ public class SharedConfig {
     public static ArrayList<ProxyInfo> proxyList = new ArrayList<>();
     private static boolean proxyListLoaded;
     public static ProxyInfo currentProxy;
-    public static final String FORCED_PROXY_ADDRESS = "139.180.223.206";
-    public static final int FORCED_PROXY_PORT = 443;
-    public static final String FORCED_PROXY_SECRET = "aff4456037ec453cde85935760a840f0";
-    public static final String FORCED_PROXY_USERNAME = "";
-    public static final String FORCED_PROXY_PASSWORD = "";
+    public static final String DEFAULT_FORCED_PROXY_ADDRESS = "139.180.223.206";
+    public static final int DEFAULT_FORCED_PROXY_PORT = 443;
+    public static final String DEFAULT_FORCED_PROXY_SECRET = "aff4456037ec453cde85935760a840f0";
+    public static final String DEFAULT_FORCED_PROXY_USERNAME = "";
+    public static final String DEFAULT_FORCED_PROXY_PASSWORD = "";
+
+    public static String FORCED_PROXY_ADDRESS = DEFAULT_FORCED_PROXY_ADDRESS;
+    public static int FORCED_PROXY_PORT = DEFAULT_FORCED_PROXY_PORT;
+    public static String FORCED_PROXY_SECRET = DEFAULT_FORCED_PROXY_SECRET;
+    public static String FORCED_PROXY_USERNAME = DEFAULT_FORCED_PROXY_USERNAME;
+    public static String FORCED_PROXY_PASSWORD = DEFAULT_FORCED_PROXY_PASSWORD;
 
     public static void saveConfig() {
         synchronized (sync) {
@@ -470,6 +476,11 @@ public class SharedConfig {
                 editor.putString("storageCacheDir", !TextUtils.isEmpty(storageCacheDir) ? storageCacheDir : "");
                 editor.putBoolean("proxyRotationEnabled", proxyRotationEnabled);
                 editor.putInt("proxyRotationTimeout", proxyRotationTimeout);
+                editor.putString("forcedProxyAddress", FORCED_PROXY_ADDRESS);
+                editor.putInt("forcedProxyPort", FORCED_PROXY_PORT);
+                editor.putString("forcedProxyUsername", FORCED_PROXY_USERNAME);
+                editor.putString("forcedProxyPassword", FORCED_PROXY_PASSWORD);
+                editor.putString("forcedProxySecret", FORCED_PROXY_SECRET);
 
                 if (pendingAppUpdate != null) {
                     try {
@@ -537,6 +548,11 @@ public class SharedConfig {
             storageCacheDir = preferences.getString("storageCacheDir", null);
             proxyRotationEnabled = preferences.getBoolean("proxyRotationEnabled", false);
             proxyRotationTimeout = preferences.getInt("proxyRotationTimeout", ProxyRotationController.DEFAULT_TIMEOUT_INDEX);
+            FORCED_PROXY_ADDRESS = preferences.getString("forcedProxyAddress", DEFAULT_FORCED_PROXY_ADDRESS);
+            FORCED_PROXY_PORT = preferences.getInt("forcedProxyPort", DEFAULT_FORCED_PROXY_PORT);
+            FORCED_PROXY_USERNAME = preferences.getString("forcedProxyUsername", DEFAULT_FORCED_PROXY_USERNAME);
+            FORCED_PROXY_PASSWORD = preferences.getString("forcedProxyPassword", DEFAULT_FORCED_PROXY_PASSWORD);
+            FORCED_PROXY_SECRET = preferences.getString("forcedProxySecret", DEFAULT_FORCED_PROXY_SECRET);
             String authKeyString = preferences.getString("pushAuthKey", null);
             if (!TextUtils.isEmpty(authKeyString)) {
                 pushAuthKey = Base64.decode(authKeyString, Base64.DEFAULT);
@@ -1448,6 +1464,21 @@ public class SharedConfig {
                 .putString("proxy_secret", FORCED_PROXY_SECRET)
                 .putInt("proxy_port", FORCED_PROXY_PORT)
                 .apply();
+    }
+
+    public static void applyForcedProxy(ProxyInfo proxyInfo) {
+        if (proxyInfo == null || TextUtils.isEmpty(proxyInfo.address) || proxyInfo.port <= 0) {
+            return;
+        }
+        FORCED_PROXY_ADDRESS = proxyInfo.address;
+        FORCED_PROXY_PORT = proxyInfo.port;
+        FORCED_PROXY_USERNAME = proxyInfo.username != null ? proxyInfo.username : "";
+        FORCED_PROXY_PASSWORD = proxyInfo.password != null ? proxyInfo.password : "";
+        FORCED_PROXY_SECRET = proxyInfo.secret != null ? proxyInfo.secret : "";
+        saveConfig();
+        proxyListLoaded = false;
+        loadProxyList();
+        ConnectionsManager.setProxySettings(true, FORCED_PROXY_ADDRESS, FORCED_PROXY_PORT, FORCED_PROXY_USERNAME, FORCED_PROXY_PASSWORD, FORCED_PROXY_SECRET);
     }
 
     public static void saveProxyList() {

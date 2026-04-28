@@ -14,6 +14,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.RedPacketSendRecord;
 import org.telegram.wallet.model.TokenAsset;
+import org.telegram.wallet.redpacket.RedPacketRepository;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -25,6 +26,8 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private static final String ARG_RECORD = "arg_record";
     private boolean showRedPacketRecords;
     private LinearLayout listContainer;
+    private volatile boolean syncingRecords;
+    private boolean recordsSyncedOnce;
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -71,6 +74,9 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         listContainer.removeAllViews();
         if (showRedPacketRecords) {
             renderRedPacketRecords();
+            if (!recordsSyncedOnce) {
+                syncRedPacketRecordsFromServer();
+            }
         } else {
             renderTokens();
         }
@@ -115,6 +121,31 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             lp.topMargin = dp(8);
             listContainer.addView(item, lp);
         }
+    }
+
+    private void syncRedPacketRecordsFromServer() {
+        if (getActivity() == null || syncingRecords) {
+            return;
+        }
+        String address = WalletStorage.getSelectedAddress(getActivity());
+        if (address == null || address.trim().isEmpty()) {
+            return;
+        }
+        syncingRecords = true;
+        new Thread(() -> {
+            try {
+                List<RedPacketSendRecord> remote = RedPacketRepository.getInstance().getSendRecords(address, 100);
+                if (getActivity() == null) {
+                    return;
+                }
+                WalletStorage.replaceRedPacketSendRecords(getActivity(), remote);
+                recordsSyncedOnce = true;
+                getActivity().runOnUiThread(this::refresh);
+            } catch (Throwable ignore) {
+            } finally {
+                syncingRecords = false;
+            }
+        }, "wallet-records-sync").start();
     }
 
     private GradientDrawable cardBg() {
