@@ -13213,25 +13213,6 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 });
             }
 
-            if (proxyMenuSubItem != null) {
-                proxyMenuSubItem.setOnClickListener(v -> {
-                    io.dismiss();
-                    presentFragment(new ProxyListActivity());
-                });
-
-                final SharedPreferences preferences = ApplicationLoader.applicationContext
-                        .getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
-
-                final String proxyAddress = preferences.getString("proxy_ip", "");
-                final boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false);
-                final boolean proxyVisible = proxyEnabled && !TextUtils.isEmpty(proxyAddress)
-                        || getMessagesController().blockedCountry && !SharedConfig.proxyList.isEmpty();
-
-                if (proxyVisible) {
-                    io.addGap();
-                    io.add(proxyMenuSubItem);
-                }
-            }
         } else {
             io.add(R.drawable.msg_customize, getString(R.string.ArchiveSettings), () -> presentFragment(new ArchiveSettingsActivity()));
             io.add(R.drawable.msg_help, getString(R.string.HowDoesItWork), this::showArchiveHelp);
