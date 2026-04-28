@@ -20373,7 +20373,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 currentBackgroundDrawable.setAlpha((int) (255 * alphaInternal));
                 currentBackgroundDrawable.drawCached(canvas, backgroundCacheParams);
 //                }
-                if (currentBackgroundShadowDrawable != null && currentPosition == null) {
+                if (currentBackgroundShadowDrawable != null && currentPosition == null && !currentMessageObject.isWeb3RedPacket()) {
                     currentBackgroundShadowDrawable.setAlpha((int) (255 * alphaInternal));
                     currentBackgroundShadowDrawable.draw(canvas);
                 }
@@ -20413,7 +20413,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                         currentBackgroundDrawable.drawCached(canvas, backgroundCacheParams);
                     }
                 }
-                if (currentBackgroundShadowDrawable != null && currentPosition == null) {
+                if (currentBackgroundShadowDrawable != null && currentPosition == null && !currentMessageObject.isWeb3RedPacket()) {
                     currentBackgroundShadowDrawable.setAlpha((int) (255 * alphaInternal));
                     currentBackgroundShadowDrawable.draw(canvas);
                 }
