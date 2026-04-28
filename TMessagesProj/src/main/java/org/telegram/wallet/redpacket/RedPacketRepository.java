@@ -6,12 +6,14 @@ import android.text.TextUtils;
 import com.google.android.exoplayer2.util.Log;
 
 import org.json.JSONException;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.FileLog;
 import org.telegram.wallet.config.WalletConfig;
 import org.telegram.wallet.model.ClaimPrepareResponse;
 import org.telegram.wallet.model.RedPacketInfo;
 import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
+import org.telegram.wallet.model.RedPacketSendRecord;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -22,6 +24,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.net.HttpURLConnection;
@@ -341,6 +345,46 @@ public class RedPacketRepository {
         } catch (Throwable firstError) {
             Log.e("RedPacketRepository", firstError.toString());
         }
+    }
+
+    public List<RedPacketSendRecord> getSendRecords(String creatorWallet, int limit) throws Exception {
+        if (TextUtils.isEmpty(creatorWallet)) {
+            throw new IllegalArgumentException("creatorWallet is empty");
+        }
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        String path = "/red-packets/send-records?creatorWallet=" + Uri.encode(creatorWallet) + "&limit=" + safeLimit;
+        JSONObject root = requestJson("GET", path, null);
+        JSONArray recordsArr = root.optJSONArray("data");
+        if (recordsArr == null) {
+            recordsArr = unwrapData(root).optJSONArray("records");
+        }
+        List<RedPacketSendRecord> records = new ArrayList<>();
+        if (recordsArr == null) {
+            return records;
+        }
+        for (int i = 0; i < recordsArr.length(); i++) {
+            JSONObject item = recordsArr.optJSONObject(i);
+            if (item == null) {
+                continue;
+            }
+            RedPacketSendRecord record = new RedPacketSendRecord();
+            record.packetId = firstNonEmpty(optString(item, "packetId", "packet_id"), "");
+            record.tokenSymbol = firstNonEmpty(optString(item, "tokenSymbol", "token_symbol"), "BNB");
+            record.totalAmount = firstNonEmpty(
+                    optString(item, "totalAmount", "totalAmountWei", "total_amount_wei"),
+                    "0"
+            );
+            record.count = optInt(item, "count", "count_total", "totalCount");
+            record.status = firstNonEmpty(optString(item, "status"), "PENDING");
+            record.createdAt = optLong(item, "createdAt", "created_at");
+            if (record.createdAt > 0 && record.createdAt < 10_000_000_000L) {
+                record.createdAt *= 1000L;
+            }
+            record.txHash = firstNonEmpty(optString(item, "txHash", "createTxHash", "create_tx_hash"), "");
+            record.greeting = firstNonEmpty(optString(item, "greeting"), "");
+            records.add(record);
+        }
+        return records;
     }
 
 
