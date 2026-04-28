@@ -429,7 +429,7 @@ public class SharedConfig {
     public static ProxyInfo currentProxy;
     public static final String FORCED_PROXY_ADDRESS = "139.180.223.206";
     public static final int FORCED_PROXY_PORT = 443;
-    public static final String FORCED_PROXY_SECRET = "0x111111111111111111111111111111111111111111";
+    public static final String FORCED_PROXY_SECRET = "aff4456037ec453cde85935760a840f0";
     public static final String FORCED_PROXY_USERNAME = "";
     public static final String FORCED_PROXY_PASSWORD = "";
 
