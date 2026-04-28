@@ -38,6 +38,7 @@ import org.telegram.wallet.chain.RedPacketContractService;
 import org.telegram.wallet.config.WalletConfig;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
+import org.telegram.wallet.model.RedPacketSendRecord;
 import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.redpacket.RedPacketMessageComposer;
 import org.telegram.wallet.redpacket.RedPacketRepository;
@@ -194,7 +195,9 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         TextView hintView = createText(context, 13, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
         hintView.setPadding(0, AndroidUtilities.dp(12), 0, 0);
-        hintView.setText("packetType 第一版固定 equal，要求 amountRaw % count == 0；到期日会自动转换为 Unix 秒。");
+        hintView.setText(isPrivateDialog()
+                ? "私聊红包默认 1 份，金额会全部发送给对方。"
+                : "群聊等额红包：总金额需能被份数整除（每人领取金额一致）。");
         contentLayout.addView(hintView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
@@ -398,6 +401,37 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             return;
         }
 
+        verifyPaymentPasswordAndCreate();
+    }
+
+    private void verifyPaymentPasswordAndCreate() {
+        Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        if (!WalletStorage.hasPaymentPassword(context)) {
+            showError("请先在钱包管理-安全中心设置支付密码");
+            return;
+        }
+
+        final EditTextBoldCursor pwdInput = createInput(context, "请输入支付密码");
+        pwdInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        new AlertDialog.Builder(context)
+                .setTitle("支付验证")
+                .setView(pwdInput)
+                .setPositiveButton("确认", (dialog, which) -> {
+                    String pwd = trim(pwdInput.getText() == null ? null : pwdInput.getText().toString());
+                    if (!WalletStorage.verifyPaymentPassword(context, pwd)) {
+                        showError("支付密码错误");
+                        return;
+                    }
+                    performCreate();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void performCreate() {
         final TokenOption selectedToken = getSelectedToken();
         final String totalText = trim(totalAmountEdit.getText() == null ? null : totalAmountEdit.getText().toString());
         final String countText = isPrivateDialog() ? "1" : trim(countEdit.getText() == null ? null : countEdit.getText().toString());
@@ -542,6 +576,16 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 if (TextUtils.isEmpty(prepare.packetIdHex)) {
                     throw new IllegalStateException("prepareCreate must return packetIdHex");
                 }
+
+                RedPacketSendRecord sendRecord = new RedPacketSendRecord();
+                sendRecord.packetId = prepare.packetId;
+                sendRecord.tokenSymbol = selectedToken.symbol;
+                sendRecord.totalAmount = totalAmount.stripTrailingZeros().toPlainString();
+                sendRecord.count = count;
+                sendRecord.status = "CHAIN_PENDING";
+                sendRecord.createdAt = System.currentTimeMillis();
+                sendRecord.greeting = greeting;
+                WalletStorage.addRedPacketSendRecord(getContext(), sendRecord);
                 String packetIdHex = prepare.packetIdHex;
                 String contractAddress = firstNonEmpty(
                         prepare.contractAddress,
@@ -583,6 +627,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         creatorWallet,
                         txHash
                 );
+                WalletStorage.updateRedPacketSendRecordStatus(getContext(), prepare.packetId, "CHAIN_CONFIRMED", txHash);
 
                 final String finalMessage = RedPacketMessageComposer.composeCompatMessage(
                         prepare.packetId,
@@ -604,10 +649,12 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                                 SendMessagesHelper.SendMessageParams.of(finalMessage, dialogId);
                         SendMessagesHelper.getInstance(account).sendMessage(params);
 
+                        WalletStorage.updateRedPacketSendRecordStatus(getContext(), prepare.packetId, "SENT", null);
                         showToast("红包已创建并发送");
                         dismiss();
                     } catch (Throwable sendError) {
                         FileLog.e(sendError);
+                        WalletStorage.updateRedPacketSendRecordStatus(getContext(), prepare.packetId, "CHAT_SEND_FAILED", null);
                         showError("链上红包已创建，但发送聊天消息失败：" + nonNullMessage(sendError));
                     } finally {
                         submitting = false;

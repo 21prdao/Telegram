@@ -5,6 +5,8 @@ import android.app.Fragment;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.InputType;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,6 +58,16 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         btnLp.topMargin = dp(16);
         card.addView(backupButton, btnLp);
 
+        Button passwordButton = new Button(getActivity());
+        passwordButton.setText("设置/修改支付密码");
+        passwordButton.setTypeface(Typeface.DEFAULT_BOLD);
+        passwordButton.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
+        passwordButton.setBackground(outlineBg());
+        passwordButton.setOnClickListener(v -> showSetPaymentPasswordDialog());
+        LinearLayout.LayoutParams pwdLp = matchWrap();
+        pwdLp.topMargin = dp(10);
+        card.addView(passwordButton, pwdLp);
+
         refresh();
         return root;
     }
@@ -73,12 +85,56 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
                 .show();
     }
 
+
+    private void showSetPaymentPasswordDialog() {
+        LinearLayout layout = new LinearLayout(getActivity());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        android.widget.EditText first = new android.widget.EditText(getActivity());
+        first.setHint("输入支付密码");
+        first.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        android.widget.EditText second = new android.widget.EditText(getActivity());
+        second.setHint("再次输入支付密码");
+        second.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(first);
+        layout.addView(second);
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle("设置支付密码")
+                .setView(layout)
+                .setPositiveButton("保存", (d, w) -> {
+                    String a = first.getText() == null ? "" : first.getText().toString().trim();
+                    String b = second.getText() == null ? "" : second.getText().toString().trim();
+                    if (TextUtils.isEmpty(a) || a.length() < 4) {
+                        ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码至少 4 位");
+                        return;
+                    }
+                    if (!TextUtils.equals(a, b)) {
+                        ((WalletWorkflowCoordinator.Host) getActivity()).toast("两次输入不一致");
+                        return;
+                    }
+                    WalletStorage.setPaymentPassword(getActivity(), a);
+                    ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码已保存");
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private GradientDrawable outlineBg() {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
+        bg.setCornerRadius(dp(12));
+        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
+        return bg;
+    }
+
     @Override
     public void refresh() {
         String selected = WalletStorage.getSelectedAddress(getActivity());
-        selectedWalletView.setText(selected == null
+        String walletText = selected == null
                 ? "当前钱包：未创建"
-                : "当前钱包：" + WalletWorkflowCoordinator.shortAddress(selected));
+                : "当前钱包：" + WalletWorkflowCoordinator.shortAddress(selected);
+        walletText += WalletStorage.hasPaymentPassword(getActivity()) ? "\n支付密码：已设置" : "\n支付密码：未设置";
+        selectedWalletView.setText(walletText);
     }
 
     private GradientDrawable primaryBg() {

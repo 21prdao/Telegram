@@ -16,10 +16,13 @@ import org.web3j.crypto.ECKeyPair;
 import org.web3j.crypto.Sign;
 
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.telegram.wallet.model.RedPacketSendRecord;
 
 public final class WalletStorage {
 
@@ -27,6 +30,8 @@ public final class WalletStorage {
     private static final String KEY_WALLETS = "wallets_json";
     private static final String KEY_SELECTED = "selected_wallet";
     private static final String KEY_TOKENS = "tokens_json";
+    private static final String KEY_PAY_PWD_HASH = "payment_password_hash";
+    private static final String KEY_RED_PACKET_RECORDS = "red_packet_send_records";
 
     private WalletStorage() {
     }
@@ -222,6 +227,113 @@ public final class WalletStorage {
             }
         }
         prefs(context).edit().putString(KEY_WALLETS, arr.toString()).apply();
+    }
+
+
+    public static boolean hasPaymentPassword(Context context) {
+        return !TextUtils.isEmpty(prefs(context).getString(KEY_PAY_PWD_HASH, null));
+    }
+
+    public static void setPaymentPassword(Context context, String password) {
+        prefs(context).edit().putString(KEY_PAY_PWD_HASH, hash(password)).apply();
+    }
+
+    public static boolean verifyPaymentPassword(Context context, String password) {
+        String hashValue = prefs(context).getString(KEY_PAY_PWD_HASH, null);
+        if (TextUtils.isEmpty(hashValue)) {
+            return false;
+        }
+        return hashValue.equals(hash(password));
+    }
+
+    public static void addRedPacketSendRecord(Context context, RedPacketSendRecord record) {
+        if (record == null || TextUtils.isEmpty(record.packetId)) {
+            return;
+        }
+        List<RedPacketSendRecord> records = getRedPacketSendRecords(context);
+        records.add(0, record);
+        if (records.size() > 100) {
+            records = new ArrayList<>(records.subList(0, 100));
+        }
+        persistRedPacketRecords(context, records);
+    }
+
+    public static List<RedPacketSendRecord> getRedPacketSendRecords(Context context) {
+        String json = prefs(context).getString(KEY_RED_PACKET_RECORDS, "[]");
+        try {
+            JSONArray arr = new JSONArray(json);
+            List<RedPacketSendRecord> result = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) {
+                    continue;
+                }
+                RedPacketSendRecord record = new RedPacketSendRecord();
+                record.packetId = o.optString("packetId", "");
+                record.tokenSymbol = o.optString("tokenSymbol", "BNB");
+                record.totalAmount = o.optString("totalAmount", "0");
+                record.count = o.optInt("count", 1);
+                record.status = o.optString("status", "PENDING");
+                record.createdAt = o.optLong("createdAt", System.currentTimeMillis());
+                record.txHash = o.optString("txHash", "");
+                record.greeting = o.optString("greeting", "");
+                result.add(record);
+            }
+            return result;
+        } catch (Throwable ignore) {
+            return new ArrayList<>();
+        }
+    }
+
+    public static void updateRedPacketSendRecordStatus(Context context, String packetId, String status, String txHash) {
+        if (TextUtils.isEmpty(packetId)) {
+            return;
+        }
+        List<RedPacketSendRecord> records = getRedPacketSendRecords(context);
+        for (RedPacketSendRecord record : records) {
+            if (packetId.equals(record.packetId)) {
+                record.status = status;
+                if (!TextUtils.isEmpty(txHash)) {
+                    record.txHash = txHash;
+                }
+                persistRedPacketRecords(context, records);
+                return;
+            }
+        }
+    }
+
+    private static void persistRedPacketRecords(Context context, List<RedPacketSendRecord> records) {
+        JSONArray arr = new JSONArray();
+        for (RedPacketSendRecord record : records) {
+            JSONObject o = new JSONObject();
+            try {
+                o.put("packetId", record.packetId);
+                o.put("tokenSymbol", record.tokenSymbol);
+                o.put("totalAmount", record.totalAmount);
+                o.put("count", record.count);
+                o.put("status", record.status);
+                o.put("createdAt", record.createdAt);
+                o.put("txHash", record.txHash);
+                o.put("greeting", record.greeting);
+                arr.put(o);
+            } catch (Throwable ignore) {
+            }
+        }
+        prefs(context).edit().putString(KEY_RED_PACKET_RECORDS, arr.toString()).apply();
+    }
+
+    private static String hash(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest((input == null ? "" : input).getBytes());
+            StringBuilder sb = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Throwable ignore) {
+            return "";
+        }
     }
 
     private static void persistTokens(Context context, List<TokenAsset> tokens) {

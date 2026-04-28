@@ -19,11 +19,13 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private static final String TAG_HOME = "wallet_home";
     private static final String TAG_SEND = "wallet_send";
     private static final String TAG_SECURITY = "wallet_security";
+    private static final String TAG_MANAGE = "wallet_manage";
 
     private int containerId;
     private TextView homeTab;
     private TextView sendTab;
     private TextView securityTab;
+    private TextView manageTab;
     private WalletWorkflowCoordinator coordinator;
 
     @Override
@@ -73,14 +75,17 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         homeTab = createTab("资产");
         sendTab = createTab("转账");
         securityTab = createTab("安全");
+        manageTab = createTab("管理");
 
         homeTab.setOnClickListener(v -> switchTo(TAG_HOME));
         sendTab.setOnClickListener(v -> switchTo(TAG_SEND));
         securityTab.setOnClickListener(v -> switchTo(TAG_SECURITY));
+        manageTab.setOnClickListener(v -> switchTo(TAG_MANAGE));
 
         tabs.addView(homeTab, tabLp());
         tabs.addView(sendTab, tabLp());
         tabs.addView(securityTab, tabLp());
+        tabs.addView(manageTab, tabLp());
 
         root.addView(tabs, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -102,7 +107,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         bar.addView(back, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         TextView title = new TextView(this);
-        title.setText("Web3 Wallet");
+        title.setText("Web3 Wallet Pro");
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextSize(19f);
         title.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
@@ -184,6 +189,9 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         if (TAG_SECURITY.equals(tag)) {
             return WalletBackupFragment.newInstance();
         }
+        if (TAG_MANAGE.equals(tag)) {
+            return WalletManageFragment.newInstance();
+        }
         return WalletHomeFragment.newInstance();
     }
 
@@ -196,6 +204,9 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
         securityTab.setBackground(tabBg(TAG_SECURITY.equals(currentTag)));
         securityTab.setTextColor(TAG_SECURITY.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
+
+        manageTab.setBackground(tabBg(TAG_MANAGE.equals(currentTag)));
+        manageTab.setTextColor(TAG_MANAGE.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
     }
 
     private String getCurrentTag() {
@@ -208,6 +219,28 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         if (current instanceof WalletRefreshable) {
             ((WalletRefreshable) current).refresh();
         }
+    }
+
+
+    public void openWalletListPage() {
+        getFragmentManager().beginTransaction()
+                .replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page")
+                .addToBackStack("wallet_list_page")
+                .commitAllowingStateLoss();
+    }
+
+    public void openTokenListPage() {
+        getFragmentManager().beginTransaction()
+                .replace(containerId, TokenListPageFragment.tokenList(), "token_list_page")
+                .addToBackStack("token_list_page")
+                .commitAllowingStateLoss();
+    }
+
+    public void openRedPacketRecordsPage() {
+        getFragmentManager().beginTransaction()
+                .replace(containerId, TokenListPageFragment.redPacketRecords(), "redpacket_records_page")
+                .addToBackStack("redpacket_records_page")
+                .commitAllowingStateLoss();
     }
 
     private int dp(int value) {
