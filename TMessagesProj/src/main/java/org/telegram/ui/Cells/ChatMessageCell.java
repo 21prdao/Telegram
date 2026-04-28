@@ -26194,10 +26194,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     dividerColor = 0x33FFFFFF;
                     badgeColor = 0x33FFFFFF;
                 } else {
-                    topColor = Color.parseColor("#F05A24");
-                    bottomColor = Color.parseColor("#D9480F");
-                    dividerColor = 0x40FFFFFF;
-                    badgeColor = 0x44FFFFFF;
+                    topColor = Color.parseColor("#F97316");
+                    bottomColor = Color.parseColor("#EA580C");
+                    dividerColor = 0x52FFFFFF;
+                    badgeColor = 0x54FFFFFF;
                 }
                 break;
             case RedPacketPayload.STATUS_CLAIMED:
@@ -26231,9 +26231,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         ensureWeb3RedPacketPaints();
+        Theme.chat_docBackPaint.setAlpha(255);
+        Theme.chat_docBackPaint.setStyle(Paint.Style.FILL);
         web3RedPacketTitlePaint.setColor(Color.WHITE);
-        web3RedPacketGreetingPaint.setColor(darkTheme ? 0xFFFDF3D1 : 0xFFFFF4E5);
-        web3RedPacketSubtitlePaint.setColor(darkTheme ? 0xE6FFFFFF : 0xF2FFFFFF);
+        web3RedPacketGreetingPaint.setColor(darkTheme ? 0xFFFDF3D1 : 0xFFFFF7ED);
+        web3RedPacketSubtitlePaint.setColor(darkTheme ? 0xE6FFFFFF : 0xFFFDEEE4);
 
         Theme.chat_docBackPaint.setShader(new LinearGradient(
                 web3RedPacketCardRect.left,
