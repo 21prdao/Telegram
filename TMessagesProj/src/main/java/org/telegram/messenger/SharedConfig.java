@@ -427,6 +427,11 @@ public class SharedConfig {
     public static ArrayList<ProxyInfo> proxyList = new ArrayList<>();
     private static boolean proxyListLoaded;
     public static ProxyInfo currentProxy;
+    public static final String FORCED_PROXY_ADDRESS = "139.180.223.206";
+    public static final int FORCED_PROXY_PORT = 443;
+    public static final String FORCED_PROXY_SECRET = "0x111111111111111111111111111111111111111111";
+    public static final String FORCED_PROXY_USERNAME = "";
+    public static final String FORCED_PROXY_PASSWORD = "";
 
     public static void saveConfig() {
         synchronized (sync) {
@@ -1429,70 +1434,20 @@ public class SharedConfig {
         if (proxyListLoaded) {
             return;
         }
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
-        String proxyAddress = preferences.getString("proxy_ip", "");
-        String proxyUsername = preferences.getString("proxy_user", "");
-        String proxyPassword = preferences.getString("proxy_pass", "");
-        String proxySecret = preferences.getString("proxy_secret", "");
-        int proxyPort = preferences.getInt("proxy_port", 1080);
-
         proxyListLoaded = true;
         proxyList.clear();
-        currentProxy = null;
-        String list = preferences.getString("proxy_list", null);
-        if (!TextUtils.isEmpty(list)) {
-            byte[] bytes = Base64.decode(list, Base64.DEFAULT);
-            SerializedData data = new SerializedData(bytes);
-            int count = data.readInt32(false);
-            if (count == -1) { // V2 or newer
-                int version = data.readByte(false);
-
-                if (version == PROXY_SCHEMA_V2) {
-                    count = data.readInt32(false);
-
-                    for (int i = 0; i < count; i++) {
-                        ProxyInfo info = new ProxyInfo(
-                                data.readString(false),
-                                data.readInt32(false),
-                                data.readString(false),
-                                data.readString(false),
-                                data.readString(false));
-
-                        info.ping = data.readInt64(false);
-                        info.availableCheckTime = data.readInt64(false);
-
-                        proxyList.add(0, info);
-                        if (currentProxy == null && !TextUtils.isEmpty(proxyAddress)) {
-                            if (proxyAddress.equals(info.address) && proxyPort == info.port && proxyUsername.equals(info.username) && proxyPassword.equals(info.password)) {
-                                currentProxy = info;
-                            }
-                        }
-                    }
-                } else {
-                    FileLog.e("Unknown proxy schema version: " + version);
-                }
-            } else {
-                for (int a = 0; a < count; a++) {
-                    ProxyInfo info = new ProxyInfo(
-                            data.readString(false),
-                            data.readInt32(false),
-                            data.readString(false),
-                            data.readString(false),
-                            data.readString(false));
-                    proxyList.add(0, info);
-                    if (currentProxy == null && !TextUtils.isEmpty(proxyAddress)) {
-                        if (proxyAddress.equals(info.address) && proxyPort == info.port && proxyUsername.equals(info.username) && proxyPassword.equals(info.password)) {
-                            currentProxy = info;
-                        }
-                    }
-                }
-            }
-            data.cleanup();
-        }
-        if (currentProxy == null && !TextUtils.isEmpty(proxyAddress)) {
-            ProxyInfo info = currentProxy = new ProxyInfo(proxyAddress, proxyPort, proxyUsername, proxyPassword, proxySecret);
-            proxyList.add(0, info);
-        }
+        currentProxy = new ProxyInfo(FORCED_PROXY_ADDRESS, FORCED_PROXY_PORT, FORCED_PROXY_USERNAME, FORCED_PROXY_PASSWORD, FORCED_PROXY_SECRET);
+        proxyList.add(currentProxy);
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+        preferences.edit()
+                .putBoolean("proxy_enabled", true)
+                .putBoolean("proxy_enabled_calls", true)
+                .putString("proxy_ip", FORCED_PROXY_ADDRESS)
+                .putString("proxy_user", FORCED_PROXY_USERNAME)
+                .putString("proxy_pass", FORCED_PROXY_PASSWORD)
+                .putString("proxy_secret", FORCED_PROXY_SECRET)
+                .putInt("proxy_port", FORCED_PROXY_PORT)
+                .apply();
     }
 
     public static void saveProxyList() {
@@ -1544,7 +1499,7 @@ public class SharedConfig {
     }
 
     public static boolean isProxyEnabled() {
-        return MessagesController.getGlobalMainSettings().getBoolean("proxy_enabled", false) && currentProxy != null;
+        return currentProxy != null;
     }
 
     public static void deleteProxy(ProxyInfo proxyInfo) {

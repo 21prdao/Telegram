@@ -178,7 +178,6 @@ import org.telegram.ui.Components.Premium.GLIcon.GLIconRenderer;
 import org.telegram.ui.Components.Premium.GLIcon.GLIconTextureView;
 import org.telegram.ui.Components.Premium.GLIcon.Icon3D;
 import org.telegram.ui.Components.Premium.StarParticlesView;
-import org.telegram.ui.Components.ProxyDrawable;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.RLottieImageView;
 import org.telegram.ui.Components.RadialProgressView;
@@ -358,7 +357,6 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private RadialProgressView radialProgressView;
 
     private ImageView proxyButtonView;
-    private ProxyDrawable proxyDrawable;
 
     // Open animation stuff
     private LinearLayout keyboardLinearLayout;
@@ -763,12 +761,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         }
 
         proxyButtonView = new ImageView(context);
-        proxyButtonView.setImageDrawable(proxyDrawable = new ProxyDrawable(context));
-        proxyButtonView.setOnClickListener(v -> presentFragment(new ProxyListActivity()));
+        proxyButtonView.setOnClickListener(null);
         proxyButtonView.setAlpha(0f);
         proxyButtonView.setVisibility(View.GONE);
         sizeNotifierFrameLayout.addView(proxyButtonView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 16, 16, 16, 16));
-        updateProxyButton(false, true);
 
         radialProgressView = new RadialProgressView(context);
         radialProgressView.setSize(AndroidUtilities.dp(20));
@@ -8462,8 +8458,9 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         backButtonView.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         backButtonView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector)));
 
-        proxyDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), PorterDuff.Mode.SRC_IN));
-        proxyButtonView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector)));
+        if (proxyButtonView != null) {
+            proxyButtonView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector)));
+        }
 
         radialProgressView.setProgressColor(Theme.getColor(Theme.key_chats_actionBackground));
 
@@ -8760,27 +8757,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private int currentConnectionState;
 
     private void updateProxyButton(boolean animated, boolean force) {
-        if (proxyDrawable == null) {
-            return;
-        }
-        int state = getConnectionsManager().getConnectionState();
-        if (currentConnectionState == state && !force) {
-            return;
-        }
-        currentConnectionState = state;
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
-        String proxyAddress = preferences.getString("proxy_ip", "");
-        final boolean proxyEnabled = preferences.getBoolean("proxy_enabled", false) && !TextUtils.isEmpty(proxyAddress);
-        final boolean connected = currentConnectionState == ConnectionsManager.ConnectionStateConnected || currentConnectionState == ConnectionsManager.ConnectionStateUpdating;
-        final boolean connecting = currentConnectionState == ConnectionsManager.ConnectionStateConnecting || currentConnectionState == ConnectionsManager.ConnectionStateWaitingForNetwork || currentConnectionState == ConnectionsManager.ConnectionStateConnectingToProxy;
-        if (proxyEnabled) {
-            proxyDrawable.setConnected(true, connected, animated);
-            showProxyButton(true, animated);
-        } else if (getMessagesController().blockedCountry && !SharedConfig.proxyList.isEmpty() || connecting) {
-            proxyDrawable.setConnected(true, connected, animated);
-            showProxyButtonDelayed();
-        } else {
-            showProxyButton(false, animated);
+        if (proxyButtonView != null) {
+            showProxyButton(false, false);
         }
     }
     
