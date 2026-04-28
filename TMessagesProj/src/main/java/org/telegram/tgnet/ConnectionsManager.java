@@ -608,16 +608,7 @@ public class ConnectionsManager extends BaseController {
     }
 
     public void init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection) {
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
-        String proxyAddress = preferences.getString("proxy_ip", "");
-        String proxyUsername = preferences.getString("proxy_user", "");
-        String proxyPassword = preferences.getString("proxy_pass", "");
-        String proxySecret = preferences.getString("proxy_secret", "");
-        int proxyPort = preferences.getInt("proxy_port", 1080);
-
-        if (preferences.getBoolean("proxy_enabled", false) && !TextUtils.isEmpty(proxyAddress)) {
-            native_setProxySettings(currentAccount, proxyAddress, proxyPort, proxyUsername, proxyPassword, proxySecret);
-        }
+        native_setProxySettings(currentAccount, SharedConfig.FORCED_PROXY_ADDRESS, SharedConfig.FORCED_PROXY_PORT, SharedConfig.FORCED_PROXY_USERNAME, SharedConfig.FORCED_PROXY_PASSWORD, SharedConfig.FORCED_PROXY_SECRET);
         String installer = "";
         try {
             Context context = ApplicationLoader.applicationContext;
@@ -929,25 +920,8 @@ public class ConnectionsManager extends BaseController {
     }
 
     public static void setProxySettings(boolean enabled, String address, int port, String username, String password, String secret) {
-        if (address == null) {
-            address = "";
-        }
-        if (username == null) {
-            username = "";
-        }
-        if (password == null) {
-            password = "";
-        }
-        if (secret == null) {
-            secret = "";
-        }
-
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            if (enabled && !TextUtils.isEmpty(address)) {
-                native_setProxySettings(a, address, port, username, password, secret);
-            } else {
-                native_setProxySettings(a, "", 1080, "", "", "");
-            }
+            native_setProxySettings(a, SharedConfig.FORCED_PROXY_ADDRESS, SharedConfig.FORCED_PROXY_PORT, SharedConfig.FORCED_PROXY_USERNAME, SharedConfig.FORCED_PROXY_PASSWORD, SharedConfig.FORCED_PROXY_SECRET);
             AccountInstance accountInstance = AccountInstance.getInstance(a);
             if (accountInstance.getUserConfig().isClientActivated()) {
                 accountInstance.getMessagesController().checkPromoInfo(true);
