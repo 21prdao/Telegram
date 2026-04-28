@@ -603,12 +603,6 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
   });
 });
 
-app.get('/api/v1/red-packets/:packetId', async (req, res) => {
-  const packet = await ensurePacket(req.params.packetId, res);
-  if (!packet) return;
-  return res.json({ ok: true, data: buildPacketResponse(packet, req.query.wallet) });
-});
-
 app.get('/api/v1/red-packets/send-records', async (req, res) => {
   const creatorWallet = String(req.query.creatorWallet || '').trim();
   const limit = Number(req.query.limit || 50);
@@ -617,6 +611,12 @@ app.get('/api/v1/red-packets/send-records', async (req, res) => {
   }
   const records = await db.getSendRecordsByCreator(creatorWallet, limit);
   return res.json({ ok: true, data: records });
+});
+
+app.get('/api/v1/red-packets/:packetId', async (req, res) => {
+  const packet = await ensurePacket(req.params.packetId, res);
+  if (!packet) return;
+  return res.json({ ok: true, data: buildPacketResponse(packet, req.query.wallet) });
 });
 
 app.get('/api/v1/client/proxy', async (_req, res) => {

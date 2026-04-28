@@ -17,6 +17,7 @@ import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.redpacket.RedPacketRepository;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -27,7 +28,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private boolean showRedPacketRecords;
     private LinearLayout listContainer;
     private volatile boolean syncingRecords;
-    private boolean recordsSyncedOnce;
+    private volatile List<RedPacketSendRecord> remoteRedPacketRecords = new ArrayList<>();
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -74,9 +75,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         listContainer.removeAllViews();
         if (showRedPacketRecords) {
             renderRedPacketRecords();
-            if (!recordsSyncedOnce) {
-                syncRedPacketRecordsFromServer();
-            }
+            syncRedPacketRecordsFromServer();
         } else {
             renderTokens();
         }
@@ -102,10 +101,10 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     }
 
     private void renderRedPacketRecords() {
-        List<RedPacketSendRecord> records = WalletStorage.getRedPacketSendRecords(getActivity());
+        List<RedPacketSendRecord> records = remoteRedPacketRecords;
         if (records.isEmpty()) {
             TextView empty = createText(14, false);
-            empty.setText("暂无红包发送记录");
+            empty.setText(syncingRecords ? "正在加载红包发送记录..." : "暂无红包发送记录");
             listContainer.addView(empty, matchWrap());
             return;
         }
@@ -138,8 +137,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
                 if (getActivity() == null) {
                     return;
                 }
-                WalletStorage.replaceRedPacketSendRecords(getActivity(), remote);
-                recordsSyncedOnce = true;
+                remoteRedPacketRecords = remote != null ? remote : new ArrayList<>();
                 getActivity().runOnUiThread(this::refresh);
             } catch (Throwable ignore) {
             } finally {
