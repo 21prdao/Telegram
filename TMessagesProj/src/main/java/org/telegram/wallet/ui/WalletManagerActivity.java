@@ -4,15 +4,12 @@ import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import org.telegram.ui.ActionBar.Theme;
 
 public class WalletManagerActivity extends Activity implements WalletWorkflowCoordinator.Host {
 
@@ -22,191 +19,152 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private static final String TAG_MANAGE = "wallet_manage";
 
     private int containerId;
-    private TextView homeTab;
-    private TextView sendTab;
-    private TextView securityTab;
-    private TextView manageTab;
+    private LinearLayout homeTab;
+    private LinearLayout sendTab;
+    private LinearLayout securityTab;
+    private LinearLayout manageTab;
     private WalletWorkflowCoordinator coordinator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Web3Ui.applySystemBars(this);
         coordinator = new WalletWorkflowCoordinator(this, this);
         setContentView(buildRootLayout());
-        if (savedInstanceState == null) {
-            switchTo(TAG_HOME);
-        } else {
-            updateTabState(getCurrentTag());
-        }
+        if (savedInstanceState == null) switchTo(TAG_HOME); else updateTabState(getCurrentTag());
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        Web3Ui.applySystemBars(this);
         refreshCurrentFragment();
     }
 
     private LinearLayout buildRootLayout() {
+        Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundGray)));
-
-        root.addView(buildActionBar(), new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
+        root.setBackgroundColor(p.pageBg);
+        root.addView(buildActionBar(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
         container.setId(containerId);
-        LinearLayout.LayoutParams containerLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-        );
-        containerLp.setMargins(dp(12), dp(10), dp(12), dp(10));
-        root.addView(container, containerLp);
-
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setPadding(dp(12), dp(8), dp(12), dp(12));
-        tabs.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundGray)));
-
-        homeTab = createTab("资产");
-        sendTab = createTab("转账");
-        securityTab = createTab("安全");
-        manageTab = createTab("管理");
-
-        homeTab.setOnClickListener(v -> switchTo(TAG_HOME));
-        sendTab.setOnClickListener(v -> switchTo(TAG_SEND));
-        securityTab.setOnClickListener(v -> switchTo(TAG_SECURITY));
-        manageTab.setOnClickListener(v -> switchTo(TAG_MANAGE));
-
-        tabs.addView(homeTab, tabLp());
-        tabs.addView(sendTab, tabLp());
-        tabs.addView(securityTab, tabLp());
-        tabs.addView(manageTab, tabLp());
-
-        root.addView(tabs, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
+        root.addView(container, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        root.addView(buildBottomTabs(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return root;
     }
 
     private LinearLayout buildActionBar() {
+        Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(12), dp(10), dp(12), dp(10));
-        bar.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
+        bar.setPadding(dp(20), dp(12), dp(20), dp(10));
+        bar.setBackgroundColor(p.pageBg);
 
-        TextView back = createActionButton("←");
+        FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        TextView title = new TextView(this);
-        title.setText("Web3 Wallet Pro");
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextSize(19f);
-        title.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
+        TextView title = Web3Ui.text(this, "Web3 Wallet Pro", 24, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        bar.addView(title, titleLp);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView settings = createActionButton("⚙");
+        FrameLayout settings = Web3Ui.iconButton(this, Web3IconView.SETTINGS);
         settings.setOnClickListener(v -> showDeveloperInfoDialog());
-        bar.addView(settings, new LinearLayout.LayoutParams(dp(40), dp(40)));
-
+        bar.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
         return bar;
     }
 
-    private TextView createActionButton(String text) {
-        TextView button = new TextView(this);
-        button.setText(text);
-        button.setGravity(Gravity.CENTER);
-        button.setTextSize(20f);
-        button.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setCornerRadius(dp(12));
-        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
-        button.setBackground(bg);
-        return button;
+    private FrameLayout buildBottomTabs() {
+        Web3Ui.Palette p = Web3Ui.palette();
+        FrameLayout wrap = new FrameLayout(this);
+        wrap.setPadding(dp(20), dp(8), dp(20), dp(14));
+        wrap.setBackgroundColor(p.pageBg);
+        LinearLayout dock = new LinearLayout(this);
+        dock.setOrientation(LinearLayout.HORIZONTAL);
+        dock.setGravity(Gravity.CENTER_VERTICAL);
+        dock.setPadding(dp(6), dp(6), dp(6), dp(6));
+        dock.setBackground(Web3Ui.roundedStroke(this, p.cardBg, p.border, 22, 1));
+        Web3Ui.setElevation(dock, 4);
+
+        homeTab = createTab(Web3IconView.WALLET, "资产");
+        sendTab = createTab(Web3IconView.SEND, "转账");
+        securityTab = createTab(Web3IconView.SHIELD, "安全");
+        manageTab = createTab(Web3IconView.MANAGE, "管理");
+        homeTab.setOnClickListener(v -> switchTo(TAG_HOME));
+        sendTab.setOnClickListener(v -> switchTo(TAG_SEND));
+        securityTab.setOnClickListener(v -> switchTo(TAG_SECURITY));
+        manageTab.setOnClickListener(v -> switchTo(TAG_MANAGE));
+        dock.addView(homeTab, tabLp());
+        dock.addView(sendTab, tabLp());
+        dock.addView(securityTab, tabLp());
+        dock.addView(manageTab, tabLp());
+        wrap.addView(dock, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(76), Gravity.CENTER));
+        return wrap;
     }
 
-    private void showDeveloperInfoDialog() {
-        coordinator.checkConnectivity(status -> new android.app.AlertDialog.Builder(this)
-                .setTitle("开发者信息")
-                .setMessage(status)
-                .setPositiveButton("确定", null)
-                .show());
-    }
-
-    private LinearLayout.LayoutParams tabLp() {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(44), 1f);
-        lp.setMargins(dp(4), 0, dp(4), 0);
-        return lp;
-    }
-
-    private TextView createTab(String text) {
-        TextView tab = new TextView(this);
-        tab.setText(text);
+    private LinearLayout createTab(int icon, String text) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        LinearLayout tab = new LinearLayout(this);
+        tab.setOrientation(LinearLayout.VERTICAL);
         tab.setGravity(Gravity.CENTER);
-        tab.setTypeface(Typeface.DEFAULT_BOLD);
-        tab.setTextSize(14f);
-        tab.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
-        tab.setBackground(tabBg(false));
+        tab.setPadding(0, dp(6), 0, dp(5));
+        Web3IconView iconView = new Web3IconView(this, icon, p.mutedText);
+        tab.addView(iconView, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView tv = Web3Ui.text(this, text, 12, p.mutedText, true);
+        tv.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        tvLp.topMargin = dp(2);
+        tab.addView(tv, tvLp);
+        tab.setBackground(Web3Ui.rounded(this, 0x00000000, 17));
         return tab;
     }
 
-    private GradientDrawable tabBg(boolean active) {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(12));
-        bg.setColor(active ? c(String.valueOf(Theme.key_featuredStickers_addButton)) : c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setStroke(dp(1), active ? c(String.valueOf(Theme.key_featuredStickers_addButton)) : c(String.valueOf(Theme.key_divider)));
-        return bg;
+    private LinearLayout.LayoutParams tabLp() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        lp.setMargins(dp(2), 0, dp(2), 0);
+        return lp;
+    }
+
+    private void setTabActive(LinearLayout tab, boolean active) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        int color = active ? p.orange : p.mutedText;
+        int bg = active ? (p.dark ? 0x331C1308 : 0xFFFFF2DF) : 0x00000000;
+        int stroke = active ? p.orange : 0x00000000;
+        tab.setBackground(Web3Ui.roundedStroke(this, bg, stroke, 17, active ? 1 : 0));
+        if (tab.getChildAt(0) instanceof Web3IconView) ((Web3IconView) tab.getChildAt(0)).setIconColor(color);
+        if (tab.getChildAt(1) instanceof TextView) ((TextView) tab.getChildAt(1)).setTextColor(color);
+    }
+
+    private void showDeveloperInfoDialog() {
+        coordinator.checkConnectivity(status -> new android.app.AlertDialog.Builder(this).setTitle("开发者信息").setMessage(status).setPositiveButton("确定", null).show());
     }
 
     private void switchTo(String tag) {
         Fragment fragment = findOrCreate(tag);
-        getFragmentManager().beginTransaction()
-                .replace(containerId, fragment, tag)
-                .commitAllowingStateLoss();
+        getFragmentManager().beginTransaction().replace(containerId, fragment, tag).commitAllowingStateLoss();
         updateTabState(tag);
     }
 
     private Fragment findOrCreate(String tag) {
         FragmentManager fm = getFragmentManager();
         Fragment existing = fm.findFragmentByTag(tag);
-        if (existing != null) {
-            return existing;
-        }
-        if (TAG_SEND.equals(tag)) {
-            return SendTokenFragment.newInstance();
-        }
-        if (TAG_SECURITY.equals(tag)) {
-            return WalletBackupFragment.newInstance();
-        }
-        if (TAG_MANAGE.equals(tag)) {
-            return WalletManageFragment.newInstance();
-        }
+        if (existing != null) return existing;
+        if (TAG_SEND.equals(tag)) return SendTokenFragment.newInstance();
+        if (TAG_SECURITY.equals(tag)) return WalletBackupFragment.newInstance();
+        if (TAG_MANAGE.equals(tag)) return WalletManageFragment.newInstance();
         return WalletHomeFragment.newInstance();
     }
 
     private void updateTabState(String currentTag) {
-        homeTab.setBackground(tabBg(TAG_HOME.equals(currentTag)));
-        homeTab.setTextColor(TAG_HOME.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
-
-        sendTab.setBackground(tabBg(TAG_SEND.equals(currentTag)));
-        sendTab.setTextColor(TAG_SEND.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
-
-        securityTab.setBackground(tabBg(TAG_SECURITY.equals(currentTag)));
-        securityTab.setTextColor(TAG_SECURITY.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
-
-        manageTab.setBackground(tabBg(TAG_MANAGE.equals(currentTag)));
-        manageTab.setTextColor(TAG_MANAGE.equals(currentTag) ? c(String.valueOf(Theme.key_featuredStickers_buttonText)) : c(String.valueOf(Theme.key_windowBackgroundWhiteGrayText)));
+        setTabActive(homeTab, TAG_HOME.equals(currentTag));
+        setTabActive(sendTab, TAG_SEND.equals(currentTag));
+        setTabActive(securityTab, TAG_SECURITY.equals(currentTag));
+        setTabActive(manageTab, TAG_MANAGE.equals(currentTag));
     }
 
     private String getCurrentTag() {
@@ -216,48 +174,15 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
     private void refreshCurrentFragment() {
         Fragment current = getFragmentManager().findFragmentById(containerId);
-        if (current instanceof WalletRefreshable) {
-            ((WalletRefreshable) current).refresh();
-        }
+        if (current instanceof WalletRefreshable) ((WalletRefreshable) current).refresh();
     }
 
+    public void openWalletListPage() { getFragmentManager().beginTransaction().replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page").addToBackStack("wallet_list_page").commitAllowingStateLoss(); }
+    public void openTokenListPage() { getFragmentManager().beginTransaction().replace(containerId, TokenListPageFragment.tokenList(), "token_list_page").addToBackStack("token_list_page").commitAllowingStateLoss(); }
+    public void openRedPacketRecordsPage() { getFragmentManager().beginTransaction().replace(containerId, TokenListPageFragment.redPacketRecords(), "redpacket_records_page").addToBackStack("redpacket_records_page").commitAllowingStateLoss(); }
 
-    public void openWalletListPage() {
-        getFragmentManager().beginTransaction()
-                .replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page")
-                .addToBackStack("wallet_list_page")
-                .commitAllowingStateLoss();
-    }
+    private int dp(int value) { return Web3Ui.dp(this, value); }
 
-    public void openTokenListPage() {
-        getFragmentManager().beginTransaction()
-                .replace(containerId, TokenListPageFragment.tokenList(), "token_list_page")
-                .addToBackStack("token_list_page")
-                .commitAllowingStateLoss();
-    }
-
-    public void openRedPacketRecordsPage() {
-        getFragmentManager().beginTransaction()
-                .replace(containerId, TokenListPageFragment.redPacketRecords(), "redpacket_records_page")
-                .addToBackStack("redpacket_records_page")
-                .commitAllowingStateLoss();
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density);
-    }
-
-    private int c(String key) {
-        return Theme.getColor(Integer.parseInt(key));
-    }
-
-    @Override
-    public WalletWorkflowCoordinator coordinator() {
-        return coordinator;
-    }
-
-    @Override
-    public void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
+    @Override public WalletWorkflowCoordinator coordinator() { return coordinator; }
+    @Override public void toast(String msg) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show(); }
 }

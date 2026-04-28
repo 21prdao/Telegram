@@ -2,55 +2,57 @@ package org.telegram.wallet.ui;
 
 import android.app.Fragment;
 import android.content.Intent;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
-import org.telegram.ui.ActionBar.Theme;
-
 public class WalletManageFragment extends Fragment implements WalletRefreshable {
+    public static WalletManageFragment newInstance() { return new WalletManageFragment(); }
 
-    public static WalletManageFragment newInstance() {
-        return new WalletManageFragment();
-    }
-
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    @Override public android.view.View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        ScrollView scroll = new ScrollView(getActivity());
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(p.pageBg);
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(12), dp(14), dp(20));
+        root.setPadding(dp(20), dp(10), dp(20), dp(20));
+        scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout card = createCard();
-        root.addView(card, matchWrap());
+        LinearLayout card = Web3Ui.card(getActivity());
+        card.setBackground(Web3Ui.roundedStroke(getActivity(), p.cardBg, p.strongBorder, 22, 1));
+        root.addView(card, Web3Ui.matchWrap());
+        LinearLayout head = new LinearLayout(getActivity());
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.WALLET, p.orange, p.dark ? 0x22F08C22 : 0xFFFFF2DF, 44);
+        head.addView(icon, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        TextView title = Web3Ui.text(getActivity(), "钱包管理", 26, p.primaryText, true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        titleLp.leftMargin = dp(12);
+        head.addView(title, titleLp);
+        FrameLayout deco = Web3Ui.iconCircle(getActivity(), Web3IconView.MANAGE, p.orange, p.dark ? 0x16F08C22 : 0xFFFFF2DF, 58);
+        head.addView(deco, new LinearLayout.LayoutParams(dp(58), dp(58)));
+        card.addView(head, Web3Ui.matchWrap());
+        TextView desc = Web3Ui.text(getActivity(), "在独立页面中查看钱包列表、切换钱包和管理代币。\n并可查看我发出的红包记录。", 16, p.secondaryText, false);
+        desc.setLineSpacing(dp(2), 1.0f);
+        card.addView(desc, Web3Ui.topMargin(getActivity(), 18));
 
-        TextView title = createText(17, true);
-        title.setText("钱包管理");
-        card.addView(title, matchWrap());
-
-        TextView desc = createText(14, false);
-        desc.setText("在独立页面中查看钱包列表、切换钱包和管理代币。\n并可查看我发出的红包记录。\n");
-        desc.setPadding(0, dp(8), 0, 0);
-        card.addView(desc, matchWrap());
-
-        Button walletList = createPrimaryButton("钱包列表 / 切换钱包");
+        LinearLayout walletList = Web3Ui.actionButton(getActivity(), "钱包列表 / 切换钱包", Web3IconView.WALLET, true);
         walletList.setOnClickListener(v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class)));
-        card.addView(walletList, topWrap(10));
-
-        Button tokenList = createOutlineButton("代币列表");
+        card.addView(walletList, Web3Ui.topMargin(getActivity(), 22));
+        LinearLayout tokenList = Web3Ui.actionButton(getActivity(), "代币列表", Web3IconView.COINS, false);
         tokenList.setOnClickListener(v -> startTokenListPage(false, false));
-        card.addView(tokenList, topWrap(10));
-
-        Button redPacketRecords = createOutlineButton("我发出的红包记录");
+        card.addView(tokenList, Web3Ui.topMargin(getActivity(), 12));
+        LinearLayout redPacketRecords = Web3Ui.actionButton(getActivity(), "我发出的红包记录", Web3IconView.RED_PACKET, false);
         redPacketRecords.setOnClickListener(v -> startTokenListPage(true, false));
-        card.addView(redPacketRecords, topWrap(10));
-
-        return root;
+        card.addView(redPacketRecords, Web3Ui.topMargin(getActivity(), 12));
+        return scroll;
     }
 
     private void startTokenListPage(boolean showRecords, boolean autoOpenAdd) {
@@ -59,86 +61,6 @@ public class WalletManageFragment extends Fragment implements WalletRefreshable 
         intent.putExtra(TokenListPageActivity.EXTRA_AUTO_OPEN_ADD, autoOpenAdd);
         startActivity(intent);
     }
-
-    @Override
-    public void refresh() {
-    }
-
-    private Button createPrimaryButton(String text) {
-        Button b = new Button(getActivity());
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setTextColor(c(String.valueOf(Theme.key_featuredStickers_buttonText)));
-        b.setBackground(primaryBg());
-        return b;
-    }
-
-    private Button createOutlineButton(String text) {
-        Button b = new Button(getActivity());
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        b.setBackground(outlineBg());
-        return b;
-    }
-
-    private TextView createText(int size, boolean bold) {
-        TextView tv = new TextView(getActivity());
-        tv.setTextSize(size);
-        tv.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        if (bold) {
-            tv.setTypeface(Typeface.DEFAULT_BOLD);
-        }
-        return tv;
-    }
-
-    private GradientDrawable primaryBg() {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_featuredStickers_addButton)));
-        bg.setCornerRadius(dp(12));
-        return bg;
-    }
-
-    private GradientDrawable outlineBg() {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setCornerRadius(dp(12));
-        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
-        return bg;
-    }
-
-    private LinearLayout createCard() {
-        LinearLayout card = new LinearLayout(getActivity());
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
-        card.setBackground(bg);
-        return card;
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-    }
-
-    private LinearLayout.LayoutParams topWrap(int topDp) {
-        LinearLayout.LayoutParams lp = matchWrap();
-        lp.topMargin = dp(topDp);
-        return lp;
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density);
-    }
-
-    private int c(String key) {
-        return Theme.getColor(Integer.parseInt(key));
-    }
+    @Override public void refresh() { }
+    private int dp(int value) { return Web3Ui.dp(getActivity(), value); }
 }

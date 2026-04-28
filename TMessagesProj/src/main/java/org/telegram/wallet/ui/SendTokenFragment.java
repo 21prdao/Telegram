@@ -3,176 +3,99 @@ package org.telegram.wallet.ui;
 import android.app.AlertDialog;
 import android.app.Fragment;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.telegram.wallet.data.WalletStorage;
-import org.telegram.ui.ActionBar.Theme;
 
 public class SendTokenFragment extends Fragment implements WalletRefreshable {
-
     private TextView fromWalletView;
     private EditText toAddressEdit;
     private EditText amountEdit;
 
-    public static SendTokenFragment newInstance() {
-        return new SendTokenFragment();
-    }
+    public static SendTokenFragment newInstance() { return new SendTokenFragment(); }
 
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    @Override public android.view.View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        ScrollView scroll = new ScrollView(getActivity());
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(p.pageBg);
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(12), dp(14), dp(20));
-
-        LinearLayout card = createCard();
-        root.addView(card, matchWrap());
-
-        TextView title = createText(17, true);
-        title.setText("转账（TokenPocket 风格：填写 → 预览 → 提交）");
-        card.addView(title, matchWrap());
-
-        fromWalletView = createText(14, false);
-        fromWalletView.setPadding(0, dp(10), 0, 0);
-        card.addView(fromWalletView, matchWrap());
-
-        TextView toLabel = createText(14, true);
-        toLabel.setPadding(0, dp(14), 0, dp(6));
-        toLabel.setText("收款地址");
-        card.addView(toLabel, matchWrap());
-
-        toAddressEdit = new EditText(getActivity());
-        toAddressEdit.setHint("0x...");
-        toAddressEdit.setBackground(inputBg());
-        toAddressEdit.setPadding(dp(12), dp(10), dp(12), dp(10));
-        card.addView(toAddressEdit, matchWrap());
-
-        TextView amountLabel = createText(14, true);
-        amountLabel.setPadding(0, dp(14), 0, dp(6));
-        amountLabel.setText("BNB 数量");
-        card.addView(amountLabel, matchWrap());
-
-        amountEdit = new EditText(getActivity());
-        amountEdit.setHint("例如 0.01");
+        root.setPadding(dp(20), dp(10), dp(20), dp(20));
+        scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        LinearLayout card = Web3Ui.card(getActivity());
+        card.setBackground(Web3Ui.roundedStroke(getActivity(), p.cardBg, p.strongBorder, 22, 1));
+        root.addView(card, Web3Ui.matchWrap());
+        LinearLayout head = new LinearLayout(getActivity());
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.SEND, p.orange, p.dark ? 0x22F08C22 : 0xFFFFF2DF, 54);
+        head.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        TextView title = Web3Ui.text(getActivity(), "转账", 26, p.primaryText, true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        titleLp.leftMargin = dp(14);
+        head.addView(title, titleLp);
+        card.addView(head, Web3Ui.matchWrap());
+        fromWalletView = Web3Ui.text(getActivity(), "付款钱包：--", 15, p.secondaryText, false);
+        card.addView(fromWalletView, Web3Ui.topMargin(getActivity(), 14));
+        card.addView(Web3Ui.text(getActivity(), "收款地址", 15, p.primaryText, true), Web3Ui.topMargin(getActivity(), 18));
+        toAddressEdit = createInput("0x...");
+        card.addView(toAddressEdit, Web3Ui.topMargin(getActivity(), 8));
+        card.addView(Web3Ui.text(getActivity(), "BNB 数量", 15, p.primaryText, true), Web3Ui.topMargin(getActivity(), 18));
+        amountEdit = createInput("例如 0.01");
         amountEdit.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        amountEdit.setBackground(inputBg());
-        amountEdit.setPadding(dp(12), dp(10), dp(12), dp(10));
-        card.addView(amountEdit, matchWrap());
-
-        Button submitButton = new Button(getActivity());
-        submitButton.setText("预览并提交");
-        submitButton.setTypeface(Typeface.DEFAULT_BOLD);
-        submitButton.setTextColor(c(String.valueOf(Theme.key_featuredStickers_buttonText)));
-        submitButton.setBackground(primaryBg());
+        card.addView(amountEdit, Web3Ui.topMargin(getActivity(), 8));
+        LinearLayout submitButton = Web3Ui.actionButton(getActivity(), "预览并提交", Web3IconView.SEND, true);
         submitButton.setOnClickListener(v -> onSubmit());
-
-        LinearLayout.LayoutParams btnLp = matchWrap();
-        btnLp.topMargin = dp(16);
-        card.addView(submitButton, btnLp);
-
+        card.addView(submitButton, Web3Ui.topMargin(getActivity(), 22));
         refresh();
-        return root;
+        return scroll;
+    }
+
+    private EditText createInput(String hint) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        EditText edit = new EditText(getActivity());
+        edit.setHint(hint);
+        edit.setTextSize(15f);
+        edit.setSingleLine(true);
+        edit.setTextColor(p.primaryText);
+        edit.setHintTextColor(p.mutedText);
+        edit.setTypeface(Typeface.DEFAULT);
+        edit.setPadding(dp(14), 0, dp(14), 0);
+        edit.setMinHeight(dp(52));
+        edit.setBackground(Web3Ui.roundedStroke(getActivity(), p.softCardBg, p.border, 14, 1));
+        return edit;
     }
 
     private void onSubmit() {
         String to = toAddressEdit.getText().toString().trim();
         String amount = amountEdit.getText().toString().trim();
-        if (TextUtils.isEmpty(to) || !to.matches("^0x[0-9a-fA-F]{40}$")) {
-            host().toast("收款地址格式错误");
-            return;
-        }
-        if (TextUtils.isEmpty(amount)) {
-            host().toast("请输入 BNB 数量");
-            return;
-        }
-
+        if (TextUtils.isEmpty(to) || !to.matches("^0x[0-9a-fA-F]{40}$")) { host().toast("收款地址格式错误"); return; }
+        if (TextUtils.isEmpty(amount)) { host().toast("请输入 BNB 数量"); return; }
         String from = WalletStorage.getSelectedAddress(getActivity());
         new AlertDialog.Builder(getActivity())
                 .setTitle("确认转账")
-                .setMessage("From: " + WalletWorkflowCoordinator.shortAddress(from)
-                        + "\nTo: " + WalletWorkflowCoordinator.shortAddress(to)
-                        + "\nAmount: " + amount + " BNB")
+                .setMessage("From: " + WalletWorkflowCoordinator.shortAddress(from) + "\nTo: " + WalletWorkflowCoordinator.shortAddress(to) + "\nAmount: " + amount + " BNB")
                 .setPositiveButton("确认发送", (d, w) -> coordinator().sendNativeTransfer(to, amount, this::refresh))
                 .setNegativeButton("取消", null)
                 .show();
     }
 
-    @Override
-    public void refresh() {
+    @Override public void refresh() {
         String selected = WalletStorage.getSelectedAddress(getActivity());
-        fromWalletView.setText(TextUtils.isEmpty(selected)
-                ? "当前钱包：未创建"
-                : "付款钱包：" + WalletWorkflowCoordinator.shortAddress(selected));
+        fromWalletView.setText(TextUtils.isEmpty(selected) ? "当前钱包：未创建" : "付款钱包：" + WalletWorkflowCoordinator.shortAddress(selected));
     }
-
-    private WalletWorkflowCoordinator.Host host() {
-        return (WalletWorkflowCoordinator.Host) getActivity();
-    }
-
-    private WalletWorkflowCoordinator coordinator() {
-        return host().coordinator();
-    }
-
-    private GradientDrawable inputBg() {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setCornerRadius(dp(10));
-        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
-        return bg;
-    }
-
-    private GradientDrawable primaryBg() {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_featuredStickers_addButton)));
-        bg.setCornerRadius(dp(12));
-        return bg;
-    }
-
-    private LinearLayout createCard() {
-        LinearLayout card = new LinearLayout(getActivity());
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
-        card.setBackground(bg);
-        return card;
-    }
-
-    private TextView createText(int size, boolean bold) {
-        TextView tv = new TextView(getActivity());
-        tv.setTextSize(size);
-        tv.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        tv.setGravity(Gravity.START);
-        if (bold) {
-            tv.setTypeface(Typeface.DEFAULT_BOLD);
-        }
-        return tv;
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density);
-    }
-
-    private int c(String key) {
-        return Theme.getColor(Integer.parseInt(key));
-    }
+    private WalletWorkflowCoordinator.Host host() { return (WalletWorkflowCoordinator.Host) getActivity(); }
+    private WalletWorkflowCoordinator coordinator() { return host().coordinator(); }
+    private int dp(int value) { return Web3Ui.dp(getActivity(), value); }
 }

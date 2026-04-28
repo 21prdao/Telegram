@@ -2,226 +2,128 @@ package org.telegram.wallet.ui;
 
 import android.app.AlertDialog;
 import android.app.Fragment;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.telegram.wallet.data.WalletStorage;
-import org.telegram.ui.ActionBar.Theme;
 
 public class WalletBackupFragment extends Fragment implements WalletRefreshable {
-
     private TextView selectedWalletView;
+    private TextView paymentPasswordView;
+    public static WalletBackupFragment newInstance() { return new WalletBackupFragment(); }
 
-    public static WalletBackupFragment newInstance() {
-        return new WalletBackupFragment();
-    }
-
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    @Override public android.view.View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        ScrollView scroll = new ScrollView(getActivity());
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(p.pageBg);
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(12), dp(14), dp(20));
-
-        LinearLayout card = createCard();
-        root.addView(card, matchWrap());
-
-        TextView title = createText(17, true);
-        title.setText("安全中心");
-        card.addView(title, matchWrap());
-
-        TextView hint = createText(14, false);
-        hint.setPadding(0, dp(8), 0, 0);
-        hint.setText("建议：定期离线备份私钥，不要截图，不要上传网盘。");
-        card.addView(hint, matchWrap());
-
-        selectedWalletView = createText(14, false);
-        selectedWalletView.setPadding(0, dp(12), 0, 0);
-        card.addView(selectedWalletView, matchWrap());
-
-        Button backupButton = new Button(getActivity());
-        backupButton.setText("查看当前钱包私钥");
-        backupButton.setTypeface(Typeface.DEFAULT_BOLD);
-        backupButton.setTextColor(c(String.valueOf(Theme.key_featuredStickers_buttonText)));
-        backupButton.setBackground(primaryBg());
+        root.setPadding(dp(20), dp(10), dp(20), dp(20));
+        scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        LinearLayout card = Web3Ui.card(getActivity());
+        card.setBackground(Web3Ui.roundedStroke(getActivity(), p.cardBg, p.strongBorder, 22, 1));
+        root.addView(card, Web3Ui.matchWrap());
+        LinearLayout head = new LinearLayout(getActivity());
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.SHIELD, p.orange, p.dark ? 0x22F08C22 : 0xFFFFF2DF, 66);
+        head.addView(icon, new LinearLayout.LayoutParams(dp(66), dp(66)));
+        TextView title = Web3Ui.text(getActivity(), "安全中心", 30, p.primaryText, true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        titleLp.leftMargin = dp(16);
+        head.addView(title, titleLp);
+        card.addView(head, Web3Ui.matchWrap());
+        android.view.View divider = new android.view.View(getActivity());
+        divider.setBackgroundColor(p.border);
+        LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1));
+        divLp.topMargin = dp(18);
+        card.addView(divider, divLp);
+        TextView hint = Web3Ui.text(getActivity(), "建议：定期离线备份私钥，不要截图，不要上传网盘。", 17, p.secondaryText, false);
+        hint.setLineSpacing(dp(4), 1.0f);
+        card.addView(hint, Web3Ui.topMargin(getActivity(), 18));
+        LinearLayout walletRow = infoRow(Web3IconView.WALLET, "当前钱包：");
+        selectedWalletView = (TextView) walletRow.getChildAt(1);
+        card.addView(walletRow, Web3Ui.topMargin(getActivity(), 18));
+        LinearLayout passwordRow = infoRow(Web3IconView.LOCK, "支付密码：");
+        paymentPasswordView = (TextView) passwordRow.getChildAt(1);
+        card.addView(passwordRow, Web3Ui.topMargin(getActivity(), 10));
+        LinearLayout backupButton = Web3Ui.actionButton(getActivity(), "查看当前钱包私钥", Web3IconView.KEY, true);
         backupButton.setOnClickListener(v -> showPrivateKey());
-
-        LinearLayout.LayoutParams btnLp = matchWrap();
-        btnLp.topMargin = dp(16);
-        card.addView(backupButton, btnLp);
-
-        Button passwordButton = new Button(getActivity());
-        passwordButton.setText("设置/修改支付密码");
-        passwordButton.setTypeface(Typeface.DEFAULT_BOLD);
-        passwordButton.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        passwordButton.setBackground(outlineBg());
+        card.addView(backupButton, Web3Ui.topMargin(getActivity(), 24));
+        LinearLayout passwordButton = Web3Ui.actionButton(getActivity(), "设置/修改支付密码", Web3IconView.LOCK, false);
         passwordButton.setOnClickListener(v -> showSetPaymentPasswordDialog());
-        LinearLayout.LayoutParams pwdLp = matchWrap();
-        pwdLp.topMargin = dp(10);
-        card.addView(passwordButton, pwdLp);
-
+        card.addView(passwordButton, Web3Ui.topMargin(getActivity(), 12));
         refresh();
-        return root;
+        return scroll;
+    }
+
+    private LinearLayout infoRow(int iconType, String prefix) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        LinearLayout row = new LinearLayout(getActivity());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(new Web3IconView(getActivity(), iconType, p.orange), new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView tv = Web3Ui.text(getActivity(), prefix, 16, p.primaryText, false);
+        LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tvLp.leftMargin = dp(12);
+        row.addView(tv, tvLp);
+        return row;
     }
 
     private void showPrivateKey() {
         String key = WalletStorage.getSelectedPrivateKey(getActivity());
-        if (key == null) {
-            ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先创建或导入钱包");
-            return;
-        }
-        if (!WalletStorage.hasPaymentPassword(getActivity())) {
-            ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先设置支付密码");
-            showSetPaymentPasswordDialog(this::showPrivateKeyDialog);
-            return;
-        }
+        if (key == null) { ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先创建或导入钱包"); return; }
+        if (!WalletStorage.hasPaymentPassword(getActivity())) { ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先设置支付密码"); showSetPaymentPasswordDialog(this::showPrivateKeyDialog); return; }
         showVerifyPaymentPasswordDialog(this::showPrivateKeyDialog, "验证支付密码");
     }
-
     private void showPrivateKeyDialog() {
         String key = WalletStorage.getSelectedPrivateKey(getActivity());
-        if (key == null) {
-            ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先创建或导入钱包");
-            return;
-        }
-        new AlertDialog.Builder(getActivity())
-                .setTitle("私钥（请妥善保管）")
-                .setMessage(key)
-                .setPositiveButton("我知道了", null)
-                .show();
+        if (key == null) { ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先创建或导入钱包"); return; }
+        new AlertDialog.Builder(getActivity()).setTitle("私钥（请妥善保管）").setMessage(key).setPositiveButton("我知道了", null).show();
     }
-
     private void showVerifyPaymentPasswordDialog(Runnable onSuccess, String title) {
-        android.widget.EditText input = new android.widget.EditText(getActivity());
+        EditText input = new EditText(getActivity());
         input.setHint("请输入支付密码");
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        new AlertDialog.Builder(getActivity())
-                .setTitle(title)
-                .setView(input)
-                .setPositiveButton("确认", (d, w) -> {
-                    String pwd = input.getText() == null ? "" : input.getText().toString().trim();
-                    if (!WalletStorage.verifyPaymentPassword(getActivity(), pwd)) {
-                        ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码错误");
-                        return;
-                    }
-                    onSuccess.run();
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        new AlertDialog.Builder(getActivity()).setTitle(title).setView(input).setPositiveButton("确认", (d, w) -> {
+            String pwd = input.getText() == null ? "" : input.getText().toString().trim();
+            if (!WalletStorage.verifyPaymentPassword(getActivity(), pwd)) { ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码错误"); return; }
+            onSuccess.run();
+        }).setNegativeButton("取消", null).show();
     }
-
-    private void showSetPaymentPasswordDialog() {
-        if (WalletStorage.hasPaymentPassword(getActivity())) {
-            showVerifyPaymentPasswordDialog(() -> showSetPaymentPasswordDialog(null), "核对当前支付密码");
-            return;
-        }
-        showSetPaymentPasswordDialog(null);
-    }
-
+    private void showSetPaymentPasswordDialog() { if (WalletStorage.hasPaymentPassword(getActivity())) { showVerifyPaymentPasswordDialog(() -> showSetPaymentPasswordDialog(null), "核对当前支付密码"); return; } showSetPaymentPasswordDialog(null); }
     private void showSetPaymentPasswordDialog(Runnable onSaved) {
-
         LinearLayout layout = new LinearLayout(getActivity());
         layout.setOrientation(LinearLayout.VERTICAL);
-        android.widget.EditText first = new android.widget.EditText(getActivity());
-        first.setHint("输入支付密码");
-        first.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        android.widget.EditText second = new android.widget.EditText(getActivity());
-        second.setHint("再次输入支付密码");
-        second.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        layout.addView(first);
-        layout.addView(second);
-
-        new AlertDialog.Builder(getActivity())
-                .setTitle(WalletStorage.hasPaymentPassword(getActivity()) ? "重置支付密码" : "设置支付密码")
-                .setView(layout)
-                .setPositiveButton("保存", (d, w) -> {
-                    String a = first.getText() == null ? "" : first.getText().toString().trim();
-                    String b = second.getText() == null ? "" : second.getText().toString().trim();
-                    if (TextUtils.isEmpty(a) || a.length() < 4) {
-                        ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码至少 4 位");
-                        return;
-                    }
-                    if (!TextUtils.equals(a, b)) {
-                        ((WalletWorkflowCoordinator.Host) getActivity()).toast("两次输入不一致");
-                        return;
-                    }
-                    WalletStorage.setPaymentPassword(getActivity(), a);
-                    ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码已保存");
-                    if (onSaved != null) {
-                        onSaved.run();
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+        EditText first = new EditText(getActivity()); first.setHint("输入支付密码"); first.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        EditText second = new EditText(getActivity()); second.setHint("再次输入支付密码"); second.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(first); layout.addView(second);
+        new AlertDialog.Builder(getActivity()).setTitle(WalletStorage.hasPaymentPassword(getActivity()) ? "重置支付密码" : "设置支付密码").setView(layout).setPositiveButton("保存", (d, w) -> {
+            String a = first.getText() == null ? "" : first.getText().toString().trim();
+            String b = second.getText() == null ? "" : second.getText().toString().trim();
+            if (TextUtils.isEmpty(a) || a.length() < 4) { ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码至少 4 位"); return; }
+            if (!TextUtils.equals(a, b)) { ((WalletWorkflowCoordinator.Host) getActivity()).toast("两次输入不一致"); return; }
+            WalletStorage.setPaymentPassword(getActivity(), a);
+            ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码已保存");
+            refresh();
+            if (onSaved != null) onSaved.run();
+        }).setNegativeButton("取消", null).show();
     }
-
-    private GradientDrawable outlineBg() {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setCornerRadius(dp(12));
-        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
-        return bg;
-    }
-
-    @Override
-    public void refresh() {
+    @Override public void refresh() {
+        if (getActivity() == null || selectedWalletView == null || paymentPasswordView == null) return;
         String selected = WalletStorage.getSelectedAddress(getActivity());
-        String walletText = selected == null
-                ? "当前钱包：未创建"
-                : "当前钱包：" + WalletWorkflowCoordinator.shortAddress(selected);
-        walletText += WalletStorage.hasPaymentPassword(getActivity()) ? "\n支付密码：已设置" : "\n支付密码：未设置";
-        selectedWalletView.setText(walletText);
+        selectedWalletView.setText(selected == null ? "当前钱包：未创建" : "当前钱包：" + WalletWorkflowCoordinator.shortAddress(selected));
+        paymentPasswordView.setText(WalletStorage.hasPaymentPassword(getActivity()) ? "支付密码：已设置" : "支付密码：未设置");
     }
-
-    private GradientDrawable primaryBg() {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_featuredStickers_addButton)));
-        bg.setCornerRadius(dp(12));
-        return bg;
-    }
-
-    private LinearLayout createCard() {
-        LinearLayout card = new LinearLayout(getActivity());
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-        bg.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), c(String.valueOf(Theme.key_divider)));
-        card.setBackground(bg);
-        return card;
-    }
-
-    private TextView createText(int size, boolean bold) {
-        TextView tv = new TextView(getActivity());
-        tv.setTextSize(size);
-        tv.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        if (bold) {
-            tv.setTypeface(Typeface.DEFAULT_BOLD);
-        }
-        return tv;
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density);
-    }
-
-    private int c(String key) {
-        return Theme.getColor(Integer.parseInt(key));
-    }
+    private int dp(int value) { return Web3Ui.dp(getActivity(), value); }
 }

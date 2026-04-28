@@ -8,81 +8,44 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.telegram.ui.ActionBar.Theme;
-
 public class WalletListPageActivity extends Activity implements WalletWorkflowCoordinator.Host {
-
     private int containerId;
     private WalletWorkflowCoordinator coordinator;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Web3Ui.applySystemBars(this);
         coordinator = new WalletWorkflowCoordinator(this, this);
         setContentView(buildRoot("钱包列表 / 切换钱包"));
-        if (savedInstanceState == null) {
-            getFragmentManager().beginTransaction()
-                    .replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page")
-                    .commitAllowingStateLoss();
-        }
+        if (savedInstanceState == null) getFragmentManager().beginTransaction().replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page").commitAllowingStateLoss();
     }
+    @Override protected void onResume() { super.onResume(); Web3Ui.applySystemBars(this); }
 
     private LinearLayout buildRoot(String titleText) {
+        Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundGray)));
-
+        root.setBackgroundColor(p.pageBg);
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(12), dp(10), dp(12), dp(10));
-        bar.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-
-        TextView back = new TextView(this);
-        back.setText("←");
-        back.setTextSize(20f);
-        back.setGravity(Gravity.CENTER);
+        bar.setPadding(dp(20), dp(12), dp(20), dp(10));
+        bar.setBackgroundColor(p.pageBg);
+        FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(40), dp(40)));
-
-        TextView title = new TextView(this);
-        title.setText(titleText);
-        title.setTextSize(18f);
+        bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        TextView title = Web3Ui.text(this, titleText, 23, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
-        title.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        bar.addView(title, titleLp);
-
-        TextView right = new TextView(this);
-        right.setText("");
-        bar.addView(right, new LinearLayout.LayoutParams(dp(40), dp(40)));
-
+        bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        bar.addView(new TextView(this), new LinearLayout.LayoutParams(dp(48), dp(48)));
         root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
         container.setId(containerId);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        lp.setMargins(dp(12), dp(10), dp(12), dp(10));
-        root.addView(container, lp);
+        root.addView(container, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         return root;
     }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density);
-    }
-
-    private int c(String key) {
-        return Theme.getColor(Integer.parseInt(key));
-    }
-
-    @Override
-    public WalletWorkflowCoordinator coordinator() {
-        return coordinator;
-    }
-
-    @Override
-    public void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
+    private int dp(int value) { return Web3Ui.dp(this, value); }
+    @Override public WalletWorkflowCoordinator coordinator() { return coordinator; }
+    @Override public void toast(String msg) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show(); }
 }

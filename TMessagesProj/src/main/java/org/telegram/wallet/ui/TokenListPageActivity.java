@@ -8,104 +8,62 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.telegram.ui.ActionBar.Theme;
-
 public class TokenListPageActivity extends Activity implements WalletWorkflowCoordinator.Host {
-
     public static final String EXTRA_SHOW_RECORDS = "extra_show_records";
     public static final String EXTRA_AUTO_OPEN_ADD = "extra_auto_open_add";
-
     private int containerId;
     private WalletWorkflowCoordinator coordinator;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Web3Ui.applySystemBars(this);
         coordinator = new WalletWorkflowCoordinator(this, this);
         boolean showRecords = getIntent() != null && getIntent().getBooleanExtra(EXTRA_SHOW_RECORDS, false);
         boolean autoOpenAdd = getIntent() != null && getIntent().getBooleanExtra(EXTRA_AUTO_OPEN_ADD, false);
         setContentView(buildRoot(showRecords));
         if (savedInstanceState == null) {
-            getFragmentManager().beginTransaction()
-                    .replace(containerId, showRecords ? TokenListPageFragment.redPacketRecords() : TokenListPageFragment.tokenList(), "token_list_page")
-                    .commitAllowingStateLoss();
-            if (!showRecords && autoOpenAdd) {
-                getWindow().getDecorView().post(() -> coordinator.showAddTokenDialog(this::refreshCurrentFragment));
-            }
+            getFragmentManager().beginTransaction().replace(containerId, showRecords ? TokenListPageFragment.redPacketRecords() : TokenListPageFragment.tokenList(), "token_list_page").commitAllowingStateLoss();
+            if (!showRecords && autoOpenAdd) getWindow().getDecorView().post(() -> coordinator.showAddTokenDialog(this::refreshCurrentFragment));
         }
     }
 
+    @Override protected void onResume() { super.onResume(); Web3Ui.applySystemBars(this); refreshCurrentFragment(); }
+
     private LinearLayout buildRoot(boolean showRecords) {
+        Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundGray)));
-
+        root.setBackgroundColor(p.pageBg);
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(12), dp(10), dp(12), dp(10));
-        bar.setBackgroundColor(c(String.valueOf(Theme.key_windowBackgroundWhite)));
-
-        TextView back = new TextView(this);
-        back.setText("←");
-        back.setTextSize(20f);
-        back.setGravity(Gravity.CENTER);
+        bar.setPadding(dp(20), dp(12), dp(20), dp(10));
+        bar.setBackgroundColor(p.pageBg);
+        FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(40), dp(40)));
-
-        TextView title = new TextView(this);
-        title.setText(showRecords ? "我发出的红包记录" : "代币列表");
-        title.setTextSize(18f);
+        bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        TextView title = Web3Ui.text(this, showRecords ? "我发出的红包记录" : "代币列表", 23, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
-        title.setTextColor(c(String.valueOf(Theme.key_windowBackgroundWhiteBlackText)));
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        bar.addView(title, titleLp);
-
-        TextView right = new TextView(this);
-        right.setText(showRecords ? "" : "添加");
-        right.setTextSize(14f);
-        right.setGravity(Gravity.CENTER);
-        right.setTextColor(c(String.valueOf(Theme.key_featuredStickers_addButton)));
-        right.setOnClickListener(v -> {
-            if (!showRecords) {
-                coordinator.showAddTokenDialog(this::refreshCurrentFragment);
-            }
-        });
-        bar.addView(right, new LinearLayout.LayoutParams(dp(40), dp(40)));
-
+        bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        if (showRecords) {
+            TextView spacer = new TextView(this);
+            bar.addView(spacer, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        } else {
+            TextView right = Web3Ui.text(this, "添加", 16, p.orange, true);
+            right.setGravity(Gravity.CENTER);
+            right.setOnClickListener(v -> coordinator.showAddTokenDialog(this::refreshCurrentFragment));
+            bar.addView(right, new LinearLayout.LayoutParams(dp(54), dp(48)));
+        }
         root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
         container.setId(containerId);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        lp.setMargins(dp(12), dp(10), dp(12), dp(10));
-        root.addView(container, lp);
+        root.addView(container, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         return root;
     }
 
-    private void refreshCurrentFragment() {
-        android.app.Fragment fragment = getFragmentManager().findFragmentById(containerId);
-        if (fragment instanceof WalletRefreshable) {
-            ((WalletRefreshable) fragment).refresh();
-        }
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density);
-    }
-
-    private int c(String key) {
-        return Theme.getColor(Integer.parseInt(key));
-    }
-
-    @Override
-    public WalletWorkflowCoordinator coordinator() {
-        return coordinator;
-    }
-
-    @Override
-    public void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
+    private void refreshCurrentFragment() { android.app.Fragment fragment = getFragmentManager().findFragmentById(containerId); if (fragment instanceof WalletRefreshable) ((WalletRefreshable) fragment).refresh(); }
+    private int dp(int value) { return Web3Ui.dp(this, value); }
+    @Override public WalletWorkflowCoordinator coordinator() { return coordinator; }
+    @Override public void toast(String msg) { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show(); }
 }
