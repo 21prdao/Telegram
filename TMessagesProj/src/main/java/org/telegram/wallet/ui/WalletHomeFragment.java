@@ -4,6 +4,7 @@ import android.app.Fragment;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -67,7 +68,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         walletOps.setPadding(0, dp(8), 0, 0);
         walletOps.addView(createQuickButton("创建", v -> coordinator().showCreateWalletDialog(this::refresh)), weightLp());
         walletOps.addView(createQuickButton("导入", v -> coordinator().showImportWalletDialog(this::refresh)), weightLp());
-        walletOps.addView(createQuickButton("切换", v -> coordinator().showSwitchWalletDialog(this::refresh)), weightLp());
+        walletOps.addView(createQuickButton("切换", v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class))), weightLp());
         assetCard.addView(walletOps, matchWrap());
 
         chainNameView = createBodyText(13, false, String.valueOf(Theme.key_windowBackgroundWhiteGrayText2));
@@ -87,10 +88,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         actions.setPadding(0, dp(10), 0, 0);
         quickCard.addView(actions, matchWrap());
 
-        actions.addView(createQuickButton("发送", v -> ((WalletWorkflowCoordinator.Host) getActivity()).toast("请前往“转账”页操作")), weightLp());
-        actions.addView(createQuickButton("收款", v -> showReceiveAddress()), weightLp());
-        actions.addView(createQuickButton("红包", v -> ((WalletManagerActivity) getActivity()).toast("请在聊天中发起红包")), weightLp());
-        actions.addView(createQuickButton("添加代币", v -> coordinator().showAddTokenDialog(this::refresh)), weightLp());
+        actions.addView(createQuickButton("添加代币", v -> openAddTokenPage()), weightLp());
 
         LinearLayout tokenCard = createCard();
         root.addView(tokenCard, topWrap(10));
@@ -129,6 +127,13 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
                 tokenListView.setText(sb.toString().trim());
             }
         });
+    }
+
+    private void openAddTokenPage() {
+        Intent intent = new Intent(getActivity(), TokenListPageActivity.class);
+        intent.putExtra(TokenListPageActivity.EXTRA_SHOW_RECORDS, false);
+        intent.putExtra(TokenListPageActivity.EXTRA_AUTO_OPEN_ADD, true);
+        startActivity(intent);
     }
 
     private void copyAddress() {

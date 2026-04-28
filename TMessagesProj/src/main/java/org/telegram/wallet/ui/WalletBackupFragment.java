@@ -78,6 +78,20 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
             ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先创建或导入钱包");
             return;
         }
+        if (!WalletStorage.hasPaymentPassword(getActivity())) {
+            ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先设置支付密码");
+            showSetPaymentPasswordDialog(this::showPrivateKeyDialog);
+            return;
+        }
+        showVerifyPaymentPasswordDialog(this::showPrivateKeyDialog, "验证支付密码");
+    }
+
+    private void showPrivateKeyDialog() {
+        String key = WalletStorage.getSelectedPrivateKey(getActivity());
+        if (key == null) {
+            ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先创建或导入钱包");
+            return;
+        }
         new AlertDialog.Builder(getActivity())
                 .setTitle("私钥（请妥善保管）")
                 .setMessage(key)
@@ -85,8 +99,35 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
                 .show();
     }
 
+    private void showVerifyPaymentPasswordDialog(Runnable onSuccess, String title) {
+        android.widget.EditText input = new android.widget.EditText(getActivity());
+        input.setHint("请输入支付密码");
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        new AlertDialog.Builder(getActivity())
+                .setTitle(title)
+                .setView(input)
+                .setPositiveButton("确认", (d, w) -> {
+                    String pwd = input.getText() == null ? "" : input.getText().toString().trim();
+                    if (!WalletStorage.verifyPaymentPassword(getActivity(), pwd)) {
+                        ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码错误");
+                        return;
+                    }
+                    onSuccess.run();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
 
     private void showSetPaymentPasswordDialog() {
+        if (WalletStorage.hasPaymentPassword(getActivity())) {
+            showVerifyPaymentPasswordDialog(() -> showSetPaymentPasswordDialog(null), "核对当前支付密码");
+            return;
+        }
+        showSetPaymentPasswordDialog(null);
+    }
+
+    private void showSetPaymentPasswordDialog(Runnable onSaved) {
+
         LinearLayout layout = new LinearLayout(getActivity());
         layout.setOrientation(LinearLayout.VERTICAL);
         android.widget.EditText first = new android.widget.EditText(getActivity());
@@ -99,7 +140,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         layout.addView(second);
 
         new AlertDialog.Builder(getActivity())
-                .setTitle("设置支付密码")
+                .setTitle(WalletStorage.hasPaymentPassword(getActivity()) ? "重置支付密码" : "设置支付密码")
                 .setView(layout)
                 .setPositiveButton("保存", (d, w) -> {
                     String a = first.getText() == null ? "" : first.getText().toString().trim();
@@ -114,6 +155,9 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
                     }
                     WalletStorage.setPaymentPassword(getActivity(), a);
                     ((WalletWorkflowCoordinator.Host) getActivity()).toast("支付密码已保存");
+                    if (onSaved != null) {
+                        onSaved.run();
+                    }
                 })
                 .setNegativeButton("取消", null)
                 .show();
