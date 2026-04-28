@@ -21,37 +21,36 @@ public class WalletManageFragment extends Fragment implements WalletRefreshable 
         scroll.setBackgroundColor(p.pageBg);
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(10), dp(20), dp(20));
+        root.setPadding(dp(14), dp(8), dp(14), dp(14));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
 
         LinearLayout card = Web3Ui.card(getActivity());
-        card.setBackground(Web3Ui.roundedStroke(getActivity(), p.cardBg, p.strongBorder, 22, 1));
         root.addView(card, Web3Ui.matchWrap());
         LinearLayout head = new LinearLayout(getActivity());
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.WALLET, p.orange, p.dark ? 0x22F08C22 : 0xFFFFF2DF, 44);
-        head.addView(icon, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        TextView title = Web3Ui.text(getActivity(), "钱包管理", 17, p.primaryText, true);
+        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.WALLET, p.orange, p.dark ? 0x26F08C22 : 0xFFFFF2DF, 38);
+        head.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        TextView title = Web3Ui.text(getActivity(), "钱包管理", 20, p.primaryText, true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        titleLp.leftMargin = dp(12);
+        titleLp.leftMargin = dp(10);
         head.addView(title, titleLp);
-        FrameLayout deco = Web3Ui.iconCircle(getActivity(), Web3IconView.MANAGE, p.orange, p.dark ? 0x16F08C22 : 0xFFFFF2DF, 58);
-        head.addView(deco, new LinearLayout.LayoutParams(dp(58), dp(58)));
+        FrameLayout deco = Web3Ui.iconCircle(getActivity(), Web3IconView.MANAGE, p.orange, p.dark ? 0x1AF08C22 : 0xFFFFF2DF, 46);
+        head.addView(deco, new LinearLayout.LayoutParams(dp(46), dp(46)));
         card.addView(head, Web3Ui.matchWrap());
         TextView desc = Web3Ui.text(getActivity(), "在独立页面中查看钱包列表、切换钱包和管理代币。\n并可查看我发出的红包记录。", 14, p.secondaryText, false);
-        desc.setLineSpacing(dp(2), 1.0f);
-        card.addView(desc, Web3Ui.topMargin(getActivity(), 18));
+        desc.setLineSpacing(dp(1), 1.0f);
+        card.addView(desc, Web3Ui.topMargin(getActivity(), 14));
 
         LinearLayout walletList = Web3Ui.actionButton(getActivity(), "钱包列表 / 切换钱包", Web3IconView.WALLET, true);
         walletList.setOnClickListener(v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class)));
-        card.addView(walletList, Web3Ui.topMargin(getActivity(), 22));
+        card.addView(walletList, Web3Ui.topMargin(getActivity(), 16));
         LinearLayout tokenList = Web3Ui.actionButton(getActivity(), "代币列表", Web3IconView.COINS, false);
         tokenList.setOnClickListener(v -> startTokenListPage(false, false));
-        card.addView(tokenList, Web3Ui.topMargin(getActivity(), 12));
+        card.addView(tokenList, Web3Ui.topMargin(getActivity(), 10));
         LinearLayout redPacketRecords = Web3Ui.actionButton(getActivity(), "我发出的红包记录", Web3IconView.RED_PACKET, false);
         redPacketRecords.setOnClickListener(v -> startTokenListPage(true, false));
-        card.addView(redPacketRecords, Web3Ui.topMargin(getActivity(), 12));
+        card.addView(redPacketRecords, Web3Ui.topMargin(getActivity(), 10));
         return scroll;
     }
 

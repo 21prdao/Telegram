@@ -6,6 +6,7 @@ import android.app.FragmentManager;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -46,13 +47,13 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(p.pageBg);
-        root.addView(buildActionBar(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(buildActionBar(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
 
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
         container.setId(containerId);
         root.addView(container, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-        root.addView(buildBottomTabs(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(buildBottomTabs(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
         return root;
     }
 
@@ -61,12 +62,12 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(20), dp(12), dp(20), dp(10));
-        bar.setBackgroundColor(p.pageBg);
+        bar.setPadding(dp(16), 0, dp(16), 0);
+        bar.setBackgroundColor(p.appBarBg);
 
         FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(56)));
 
         TextView title = Web3Ui.text(this, "Web3 Wallet Pro", 19, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
@@ -75,21 +76,24 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
         FrameLayout settings = Web3Ui.iconButton(this, Web3IconView.SETTINGS);
         settings.setOnClickListener(v -> showDeveloperInfoDialog());
-        bar.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        bar.addView(settings, new LinearLayout.LayoutParams(dp(44), dp(56)));
         return bar;
     }
 
     private FrameLayout buildBottomTabs() {
         Web3Ui.Palette p = Web3Ui.palette();
         FrameLayout wrap = new FrameLayout(this);
-        wrap.setPadding(dp(20), dp(8), dp(20), dp(14));
         wrap.setBackgroundColor(p.pageBg);
+
+        View divider = new View(this);
+        divider.setBackgroundColor(p.dark ? 0x26314052 : 0xFFE5EAF2);
+        wrap.addView(divider, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(1), Gravity.TOP));
+
         LinearLayout dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setGravity(Gravity.CENTER_VERTICAL);
-        dock.setPadding(dp(6), dp(6), dp(6), dp(6));
-        dock.setBackground(Web3Ui.roundedStroke(this, p.cardBg, p.border, 22, 1));
-        Web3Ui.setElevation(dock, 4);
+        dock.setPadding(dp(4), dp(2), dp(4), dp(2));
+        dock.setBackgroundColor(p.pageBg);
 
         homeTab = createTab(Web3IconView.WALLET, "资产");
         sendTab = createTab(Web3IconView.SEND, "转账");
@@ -103,7 +107,9 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         dock.addView(sendTab, tabLp());
         dock.addView(securityTab, tabLp());
         dock.addView(manageTab, tabLp());
-        wrap.addView(dock, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(76), Gravity.CENTER));
+        FrameLayout.LayoutParams dockLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.BOTTOM);
+        dockLp.topMargin = dp(1);
+        wrap.addView(dock, dockLp);
         return wrap;
     }
 
@@ -112,30 +118,29 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         LinearLayout tab = new LinearLayout(this);
         tab.setOrientation(LinearLayout.VERTICAL);
         tab.setGravity(Gravity.CENTER);
-        tab.setPadding(0, dp(6), 0, dp(5));
+        tab.setPadding(0, dp(2), 0, dp(2));
+        tab.setBackgroundColor(0x00000000);
+
         Web3IconView iconView = new Web3IconView(this, icon, p.mutedText);
-        tab.addView(iconView, new LinearLayout.LayoutParams(dp(24), dp(24)));
-        TextView tv = Web3Ui.text(this, text, 12, p.mutedText, true);
+        tab.addView(iconView, new LinearLayout.LayoutParams(dp(20), dp(20)));
+
+        TextView tv = Web3Ui.text(this, text, 11, p.mutedText, true);
         tv.setGravity(Gravity.CENTER);
+        tv.setIncludeFontPadding(false);
         LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        tvLp.topMargin = dp(2);
+        tvLp.topMargin = dp(1);
         tab.addView(tv, tvLp);
-        tab.setBackground(Web3Ui.rounded(this, 0x00000000, 17));
         return tab;
     }
 
     private LinearLayout.LayoutParams tabLp() {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
-        lp.setMargins(dp(2), 0, dp(2), 0);
-        return lp;
+        return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
     }
 
     private void setTabActive(LinearLayout tab, boolean active) {
         Web3Ui.Palette p = Web3Ui.palette();
         int color = active ? p.orange : p.mutedText;
-        int bg = active ? (p.dark ? 0x331C1308 : 0xFFFFF2DF) : 0x00000000;
-        int stroke = active ? p.orange : 0x00000000;
-        tab.setBackground(Web3Ui.roundedStroke(this, bg, stroke, 17, active ? 1 : 0));
+        tab.setBackgroundColor(0x00000000);
         if (tab.getChildAt(0) instanceof Web3IconView) ((Web3IconView) tab.getChildAt(0)).setIconColor(color);
         if (tab.getChildAt(1) instanceof TextView) ((TextView) tab.getChildAt(1)).setTextColor(color);
     }

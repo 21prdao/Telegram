@@ -37,24 +37,24 @@ public class TokenListPageActivity extends Activity implements WalletWorkflowCoo
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(20), dp(12), dp(20), dp(10));
-        bar.setBackgroundColor(p.pageBg);
+        bar.setPadding(dp(16), 0, dp(16), 0);
+        bar.setBackgroundColor(p.appBarBg);
         FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(56)));
         TextView title = Web3Ui.text(this, showRecords ? "我发出的红包记录" : "代币列表", 18, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         if (showRecords) {
             TextView spacer = new TextView(this);
-            bar.addView(spacer, new LinearLayout.LayoutParams(dp(48), dp(48)));
+            bar.addView(spacer, new LinearLayout.LayoutParams(dp(44), dp(56)));
         } else {
-            TextView right = Web3Ui.text(this, "添加", 14, p.orange, true);
+            TextView right = Web3Ui.text(this, "添加", 15, p.orange, true);
             right.setGravity(Gravity.CENTER);
             right.setOnClickListener(v -> coordinator.showAddTokenDialog(this::refreshCurrentFragment));
-            bar.addView(right, new LinearLayout.LayoutParams(dp(54), dp(48)));
+            bar.addView(right, new LinearLayout.LayoutParams(dp(54), dp(56)));
         }
-        root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
         container.setId(containerId);
