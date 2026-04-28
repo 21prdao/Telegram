@@ -50,7 +50,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout labelRow = new LinearLayout(getActivity());
         labelRow.setOrientation(LinearLayout.HORIZONTAL);
         labelRow.setGravity(Gravity.CENTER_VERTICAL);
-        labelRow.addView(Web3Ui.text(getActivity(), "总资产", 15, p.secondaryText, false));
+        labelRow.addView(Web3Ui.text(getActivity(), "总资产", 13, p.secondaryText, false));
         Web3IconView eye = new Web3IconView(getActivity(), Web3IconView.EYE, p.mutedText);
         LinearLayout.LayoutParams eyeLp = new LinearLayout.LayoutParams(dp(22), dp(22));
         eyeLp.leftMargin = dp(8);
@@ -61,7 +61,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         heroRow.setOrientation(LinearLayout.HORIZONTAL);
         heroRow.setGravity(Gravity.CENTER_VERTICAL);
         assetCard.addView(heroRow, Web3Ui.topMargin(getActivity(), 6));
-        totalAssetView = Web3Ui.text(getActivity(), "--", 34, p.primaryText, true);
+        totalAssetView = Web3Ui.text(getActivity(), "--", 20, p.primaryText, true);
         totalAssetView.setSingleLine(true);
         totalAssetView.setIncludeFontPadding(false);
         heroRow.addView(totalAssetView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -71,7 +71,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout addressRow = new LinearLayout(getActivity());
         addressRow.setOrientation(LinearLayout.HORIZONTAL);
         addressRow.setGravity(Gravity.CENTER_VERTICAL);
-        walletAddressView = Web3Ui.text(getActivity(), "钱包地址：未创建", 16, p.secondaryText, false);
+        walletAddressView = Web3Ui.text(getActivity(), "钱包地址：未创建", 14, p.secondaryText, false);
         addressRow.addView(walletAddressView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         addressRow.addView(new Web3IconView(getActivity(), Web3IconView.COPY, p.mutedText), new LinearLayout.LayoutParams(dp(20), dp(20)));
         addressRow.setOnClickListener(v -> copyAddress());
@@ -93,7 +93,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         chainRow.setGravity(Gravity.CENTER_VERTICAL);
         chainRow.setOrientation(LinearLayout.HORIZONTAL);
         chainRow.addView(new Web3IconView(getActivity(), Web3IconView.CUBE, p.mutedText), new LinearLayout.LayoutParams(dp(20), dp(20)));
-        chainNameView = Web3Ui.text(getActivity(), "链：BNB Smart Chain", 15, p.mutedText, false);
+        chainNameView = Web3Ui.text(getActivity(), "链：BNB Smart Chain", 13, p.mutedText, false);
         LinearLayout.LayoutParams chainLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         chainLp.leftMargin = dp(8);
         chainRow.addView(chainNameView, chainLp);
@@ -132,7 +132,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         if (tokenListContainer == null) return;
         tokenListContainer.removeAllViews();
         if (tokenLines == null || tokenLines.isEmpty()) {
-            tokenListContainer.addView(Web3Ui.text(getActivity(), "暂无 Token，点击“添加代币”开始", 15, Web3Ui.palette().secondaryText, false), Web3Ui.matchWrap());
+            tokenListContainer.addView(Web3Ui.text(getActivity(), "暂无 Token，点击“添加代币”开始", 14, Web3Ui.palette().secondaryText, false), Web3Ui.matchWrap());
             return;
         }
         for (String line : tokenLines) tokenListContainer.addView(createTokenRow(line), Web3Ui.topMargin(getActivity(), 8));
@@ -167,12 +167,12 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         infoLp.leftMargin = dp(12);
         row.addView(info, infoLp);
-        info.addView(Web3Ui.text(getActivity(), symbol, 17, p.primaryText, true), Web3Ui.matchWrap());
+        info.addView(Web3Ui.text(getActivity(), symbol, 14, p.primaryText, true), Web3Ui.matchWrap());
         info.addView(Web3Ui.text(getActivity(), sub, 13, p.secondaryText, false), Web3Ui.matchWrap());
         LinearLayout right = new LinearLayout(getActivity());
         right.setOrientation(LinearLayout.VERTICAL);
         right.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        TextView amountView = Web3Ui.text(getActivity(), amount, 17, p.primaryText, true);
+        TextView amountView = Web3Ui.text(getActivity(), amount, 14, p.primaryText, true);
         amountView.setGravity(Gravity.RIGHT);
         right.addView(amountView);
         TextView usd = Web3Ui.text(getActivity(), "≈ $--", 12, p.mutedText, false);

@@ -68,7 +68,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         back.setOnClickListener(v -> finish());
         bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        TextView title = Web3Ui.text(this, "Web3 Wallet Pro", 24, p.primaryText, true);
+        TextView title = Web3Ui.text(this, "Web3 Wallet Pro", 19, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));

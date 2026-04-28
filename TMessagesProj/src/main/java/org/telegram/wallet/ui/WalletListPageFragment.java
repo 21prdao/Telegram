@@ -29,7 +29,7 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         root.setPadding(dp(20), dp(18), dp(20), dp(28));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
         root.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.WALLET, "钱包列表"), Web3Ui.matchWrap());
-        root.addView(Web3Ui.text(getActivity(), "点击列表项即可切换钱包", 16, p.secondaryText, false), Web3Ui.topMargin(getActivity(), 8));
+        root.addView(Web3Ui.text(getActivity(), "点击列表项即可切换钱包", 13, p.secondaryText, false), Web3Ui.topMargin(getActivity(), 8));
         listContainer = new LinearLayout(getActivity());
         listContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(listContainer, Web3Ui.topMargin(getActivity(), 20));
@@ -43,7 +43,7 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         String selected = WalletStorage.getSelectedAddress(getActivity());
         List<WalletAccount> wallets = WalletStorage.getWallets(getActivity());
         if (wallets.isEmpty()) {
-            TextView empty = Web3Ui.text(getActivity(), "暂无钱包，请先创建或导入", 15, Web3Ui.palette().secondaryText, false);
+            TextView empty = Web3Ui.text(getActivity(), "暂无钱包，请先创建或导入", 14, Web3Ui.palette().secondaryText, false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(0, dp(34), 0, 0);
             listContainer.addView(empty, Web3Ui.matchWrap());
@@ -71,8 +71,8 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         infoLp.leftMargin = dp(16);
         card.addView(info, infoLp);
         String name = wallet.name == null ? "钱包" : wallet.name;
-        info.addView(Web3Ui.text(getActivity(), name + (selected ? "（当前）" : ""), 22, selected ? 0xFFFFFFFF : p.primaryText, true), Web3Ui.matchWrap());
-        info.addView(Web3Ui.text(getActivity(), WalletWorkflowCoordinator.shortAddress(wallet.address), 16, selected ? 0xEEFFFFFF : p.secondaryText, false), Web3Ui.matchWrap());
+        info.addView(Web3Ui.text(getActivity(), name + (selected ? "（当前）" : ""), 15, selected ? 0xFFFFFFFF : p.primaryText, true), Web3Ui.matchWrap());
+        info.addView(Web3Ui.text(getActivity(), WalletWorkflowCoordinator.shortAddress(wallet.address), 13, selected ? 0xEEFFFFFF : p.secondaryText, false), Web3Ui.matchWrap());
         card.addView(new Web3IconView(getActivity(), Web3IconView.CHEVRON, selected ? 0xFFFFFFFF : p.mutedText), new LinearLayout.LayoutParams(dp(22), dp(22)));
         card.setOnClickListener(v -> {
             WalletStorage.setSelectedAddress(getActivity(), wallet.address);

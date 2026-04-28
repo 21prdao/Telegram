@@ -34,7 +34,7 @@ public class WalletListPageActivity extends Activity implements WalletWorkflowCo
         FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
         bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView title = Web3Ui.text(this, titleText, 23, p.primaryText, true);
+        TextView title = Web3Ui.text(this, titleText, 18, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         bar.addView(new TextView(this), new LinearLayout.LayoutParams(dp(48), dp(48)));

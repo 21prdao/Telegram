@@ -177,7 +177,7 @@ public final class Web3Ui {
         Palette p = palette();
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(context, 18), dp(context, 18), dp(context, 18), dp(context, 18));
+        card.setPadding(dp(context, 14), dp(context, 14), dp(context, 14), dp(context, 14));
         card.setBackground(roundedStroke(context, p.cardBg, p.border, 20, 1));
         setElevation(card, 2);
         return card;
@@ -192,7 +192,7 @@ public final class Web3Ui {
             FrameLayout badge = iconCircle(context, icon, p.orange, p.dark ? 0x22111111 : 0x11F08C22, 36);
             row.addView(badge, new LinearLayout.LayoutParams(dp(context, 36), dp(context, 36)));
         }
-        TextView tv = text(context, title, 22, p.primaryText, true);
+        TextView tv = text(context, title, 15, p.primaryText, true);
         LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         if (icon != 0) {
             tvLp.leftMargin = dp(context, 10);
@@ -227,15 +227,15 @@ public final class Web3Ui {
         button.setOrientation(LinearLayout.HORIZONTAL);
         button.setGravity(Gravity.CENTER);
         button.setPadding(dp(context, 12), 0, dp(context, 12), 0);
-        button.setMinimumHeight(dp(context, primary ? 56 : 52));
+        button.setMinimumHeight(dp(context, primary ? 48 : 44));
         button.setBackground(primary ? orangeGradient(context, 15) : roundedStroke(context, p.softCardBg, p.border, 15, 1));
         if (icon != 0) {
             Web3IconView iconView = new Web3IconView(context, icon, primary ? Color.WHITE : p.orange);
-            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(context, 22), dp(context, 22));
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(context, 18), dp(context, 18));
             iconLp.rightMargin = dp(context, 8);
             button.addView(iconView, iconLp);
         }
-        TextView tv = text(context, label, 16, primary ? Color.WHITE : p.primaryText, true);
+        TextView tv = text(context, label, 13, primary ? Color.WHITE : p.primaryText, true);
         tv.setGravity(Gravity.CENTER);
         button.addView(tv, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         setElevation(button, primary ? 3 : 1);
@@ -243,7 +243,7 @@ public final class Web3Ui {
     }
 
     public static TextView tokenBadge(Context context, String symbol, int sizeDp) {
-        TextView tv = text(context, tokenLetter(symbol), Math.max(15, sizeDp / 2.2f), Color.WHITE, true);
+        TextView tv = text(context, tokenLetter(symbol), Math.max(12, sizeDp / 3.1f), Color.WHITE, true);
         tv.setGravity(Gravity.CENTER);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFFFFB12B, 0xFFFF6A18});
         bg.setShape(GradientDrawable.OVAL);
@@ -276,10 +276,10 @@ public final class Web3Ui {
             bgColor = p.grayBadgeBg;
             strokeColor = p.dark ? 0xFF465565 : 0xFFD8E0EA;
         }
-        TextView tv = text(context, "●  " + safeStatus, pending ? 11 : 12, textColor, false);
+        TextView tv = text(context, "●  " + safeStatus, pending ? 10 : 11, textColor, false);
         tv.setGravity(Gravity.CENTER);
         tv.setSingleLine(true);
-        tv.setPadding(dp(context, 10), dp(context, 6), dp(context, 10), dp(context, 6));
+        tv.setPadding(dp(context, 8), dp(context, 4), dp(context, 8), dp(context, 4));
         tv.setBackground(roundedStroke(context, bgColor, strokeColor, 10, 1));
         return tv;
     }

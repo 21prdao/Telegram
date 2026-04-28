@@ -38,7 +38,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         head.setGravity(Gravity.CENTER_VERTICAL);
         FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.SHIELD, p.orange, p.dark ? 0x22F08C22 : 0xFFFFF2DF, 66);
         head.addView(icon, new LinearLayout.LayoutParams(dp(66), dp(66)));
-        TextView title = Web3Ui.text(getActivity(), "安全中心", 30, p.primaryText, true);
+        TextView title = Web3Ui.text(getActivity(), "安全中心", 17, p.primaryText, true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         titleLp.leftMargin = dp(16);
         head.addView(title, titleLp);
@@ -48,7 +48,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         LinearLayout.LayoutParams divLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1));
         divLp.topMargin = dp(18);
         card.addView(divider, divLp);
-        TextView hint = Web3Ui.text(getActivity(), "建议：定期离线备份私钥，不要截图，不要上传网盘。", 17, p.secondaryText, false);
+        TextView hint = Web3Ui.text(getActivity(), "建议：定期离线备份私钥，不要截图，不要上传网盘。", 14, p.secondaryText, false);
         hint.setLineSpacing(dp(4), 1.0f);
         card.addView(hint, Web3Ui.topMargin(getActivity(), 18));
         LinearLayout walletRow = infoRow(Web3IconView.WALLET, "当前钱包：");
@@ -73,7 +73,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(new Web3IconView(getActivity(), iconType, p.orange), new LinearLayout.LayoutParams(dp(24), dp(24)));
-        TextView tv = Web3Ui.text(getActivity(), prefix, 16, p.primaryText, false);
+        TextView tv = Web3Ui.text(getActivity(), prefix, 14, p.primaryText, false);
         LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         tvLp.leftMargin = dp(12);
         row.addView(tv, tvLp);

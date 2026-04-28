@@ -42,14 +42,14 @@ public class TokenListPageActivity extends Activity implements WalletWorkflowCoo
         FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
         bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView title = Web3Ui.text(this, showRecords ? "我发出的红包记录" : "代币列表", 23, p.primaryText, true);
+        TextView title = Web3Ui.text(this, showRecords ? "我发出的红包记录" : "代币列表", 18, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         if (showRecords) {
             TextView spacer = new TextView(this);
             bar.addView(spacer, new LinearLayout.LayoutParams(dp(48), dp(48)));
         } else {
-            TextView right = Web3Ui.text(this, "添加", 16, p.orange, true);
+            TextView right = Web3Ui.text(this, "添加", 14, p.orange, true);
             right.setGravity(Gravity.CENTER);
             right.setOnClickListener(v -> coordinator.showAddTokenDialog(this::refreshCurrentFragment));
             bar.addView(right, new LinearLayout.LayoutParams(dp(54), dp(48)));
