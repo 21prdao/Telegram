@@ -1,6 +1,7 @@
 package org.telegram.wallet.ui;
 
 import android.app.Fragment;
+import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -38,18 +39,25 @@ public class WalletManageFragment extends Fragment implements WalletRefreshable 
         card.addView(desc, matchWrap());
 
         Button walletList = createPrimaryButton("钱包列表 / 切换钱包");
-        walletList.setOnClickListener(v -> ((WalletManagerActivity) getActivity()).openWalletListPage());
+        walletList.setOnClickListener(v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class)));
         card.addView(walletList, topWrap(10));
 
         Button tokenList = createOutlineButton("代币列表");
-        tokenList.setOnClickListener(v -> ((WalletManagerActivity) getActivity()).openTokenListPage());
+        tokenList.setOnClickListener(v -> startTokenListPage(false, false));
         card.addView(tokenList, topWrap(10));
 
         Button redPacketRecords = createOutlineButton("我发出的红包记录");
-        redPacketRecords.setOnClickListener(v -> ((WalletManagerActivity) getActivity()).openRedPacketRecordsPage());
+        redPacketRecords.setOnClickListener(v -> startTokenListPage(true, false));
         card.addView(redPacketRecords, topWrap(10));
 
         return root;
+    }
+
+    private void startTokenListPage(boolean showRecords, boolean autoOpenAdd) {
+        Intent intent = new Intent(getActivity(), TokenListPageActivity.class);
+        intent.putExtra(TokenListPageActivity.EXTRA_SHOW_RECORDS, showRecords);
+        intent.putExtra(TokenListPageActivity.EXTRA_AUTO_OPEN_ADD, autoOpenAdd);
+        startActivity(intent);
     }
 
     @Override
