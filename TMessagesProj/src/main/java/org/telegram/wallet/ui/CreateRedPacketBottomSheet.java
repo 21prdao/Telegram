@@ -416,10 +416,11 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         final EditTextBoldCursor pwdInput = createInput(context, "请输入支付密码");
         pwdInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        new AlertDialog.Builder(context)
+        final AlertDialog dialog = new AlertDialog.Builder(context)
                 .setTitle("支付验证")
+                .setMessage("请输入支付密码后继续")
                 .setView(pwdInput)
-                .setPositiveButton("确认", (dialog, which) -> {
+                .setPositiveButton("确认", (dialogInterface, which) -> {
                     String pwd = trim(pwdInput.getText() == null ? null : pwdInput.getText().toString());
                     if (!WalletStorage.verifyPaymentPassword(context, pwd)) {
                         showError("支付密码错误");
@@ -428,7 +429,30 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                     performCreate();
                 })
                 .setNegativeButton("取消", null)
-                .show();
+                .create();
+        dialog.setOnShowListener(d -> {
+            int bgColor = getThemedColor(Theme.key_dialogBackground);
+            int textColor = getThemedColor(Theme.key_dialogTextBlack);
+            int hintColor = adjustAlpha(getThemedColor(Theme.key_dialogTextHint), 0.85f);
+            int accentColor = getThemedColor(Theme.key_featuredStickers_buttonText);
+
+            pwdInput.setTextColor(textColor);
+            pwdInput.setHintTextColor(hintColor);
+            pwdInput.setBackground(createInputBackground());
+            pwdInput.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(12), AndroidUtilities.dp(14), AndroidUtilities.dp(12));
+
+            Window window = dialog.getWindow();
+            if (window != null) {
+                GradientDrawable bg = new GradientDrawable();
+                bg.setColor(bgColor);
+                bg.setCornerRadius(AndroidUtilities.dp(18));
+                window.setBackgroundDrawable(bg);
+            }
+
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(accentColor);
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(adjustAlpha(textColor, 0.8f));
+        });
+        dialog.show();
     }
 
     private void performCreate() {
