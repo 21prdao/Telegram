@@ -26181,24 +26181,24 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (currentMessageObject == null || web3RedPacketCardRect.isEmpty()) {
             return;
         }
-        // Web3 红包禁用了 Telegram 原生 MessageDrawable 气泡背景，
-        // 因此需要手动补一个与红包卡片同色的聊天气泡尾巴。
+        // 用更贴近 Telegram 默认气泡的短尾巴，避免尾巴过长导致底部外溢。
         rectPath.rewind();
         final float bottom = web3RedPacketCardRect.bottom;
+        final float top = bottom - dp(16);
         if (currentMessageObject.isOutOwner()) {
             final float right = web3RedPacketCardRect.right;
-            final float tailRight = Math.min(getMeasuredWidth() - dp(1), right + dp(12));
-            rectPath.moveTo(right - dp(5), bottom - dp(20));
-            rectPath.cubicTo(right + dp(2), bottom - dp(17), tailRight - dp(2), bottom - dp(9), tailRight, bottom - dp(1));
-            rectPath.cubicTo(right + dp(6), bottom - dp(2), right + dp(1), bottom - dp(5), right - dp(2), bottom - dp(9));
-            rectPath.cubicTo(right - dp(4), bottom - dp(13), right - dp(5), bottom - dp(17), right - dp(5), bottom - dp(20));
+            final float tipX = Math.min(getMeasuredWidth() - dp(1), right + dp(7));
+            rectPath.moveTo(right - dp(1), top);
+            rectPath.cubicTo(right + dp(1), top + dp(4), tipX - dp(1), bottom - dp(8), tipX, bottom - dp(2));
+            rectPath.cubicTo(right + dp(3), bottom - dp(2), right + dp(1), bottom - dp(5), right - dp(2), bottom - dp(8));
+            rectPath.lineTo(right - dp(2), top + dp(1));
         } else {
             final float left = web3RedPacketCardRect.left;
-            final float tailLeft = Math.max(dp(1), left - dp(12));
-            rectPath.moveTo(left + dp(5), bottom - dp(20));
-            rectPath.cubicTo(left - dp(2), bottom - dp(17), tailLeft + dp(2), bottom - dp(9), tailLeft, bottom - dp(1));
-            rectPath.cubicTo(left - dp(6), bottom - dp(2), left - dp(1), bottom - dp(5), left + dp(2), bottom - dp(9));
-            rectPath.cubicTo(left + dp(4), bottom - dp(13), left + dp(5), bottom - dp(17), left + dp(5), bottom - dp(20));
+            final float tipX = Math.max(dp(1), left - dp(7));
+            rectPath.moveTo(left + dp(1), top);
+            rectPath.cubicTo(left - dp(1), top + dp(4), tipX + dp(1), bottom - dp(8), tipX, bottom - dp(2));
+            rectPath.cubicTo(left - dp(3), bottom - dp(2), left - dp(1), bottom - dp(5), left + dp(2), bottom - dp(8));
+            rectPath.lineTo(left + dp(2), top + dp(1));
         }
         rectPath.close();
         canvas.drawPath(rectPath, paint);
