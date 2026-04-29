@@ -7570,7 +7570,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     hasInvoicePrice = false;
                     drawInstantView = false;
                     linkPreviewHeight = 0;
-                    drawBackground = false;
+                    drawBackground = true;
                     mediaBackground = false;
                 } else if (messageObject.isSponsored()) {
                     if (AndroidUtilities.isTablet()) {
@@ -7585,7 +7585,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     totalHeight = dp(22.5f);
                 } else if (messageObject.isWeb3RedPacket()) {
                     totalHeight = getWeb3RedPacketTotalHeight();
-                    drawBackground = false;
+                    drawBackground = true;
                     mediaBackground = false;
                 } else {
                     totalHeight = messageObject.textHeight() + dp(19.5f) + namesOffset;
@@ -26247,19 +26247,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         ensureWeb3RedPacketPaints();
-        Theme.chat_docBackPaint.setAlpha(255);
-        Theme.chat_docBackPaint.setStyle(Paint.Style.FILL);
-        Theme.chat_docBackPaint.setShader(new LinearGradient(
-                web3RedPacketCardRect.left,
-                web3RedPacketCardRect.top,
-                web3RedPacketCardRect.left,
-                web3RedPacketCardRect.bottom,
-                topColor,
-                bottomColor,
-                Shader.TileMode.CLAMP
-        ));
-        canvas.drawRoundRect(web3RedPacketCardRect, dp(14), dp(14), Theme.chat_docBackPaint);
-        drawWeb3RedPacketTail(canvas, Theme.chat_docBackPaint);
+        // 仅保留 Telegram 原生气泡背景，不再额外叠加红包整块橙色覆盖层。
         Theme.chat_docBackPaint.setShader(null);
 
         web3RedPacketTitlePaint.setColor(Color.WHITE);
