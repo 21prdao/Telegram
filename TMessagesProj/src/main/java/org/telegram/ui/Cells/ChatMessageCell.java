@@ -26161,8 +26161,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         int cardWidth = Math.min(backgroundWidth, measuredWidth - left - dp(12));
         if (currentMessageObject != null && currentMessageObject.isOutOwner()) {
-            cardWidth = Math.min(backgroundWidth, measuredWidth - dp(24));
-            left = measuredWidth - cardWidth - dp(12);
+            cardWidth = Math.min(backgroundWidth, measuredWidth - dp(32));
+            left = measuredWidth - cardWidth - dp(16);
         }
         cardWidth = Math.max(dp(WEB3_RED_PACKET_CARD_MIN_WIDTH_DP), cardWidth);
         int right = left + cardWidth;
@@ -26247,12 +26247,24 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         ensureWeb3RedPacketPaints();
-        // 仅保留 Telegram 原生气泡背景，不再额外叠加红包整块橙色覆盖层。
+        LinearGradient gradient = new LinearGradient(
+                web3RedPacketCardRect.left,
+                web3RedPacketCardRect.top,
+                web3RedPacketCardRect.left,
+                web3RedPacketCardRect.bottom,
+                topColor,
+                bottomColor,
+                Shader.TileMode.CLAMP
+        );
+        Theme.chat_docBackPaint.setShader(gradient);
+        float corner = dp(24);
+        canvas.drawRoundRect(web3RedPacketCardRect, corner, corner, Theme.chat_docBackPaint);
+        drawWeb3RedPacketTail(canvas, Theme.chat_docBackPaint);
         Theme.chat_docBackPaint.setShader(null);
 
-        web3RedPacketTitlePaint.setColor(Color.WHITE);
-        web3RedPacketGreetingPaint.setColor(darkTheme ? 0xFFFDF3D1 : 0xFFFFF7ED);
-        web3RedPacketSubtitlePaint.setColor(darkTheme ? 0xE6FFFFFF : 0xFFFDEEE4);
+        web3RedPacketTitlePaint.setColor(0xFFFFFFFF);
+        web3RedPacketGreetingPaint.setColor(darkTheme ? 0xFFFDF3D1 : 0xFFFDE7C2);
+        web3RedPacketSubtitlePaint.setColor(darkTheme ? 0xE6FFFFFF : 0xFFFCE2C4);
 
         float contentTop = web3RedPacketCardRect.top + namesOffset + dp(WEB3_RED_PACKET_CARD_CONTENT_TOP_DP);
 
