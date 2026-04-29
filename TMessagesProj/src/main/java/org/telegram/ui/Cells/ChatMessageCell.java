@@ -1506,6 +1506,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     private static final int WEB3_RED_PACKET_FOOTER_TOP_MARGIN_DP = 12;
 
     private final RectF web3RedPacketCardRect = new RectF();
+    private final Path web3RedPacketTailPath = new Path();
     private boolean web3RedPacketPressed;
     private TextPaint web3RedPacketTitlePaint;
     private TextPaint web3RedPacketGreetingPaint;
@@ -7569,6 +7570,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     hasInvoicePrice = false;
                     drawInstantView = false;
                     linkPreviewHeight = 0;
+                    drawBackground = false;
+                    mediaBackground = false;
                 } else if (messageObject.isSponsored()) {
                     if (AndroidUtilities.isTablet()) {
                         backgroundWidth = Math.min(AndroidUtilities.getMinTabletSide() - dp(50), dp(270));
@@ -7582,6 +7585,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     totalHeight = dp(22.5f);
                 } else if (messageObject.isWeb3RedPacket()) {
                     totalHeight = getWeb3RedPacketTotalHeight();
+                    drawBackground = false;
+                    mediaBackground = false;
                 } else {
                     totalHeight = messageObject.textHeight() + dp(19.5f) + namesOffset;
                 }
@@ -21529,6 +21534,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     public void drawBackground(Canvas canvas, int left, int top, int right, int bottom, boolean pinnedTop, boolean pinnedBottom, boolean selected, int keyboardHeight) {
+        if (currentMessageObject != null && currentMessageObject.isWeb3RedPacket()) {
+            return;
+        }
         if (currentMessageObject != null && currentMessageObject.isOutOwner()) {
             if (!mediaBackground && !pinnedBottom) {
                 currentBackgroundDrawable = (Theme.MessageDrawable) getThemedDrawable(selected ? Theme.key_drawable_msgOutSelected : Theme.key_drawable_msgOut);
@@ -26135,42 +26143,66 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (layoutWidth <= 0) {
             layoutWidth = measuredWidth;
         }
+        if (backgroundWidth <= 0) {
+            backgroundWidth = getWeb3RedPacketLayoutWidth(measuredWidth - dp(80));
+        }
         if (layoutHeight <= 0) {
             layoutHeight = Math.max(getWeb3RedPacketTotalHeight(), getMeasuredHeight() - substractBackgroundHeight - getPaddingTop() - getPaddingBottom() - additionalPaddingHeight);
         }
 
         int left;
-        int top;
-        int right;
-        int bottom;
-
-        Rect backgroundBounds = currentBackgroundDrawable != null ? currentBackgroundDrawable.getBounds() : null;
-        if (backgroundBounds != null && !backgroundBounds.isEmpty()) {
-            left = backgroundBounds.left;
-            top = backgroundBounds.top;
-            right = backgroundBounds.right;
-            bottom = backgroundBounds.bottom;
+        if (currentMessageObject != null && currentMessageObject.isOutOwner()) {
+            left = measuredWidth - backgroundWidth - dp(8);
         } else {
-            left = getBackgroundDrawableLeft();
-            top = getBackgroundDrawableTop();
-            right = getBackgroundDrawableRight();
-            bottom = getBackgroundDrawableBottom();
+            left = dp((isChat || currentMessageObject != null && (currentMessageObject.isRepostPreview || currentMessageObject.forceAvatar) || currentMessageObject != null && currentMessageObject.getDialogId() == UserObject.VERIFY) && isAvatarVisible ? 54 : 12);
+            if (isSideMenuLeftMargin()) {
+                left += dp(ChatActivity.SIDE_MENU_WIDTH);
+            }
         }
+        int cardWidth = Math.min(backgroundWidth, measuredWidth - left - dp(12));
+        if (currentMessageObject != null && currentMessageObject.isOutOwner()) {
+            cardWidth = Math.min(backgroundWidth, measuredWidth - dp(24));
+            left = measuredWidth - cardWidth - dp(12);
+        }
+        cardWidth = Math.max(dp(WEB3_RED_PACKET_CARD_MIN_WIDTH_DP), cardWidth);
+        int right = left + cardWidth;
 
-        if (right <= left) {
-            left = currentMessageObject != null && currentMessageObject.isOutOwner() ? measuredWidth - backgroundWidth : dp(15);
-            right = left + backgroundWidth;
-        }
-        if (bottom <= top) {
-            bottom = top + getWeb3RedPacketCardHeight();
-        }
-
+        int top = getBackgroundDrawableTop();
+        int bottom = top + getWeb3RedPacketCardHeight();
         web3RedPacketCardRect.set(left, top, right, bottom);
 
         backgroundDrawableLeft = (int) web3RedPacketCardRect.left;
         backgroundDrawableRight = (int) web3RedPacketCardRect.width();
         backgroundDrawableTop = (int) web3RedPacketCardRect.top;
         backgroundDrawableBottom = (int) web3RedPacketCardRect.bottom;
+    }
+
+    private void drawWeb3RedPacketTail(Canvas canvas, Paint paint) {
+        if (currentMessageObject == null || web3RedPacketCardRect.isEmpty()) {
+            return;
+        }
+        // Web3 红包禁用了 Telegram 原生 MessageDrawable 气泡背景，
+        // 因此需要手动补一个与红包卡片同色的聊天气泡尾巴。
+        rectPath.rewind();
+        final float bottom = web3RedPacketCardRect.bottom;
+        if (currentMessageObject.isOutOwner()) {
+            final float right = web3RedPacketCardRect.right;
+            final float tailRight = Math.min(getMeasuredWidth() - dp(1), right + dp(12));
+            rectPath.moveTo(right - dp(5), bottom - dp(20));
+            rectPath.cubicTo(right + dp(2), bottom - dp(17), tailRight - dp(2), bottom - dp(9), tailRight, bottom - dp(1));
+            rectPath.cubicTo(right + dp(6), bottom - dp(2), right + dp(1), bottom - dp(5), right - dp(2), bottom - dp(9));
+            rectPath.cubicTo(right - dp(4), bottom - dp(13), right - dp(5), bottom - dp(17), right - dp(5), bottom - dp(20));
+        } else {
+            final float left = web3RedPacketCardRect.left;
+            final float tailLeft = Math.max(dp(1), left - dp(12));
+            rectPath.moveTo(left + dp(5), bottom - dp(20));
+            rectPath.cubicTo(left - dp(2), bottom - dp(17), tailLeft + dp(2), bottom - dp(9), tailLeft, bottom - dp(1));
+            rectPath.cubicTo(left - dp(6), bottom - dp(2), left - dp(1), bottom - dp(5), left + dp(2), bottom - dp(9));
+            rectPath.cubicTo(left + dp(4), bottom - dp(13), left + dp(5), bottom - dp(17), left + dp(5), bottom - dp(20));
+        }
+        rectPath.close();
+        canvas.drawPath(rectPath, paint);
+        rectPath.rewind();
     }
 
     private void drawWeb3RedPacketCard(Canvas canvas) {
@@ -26187,19 +26219,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         int badgeColor;
         boolean darkTheme = isDark();
         switch (payload.normalizedStatus()) {
-            case RedPacketPayload.STATUS_ACTIVE:
-                if (darkTheme) {
-                    topColor = Color.parseColor("#FA8C16");
-                    bottomColor = Color.parseColor("#F97316");
-                    dividerColor = 0x33FFFFFF;
-                    badgeColor = 0x33FFFFFF;
-                } else {
-                    topColor = Color.parseColor("#F97316");
-                    bottomColor = Color.parseColor("#EA580C");
-                    dividerColor = 0x52FFFFFF;
-                    badgeColor = 0x54FFFFFF;
-                }
-                break;
             case RedPacketPayload.STATUS_CLAIMED:
                 topColor = Color.parseColor(darkTheme ? "#22C55E" : "#16A34A");
                 bottomColor = Color.parseColor(darkTheme ? "#16A34A" : "#15803D");
@@ -26207,36 +26226,29 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 badgeColor = darkTheme ? 0x33FFFFFF : 0x40FFFFFF;
                 break;
             case RedPacketPayload.STATUS_EMPTY:
+            case RedPacketPayload.STATUS_EXPIRED:
                 topColor = Color.parseColor(darkTheme ? "#6B7280" : "#4B5563");
                 bottomColor = Color.parseColor(darkTheme ? "#4B5563" : "#374151");
                 dividerColor = darkTheme ? 0x29FFFFFF : 0x33FFFFFF;
                 badgeColor = darkTheme ? 0x29FFFFFF : 0x33FFFFFF;
                 break;
-            case RedPacketPayload.STATUS_EXPIRED:
-                topColor = Color.parseColor(darkTheme ? "#9CA3AF" : "#6B7280");
-                bottomColor = Color.parseColor(darkTheme ? "#6B7280" : "#4B5563");
-                dividerColor = darkTheme ? 0x26FFFFFF : 0x30FFFFFF;
-                badgeColor = darkTheme ? 0x26FFFFFF : 0x30FFFFFF;
-                break;
+            case RedPacketPayload.STATUS_ACTIVE:
             default:
-                topColor = Color.parseColor(darkTheme ? "#60A5FA" : "#3B82F6");
-                bottomColor = Color.parseColor(darkTheme ? "#3B82F6" : "#2563EB");
-                dividerColor = darkTheme ? 0x33FFFFFF : 0x40FFFFFF;
-                badgeColor = darkTheme ? 0x33FFFFFF : 0x40FFFFFF;
+                // Web3 红包消息默认以整块橙色为唯一背景，不再叠加 Telegram 原生气泡/透明贴图。
+                topColor = Color.parseColor("#FFA126");
+                bottomColor = Color.parseColor("#FF7A12");
+                dividerColor = 0x33FFFFFF;
+                badgeColor = 0x44FFFFFF;
                 break;
         }
         if (web3RedPacketPressed) {
-            topColor = ColorUtils.blendARGB(topColor, Color.BLACK, 0.12f);
-            bottomColor = ColorUtils.blendARGB(bottomColor, Color.BLACK, 0.12f);
+            topColor = ColorUtils.blendARGB(topColor, Color.BLACK, 0.10f);
+            bottomColor = ColorUtils.blendARGB(bottomColor, Color.BLACK, 0.10f);
         }
 
         ensureWeb3RedPacketPaints();
         Theme.chat_docBackPaint.setAlpha(255);
         Theme.chat_docBackPaint.setStyle(Paint.Style.FILL);
-        web3RedPacketTitlePaint.setColor(Color.WHITE);
-        web3RedPacketGreetingPaint.setColor(darkTheme ? 0xFFFDF3D1 : 0xFFFFF7ED);
-        web3RedPacketSubtitlePaint.setColor(darkTheme ? 0xE6FFFFFF : 0xFFFDEEE4);
-
         Theme.chat_docBackPaint.setShader(new LinearGradient(
                 web3RedPacketCardRect.left,
                 web3RedPacketCardRect.top,
@@ -26246,28 +26258,15 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 bottomColor,
                 Shader.TileMode.CLAMP
         ));
-        Path bubblePath = currentBackgroundDrawable != null ? currentBackgroundDrawable.makePath() : null;
-        if (bubblePath != null) {
-            canvas.drawPath(bubblePath, Theme.chat_docBackPaint);
-        } else {
-            canvas.drawRoundRect(web3RedPacketCardRect, dp(14), dp(14), Theme.chat_docBackPaint);
-        }
+        canvas.drawRoundRect(web3RedPacketCardRect, dp(14), dp(14), Theme.chat_docBackPaint);
+        drawWeb3RedPacketTail(canvas, Theme.chat_docBackPaint);
         Theme.chat_docBackPaint.setShader(null);
 
+        web3RedPacketTitlePaint.setColor(Color.WHITE);
+        web3RedPacketGreetingPaint.setColor(darkTheme ? 0xFFFDF3D1 : 0xFFFFF7ED);
+        web3RedPacketSubtitlePaint.setColor(darkTheme ? 0xE6FFFFFF : 0xFFFDEEE4);
+
         float contentTop = web3RedPacketCardRect.top + namesOffset + dp(WEB3_RED_PACKET_CARD_CONTENT_TOP_DP);
-        RectF headerRect = AndroidUtilities.rectTmp;
-        headerRect.set(web3RedPacketCardRect.left, web3RedPacketCardRect.top, web3RedPacketCardRect.right, Math.min(web3RedPacketCardRect.bottom, contentTop + dp(34)));
-        Theme.chat_docBackPaint.setShader(new LinearGradient(
-                headerRect.left,
-                headerRect.top,
-                headerRect.left,
-                headerRect.bottom,
-                0x26FFFFFF,
-                0x00FFFFFF,
-                Shader.TileMode.CLAMP
-        ));
-        canvas.drawRoundRect(headerRect, dp(14), dp(14), Theme.chat_docBackPaint);
-        Theme.chat_docBackPaint.setShader(null);
 
         float iconCx = web3RedPacketCardRect.left + dp(28);
         float iconCy = contentTop + dp(12);
@@ -26315,9 +26314,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
         String statusText;
         switch (payload.normalizedStatus()) {
-            case RedPacketPayload.STATUS_ACTIVE:
-                statusText = "查看红包";
-                break;
             case RedPacketPayload.STATUS_CLAIMED:
                 statusText = "已领取";
                 break;
@@ -26327,6 +26323,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             case RedPacketPayload.STATUS_EXPIRED:
                 statusText = "已过期";
                 break;
+            case RedPacketPayload.STATUS_ACTIVE:
             default:
                 statusText = "查看红包";
                 break;
