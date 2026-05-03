@@ -10639,6 +10639,17 @@
     <string name="Gift2PinnedTitle">Gift pinned</string>
     <string name="Gift2PinnedSubtitle">Now it will always be shown on top.</string>
     <string name="Gift2Unpinned">Gift unpinned</string>
+    <string name="WalletManageTitle">Wallet Management</string>
+    <string name="WalletManageDesc">View your wallets, switch wallet, and manage tokens in a dedicated page.
+You can also view red packet records you sent.</string>
+    <string name="WalletTokenList">Token List</string>
+    <string name="WalletMyRedPacketRecords">My Sent Red Packet Records</string>
+    <string name="WalletRedPacketRecords">Red Packet Send Records</string>
+    <string name="WalletRedPacketRecordsLoading">Loading red packet send records...</string>
+    <string name="WalletRedPacketRecordsEmpty">No red packet send records yet.</string>
+    <string name="Web3RedPacketTitleDefault">HTL Red Packet</string>
+    <string name="Web3RedPacketView">View Red Packet</string>
+    <string name="Web3RedPacketClaimed">Claimed</string>
     <string name="StarsTopUp">Top Up</string>
     <string name="StarsStats">Stats</string>
     <string name="TonTopUp">Top Up</string>

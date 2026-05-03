@@ -8,6 +8,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
+
 public class TokenListPageActivity extends Activity implements WalletWorkflowCoordinator.Host {
     public static final String EXTRA_SHOW_RECORDS = "extra_show_records";
     public static final String EXTRA_AUTO_OPEN_ADD = "extra_auto_open_add";
@@ -42,7 +45,7 @@ public class TokenListPageActivity extends Activity implements WalletWorkflowCoo
         FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
         bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(56)));
-        TextView title = Web3Ui.text(this, showRecords ? "我发出的红包记录" : "代币列表", 18, p.primaryText, true);
+        TextView title = Web3Ui.text(this, showRecords ? LocaleController.getString(R.string.WalletMyRedPacketRecords) : LocaleController.getString(R.string.WalletTokenList), 18, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         if (showRecords) {
