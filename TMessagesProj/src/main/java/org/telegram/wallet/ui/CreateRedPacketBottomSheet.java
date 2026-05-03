@@ -665,6 +665,18 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         creatorWallet,
                         txHash
                 );
+                RedPacketInfo latestPacket = RedPacketRepository.getInstance().getPacket(prepare.packetId, creatorWallet);
+                String latestStatus = latestPacket == null ? "" : safeLower(latestPacket.status);
+                if ("pending_create_confirm".equals(latestStatus)) {
+                    WalletStorage.updateRedPacketSendRecordStatus(getContext(), prepare.packetId, "PENDING_CREATE_CONFIRM", txHash);
+                    AndroidUtilities.runOnUIThread(() -> {
+                        showToast("暂时无法发红包，请重新试一下");
+                        submitting = false;
+                        setLoading(false, null);
+                        dismiss();
+                    });
+                    return;
+                }
                 WalletStorage.updateRedPacketSendRecordStatus(getContext(), prepare.packetId, "CHAIN_CONFIRMED", txHash);
 
                 final String finalMessage = RedPacketMessageComposer.composeCompatMessage(
@@ -947,6 +959,10 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             return address == null ? "" : address;
         }
         return address.substring(0, 6) + "..." + address.substring(address.length() - 4);
+    }
+
+    private String safeLower(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.US);
     }
 
     private static class TokenOption {

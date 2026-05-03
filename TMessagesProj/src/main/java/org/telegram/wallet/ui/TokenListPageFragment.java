@@ -14,6 +14,8 @@ import android.widget.TextView;
 
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.RedPacketSendRecord;
+import org.telegram.wallet.model.RedPacketSendRecordDetail;
+import org.telegram.wallet.model.RedPacketClaimRecord;
 import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.redpacket.RedPacketRepository;
 
@@ -167,7 +169,13 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     }
 
     private void renderRedPacketRecords() {
-        List<RedPacketSendRecord> records = remoteRedPacketRecords;
+        List<RedPacketSendRecord> records = new ArrayList<>();
+        for (RedPacketSendRecord item : remoteRedPacketRecords) {
+            if (item == null || "PENDING_CREATE_CONFIRM".equalsIgnoreCase(item.status) || "pending_create_confirm".equalsIgnoreCase(item.status)) {
+                continue;
+            }
+            records.add(item);
+        }
         if (summaryCountView != null) {
             summaryCountView.setText("共 " + records.size() + " 条记录");
         }
@@ -248,6 +256,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         LinearLayout.LayoutParams chevronLp = new LinearLayout.LayoutParams(dp(16), dp(16));
         chevronLp.leftMargin = dp(6);
         card.addView(new Web3IconView(getActivity(), Web3IconView.CHEVRON, p.mutedText), chevronLp);
+        card.setOnClickListener(v -> openRecordDetail(record));
         return card;
     }
 
@@ -306,6 +315,13 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
 
     private String safe(String value, String fallback) {
         return TextUtils.isEmpty(value) ? fallback : value;
+    }
+
+
+    private void openRecordDetail(RedPacketSendRecord record) {
+        if (getActivity() instanceof WalletManagerActivity) {
+            ((WalletManagerActivity) getActivity()).openRedPacketRecordDetailPage(record.packetId);
+        }
     }
 
     private void syncRedPacketRecordsFromServer() {
