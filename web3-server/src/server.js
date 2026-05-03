@@ -304,7 +304,7 @@ class MySqlDB {
     const [rows] = await this.pool.query(
       `SELECT packet_id, token_symbol, total_amount_wei, count_total, status, created_at, create_tx_hash, greeting
        FROM red_packets
-       WHERE creator_wallet = ?
+       WHERE creator_wallet = ? AND status <> 'pending_create_confirm'
        ORDER BY created_at DESC
        LIMIT ?`,
       [normalized, safeLimit],
@@ -319,6 +319,38 @@ class MySqlDB {
       txHash: row.create_tx_hash || '',
       greeting: row.greeting || '',
     }));
+  }
+
+  async getSendRecordDetail(packetId) {
+    const [rows] = await this.pool.query(
+      `SELECT packet_id, token_symbol, total_amount_wei, count_total, status, created_at, create_tx_hash, greeting
+       FROM red_packets WHERE packet_id = ? LIMIT 1`,
+      [packetId],
+    );
+    if (!rows.length) return null;
+    const row = rows[0];
+    const [claims] = await this.pool.query(
+      `SELECT claimer_address, tx_hash, amount_wei, created_at FROM red_packet_claims
+       WHERE packet_id = ? ORDER BY id ASC`,
+      [packetId],
+    );
+    return {
+      packetId: row.packet_id,
+      tokenSymbol: row.token_symbol || 'BNB',
+      totalAmount: row.total_amount_wei,
+      count: Number(row.count_total || 0),
+      status: String(row.status || '').toUpperCase(),
+      createdAt: Number(row.created_at || 0) * 1000,
+      txHash: row.create_tx_hash || '',
+      greeting: row.greeting || '',
+      claimRecords: claims.map((c) => ({
+        claimerName: c.claimer_address,
+        claimerAddress: c.claimer_address,
+        claimedAt: Number(c.created_at || 0) * 1000,
+        amountWei: String(c.amount_wei || '0'),
+        txHash: c.tx_hash || '',
+      })),
+    };
   }
 
   mapPacket(row, claims = []) {
@@ -611,6 +643,14 @@ app.get('/api/v1/red-packets/send-records', async (req, res) => {
   }
   const records = await db.getSendRecordsByCreator(creatorWallet, limit);
   return res.json({ ok: true, data: records });
+});
+
+app.get('/api/v1/red-packets/send-records/:packetId', async (req, res) => {
+  const detail = await db.getSendRecordDetail(String(req.params.packetId || '').trim());
+  if (!detail) {
+    return res.status(404).json({ ok: false, message: 'not found' });
+  }
+  return res.json({ ok: true, data: detail });
 });
 
 app.get('/api/v1/red-packets/:packetId', async (req, res) => {

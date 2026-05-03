@@ -16,6 +16,7 @@ public class RedPacketInfo {
 
     public String creatorWallet;
     public String contractAddress;
+    public String status;
 
     public boolean canClaim;
     public boolean canRefund;

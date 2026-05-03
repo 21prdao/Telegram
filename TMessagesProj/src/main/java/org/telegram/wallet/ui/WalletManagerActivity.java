@@ -185,6 +185,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     public void openWalletListPage() { getFragmentManager().beginTransaction().replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page").addToBackStack("wallet_list_page").commitAllowingStateLoss(); }
     public void openTokenListPage() { getFragmentManager().beginTransaction().replace(containerId, TokenListPageFragment.tokenList(), "token_list_page").addToBackStack("token_list_page").commitAllowingStateLoss(); }
     public void openRedPacketRecordsPage() { getFragmentManager().beginTransaction().replace(containerId, TokenListPageFragment.redPacketRecords(), "redpacket_records_page").addToBackStack("redpacket_records_page").commitAllowingStateLoss(); }
+    public void openRedPacketRecordDetailPage(String packetId) { getFragmentManager().beginTransaction().replace(containerId, RedPacketRecordDetailFragment.newInstance(packetId), "redpacket_record_detail_page").addToBackStack("redpacket_record_detail_page").commitAllowingStateLoss(); }
 
     private int dp(int value) { return Web3Ui.dp(this, value); }
 

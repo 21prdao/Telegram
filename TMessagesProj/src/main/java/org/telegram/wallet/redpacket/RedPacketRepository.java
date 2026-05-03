@@ -11,9 +11,11 @@ import org.json.JSONObject;
 import org.telegram.messenger.FileLog;
 import org.telegram.wallet.config.WalletConfig;
 import org.telegram.wallet.model.ClaimPrepareResponse;
+import org.telegram.wallet.model.RedPacketClaimRecord;
 import org.telegram.wallet.model.RedPacketInfo;
 import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
 import org.telegram.wallet.model.RedPacketSendRecord;
+import org.telegram.wallet.model.RedPacketSendRecordDetail;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -137,6 +139,7 @@ public class RedPacketRepository {
                 optString(data, "status", "packetStatus", "packet_status"),
                 ""
         ).toLowerCase(Locale.US);
+        info.status = status;
 
         info.refunded = optBoolean(data, "refunded")
                 || "refunded".equals(status);
@@ -385,6 +388,49 @@ public class RedPacketRepository {
             records.add(record);
         }
         return records;
+    }
+
+    public RedPacketSendRecordDetail getSendRecordDetail(String packetId) throws Exception {
+        if (TextUtils.isEmpty(packetId)) {
+            throw new IllegalArgumentException("packetId is empty");
+        }
+        JSONObject root = requestJson("GET", "/red-packets/send-records/" + Uri.encode(packetId), null);
+        JSONObject data = unwrapData(root);
+
+        RedPacketSendRecordDetail detail = new RedPacketSendRecordDetail();
+        detail.packetId = firstNonEmpty(optString(data, "packetId", "packet_id"), "");
+        detail.tokenSymbol = firstNonEmpty(optString(data, "tokenSymbol", "token_symbol"), "BNB");
+        detail.totalAmount = firstNonEmpty(optString(data, "totalAmount", "totalAmountWei", "total_amount_wei"), "0");
+        detail.count = optInt(data, "count", "count_total", "totalCount");
+        detail.status = firstNonEmpty(optString(data, "status"), "PENDING");
+        detail.createdAt = optLong(data, "createdAt", "created_at");
+        if (detail.createdAt > 0 && detail.createdAt < 10_000_000_000L) {
+            detail.createdAt *= 1000L;
+        }
+        detail.txHash = firstNonEmpty(optString(data, "txHash", "createTxHash", "create_tx_hash"), "");
+        detail.greeting = firstNonEmpty(optString(data, "greeting"), "");
+
+        JSONArray claims = data.optJSONArray("claimRecords");
+        if (claims == null) {
+            claims = data.optJSONArray("claims");
+        }
+        if (claims != null) {
+            for (int i = 0; i < claims.length(); i++) {
+                JSONObject item = claims.optJSONObject(i);
+                if (item == null) continue;
+                RedPacketClaimRecord claim = new RedPacketClaimRecord();
+                claim.claimerName = firstNonEmpty(optString(item, "claimerName", "claimer_name"), "");
+                claim.claimerAddress = firstNonEmpty(optString(item, "claimerAddress", "claimer_address"), "");
+                claim.claimedAt = optLong(item, "claimedAt", "created_at");
+                if (claim.claimedAt > 0 && claim.claimedAt < 10_000_000_000L) {
+                    claim.claimedAt *= 1000L;
+                }
+                claim.amountWei = firstNonEmpty(optString(item, "amountWei", "amount_wei"), "0");
+                claim.txHash = firstNonEmpty(optString(item, "txHash", "tx_hash"), "");
+                detail.claimRecords.add(claim);
+            }
+        }
+        return detail;
     }
 
 
