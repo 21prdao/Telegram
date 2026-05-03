@@ -14284,6 +14284,17 @@
     <string name="messages_few">%1$d 則訊息</string>
     <string name="messages_many">%1$d 則訊息</string>
     <string name="telegram_passport">ETZone Passport</string>
+    <string name="Web3Wallet">Web3 钱包</string>
+    <string name="Web3WalletInfo">BNB Chain 钱包管理</string>
+    <string name="WalletRequiredTitle">需要先创建钱包</string>
+    <string name="WalletRequiredMessage">发红包前请先创建或导入 Web3 钱包。
+
+点击“创建钱包”进入钱包管理。
+创建完成后即可继续发红包。</string>
+    <string name="WalletCreateNow">创建钱包</string>
+    <string name="CreateRedPacket">发红包</string>
+    <string name="OpenRedPacket">打开红包</string>
+    <string name="WalletUnsupportedApi">当前系统版本暂不支持钱包功能</string>
     <string name="WalletManageTitle">钱包管理</string>
     <string name="WalletManageDesc">在独立页面中查看钱包列表、切换钱包和管理代币。
 并可查看我发出的红包记录。</string>

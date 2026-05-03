@@ -10446,13 +10446,13 @@
     <string name="CreateManagedBotLimitTextPremium">Subscribe to **Premium** to create up to %1$d bots, or delete one of your %2$d bots via @BotFather</string>
     <string name="CreateManagedBotLimitText">You can create up to %d bots, or delete your current ones via @BotFather</string>
     <string name="Web3Wallet">Web3 Wallet</string>
-    <string name="Web3WalletInfo">BNB Chain 钱包管理</string>
-    <string name="WalletRequiredTitle">需要先创建钱包</string>
-    <string name="WalletRequiredMessage">发红包前请先创建或导入 Web3 钱包。
+    <string name="Web3WalletInfo">BNB Chain wallet management</string>
+    <string name="WalletRequiredTitle">Create a wallet first</string>
+    <string name="WalletRequiredMessage">Before sending a red packet, please create or import a Web3 wallet.
 
-点击“创建钱包”进入钱包管理。
-创建完成后即可继续发红包。</string>
-    <string name="WalletCreateNow">创建钱包</string>
+Tap "Create Wallet" to open wallet management.
+After setup, you can continue sending red packets.</string>
+    <string name="WalletCreateNow">Create Wallet</string>
     <string name="UnverifiedApp">Unverified App</string>
 
     <string name="AIEditor">AI Editor</string>
@@ -10476,9 +10476,9 @@
     <string name="TranslateCopy">Copy Translation</string>
     <string name="TranslateEntireChat">Translate Entire Chat</string>
 
-    <string name="CreateRedPacket">发红包</string>
-    <string name="OpenRedPacket">打开红包</string>
-    <string name="WalletUnsupportedApi">当前系统版本暂不支持钱包功能</string>
+    <string name="CreateRedPacket">Send Red Packet</string>
+    <string name="OpenRedPacket">Open Red Packet</string>
+    <string name="WalletUnsupportedApi">Wallet features are not supported on this system version.</string>
     <string name="StoryViewsSortDescription">Choose the order for the  list of viewers.</string>
     <string name="StoryReactionsSortDescription">Choose the order for the  list of reactions.</string>
     <string name="NoContactsViewed">None of your contacts viewed this story.</string>
