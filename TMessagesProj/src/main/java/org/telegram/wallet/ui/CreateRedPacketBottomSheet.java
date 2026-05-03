@@ -384,9 +384,15 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
     }
 
     private GradientDrawable createInputBackground() {
+        int base = getThemedColor(Theme.key_windowBackgroundWhiteGrayText2);
+        return createInputBackground(adjustAlpha(base, 0.08f), adjustAlpha(base, 0.14f));
+    }
+
+    private GradientDrawable createInputBackground(int backgroundColor, int strokeColor) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(adjustAlpha(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2), 0.08f));
+        drawable.setColor(backgroundColor);
         drawable.setCornerRadius(AndroidUtilities.dp(12));
+        drawable.setStroke(AndroidUtilities.dp(1), strokeColor);
         return drawable;
     }
 
@@ -416,10 +422,16 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         final EditTextBoldCursor pwdInput = createInput(context, "请输入支付密码");
         pwdInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        FrameLayout inputContainer = new FrameLayout(context);
+        FrameLayout.LayoutParams inputLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        inputLp.leftMargin = AndroidUtilities.dp(8);
+        inputLp.rightMargin = AndroidUtilities.dp(8);
+        inputContainer.addView(pwdInput, inputLp);
+
         final AlertDialog dialog = new AlertDialog.Builder(context)
                 .setTitle("支付验证")
                 .setMessage("请输入支付密码后继续")
-                .setView(pwdInput)
+                .setView(inputContainer)
                 .setPositiveButton("确认", (dialogInterface, which) -> {
                     String pwd = trim(pwdInput.getText() == null ? null : pwdInput.getText().toString());
                     if (!WalletStorage.verifyPaymentPassword(context, pwd)) {
@@ -433,12 +445,14 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         dialog.setOnShowListener(d -> {
             int bgColor = getThemedColor(Theme.key_dialogBackground);
             int textColor = getThemedColor(Theme.key_dialogTextBlack);
-            int hintColor = adjustAlpha(getThemedColor(Theme.key_dialogTextHint), 0.85f);
+            int hintColor = getThemedColor(Theme.key_dialogTextHint);
             int accentColor = getThemedColor(Theme.key_featuredStickers_buttonText);
+            int inputBgColor = Theme.blendOver(bgColor, adjustAlpha(0xFF000000, Theme.isCurrentThemeDark() ? 0.18f : 0.06f));
+            int inputStrokeColor = Theme.blendOver(bgColor, adjustAlpha(0xFFFFFFFF, Theme.isCurrentThemeDark() ? 0.12f : 0.18f));
 
             pwdInput.setTextColor(textColor);
             pwdInput.setHintTextColor(hintColor);
-            pwdInput.setBackground(createInputBackground());
+            pwdInput.setBackground(createInputBackground(inputBgColor, inputStrokeColor));
             pwdInput.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(12), AndroidUtilities.dp(14), AndroidUtilities.dp(12));
 
             Window window = dialog.getWindow();
