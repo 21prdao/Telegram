@@ -14284,4 +14284,15 @@
     <string name="messages_few">%1$d 条消息</string>
     <string name="messages_many">%1$d 条消息</string>
     <string name="telegram_passport">ETZone 通行证</string>
+    <string name="WalletManageTitle">钱包管理</string>
+    <string name="WalletManageDesc">在独立页面中查看钱包列表、切换钱包和管理代币。
+并可查看我发出的红包记录。</string>
+    <string name="WalletTokenList">代币列表</string>
+    <string name="WalletMyRedPacketRecords">我发出的红包记录</string>
+    <string name="WalletRedPacketRecords">红包发送记录</string>
+    <string name="WalletRedPacketRecordsLoading">正在加载红包发送记录...</string>
+    <string name="WalletRedPacketRecordsEmpty">暂无红包发送记录</string>
+    <string name="Web3RedPacketTitleDefault">HTL 红包</string>
+    <string name="Web3RedPacketView">查看红包</string>
+    <string name="Web3RedPacketClaimed">已领取</string>
 </resources>

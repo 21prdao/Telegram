@@ -12,6 +12,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.RedPacketSendRecord;
 import org.telegram.wallet.model.RedPacketSendRecordDetail;
@@ -69,7 +71,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         if (showRedPacketRecords) {
             root.addView(createRecordSummaryCard(), Web3Ui.matchWrap());
         } else {
-            root.addView(Web3Ui.sectionTitle(getActivity(), 0, "代币列表"), Web3Ui.matchWrap());
+            root.addView(Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.WalletTokenList)), Web3Ui.matchWrap());
         }
 
         listContainer = new LinearLayout(getActivity());
@@ -111,7 +113,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         copyLp.leftMargin = dp(10);
         card.addView(copy, copyLp);
 
-        copy.addView(Web3Ui.text(getActivity(), "红包发送记录", 17, p.primaryText, true), Web3Ui.matchWrap());
+        copy.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.WalletRedPacketRecords), 17, p.primaryText, true), Web3Ui.matchWrap());
         summaryCountView = Web3Ui.text(getActivity(), "共 0 条记录", 13, p.secondaryText, false);
         copy.addView(summaryCountView, Web3Ui.topMargin(getActivity(), 2));
         return card;
@@ -181,7 +183,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         }
         if (records.isEmpty()) {
             LinearLayout emptyCard = Web3Ui.card(getActivity());
-            TextView empty = Web3Ui.text(getActivity(), syncingRecords ? "正在加载红包发送记录..." : "暂无红包发送记录", 15, Web3Ui.palette().secondaryText, false);
+            TextView empty = Web3Ui.text(getActivity(), syncingRecords ? LocaleController.getString(R.string.WalletRedPacketRecordsLoading) : LocaleController.getString(R.string.WalletRedPacketRecordsEmpty), 15, Web3Ui.palette().secondaryText, false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(0, dp(12), 0, dp(12));
             emptyCard.addView(empty, Web3Ui.matchWrap());

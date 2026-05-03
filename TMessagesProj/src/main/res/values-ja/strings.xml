@@ -14284,4 +14284,15 @@
     <string name="PsaMessageInfo_psa">This is an official message from the CEO of ETZone regarding the ongoing conflict.</string>
     <string name="PsaMessage_psa">Announcement</string>
     <string name="PsaType_psa">Announcement</string>
+    <string name="WalletManageTitle">Wallet Management</string>
+    <string name="WalletManageDesc">View your wallets, switch wallet, and manage tokens in a dedicated page.
+You can also view red packet records you sent.</string>
+    <string name="WalletTokenList">Token List</string>
+    <string name="WalletMyRedPacketRecords">My Sent Red Packet Records</string>
+    <string name="WalletRedPacketRecords">Red Packet Send Records</string>
+    <string name="WalletRedPacketRecordsLoading">Loading red packet send records...</string>
+    <string name="WalletRedPacketRecordsEmpty">No red packet send records yet.</string>
+    <string name="Web3RedPacketTitleDefault">HTL Red Packet</string>
+    <string name="Web3RedPacketView">View Red Packet</string>
+    <string name="Web3RedPacketClaimed">Claimed</string>
 </resources>

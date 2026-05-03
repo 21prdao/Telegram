@@ -26251,7 +26251,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         float titleY = contentTop + dp(18);
         String titleText = payload.titleText();
         if (TextUtils.isEmpty(titleText)) {
-            titleText = "HTL 红包";
+            titleText = getString(R.string.Web3RedPacketTitleDefault);
         }
         String symbolLabel = TextUtils.isEmpty(payload.symbol) ? "" : payload.symbol.toUpperCase(Locale.US);
         float symbolWidth = TextUtils.isEmpty(symbolLabel) ? 0 : web3RedPacketSubtitlePaint.measureText(symbolLabel) + dp(16);
@@ -26283,10 +26283,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         String statusText;
         switch (payload.normalizedStatus()) {
             case RedPacketPayload.STATUS_ACTIVE:
-                statusText = "查看红包";
+                statusText = getString(R.string.Web3RedPacketView);
                 break;
             case RedPacketPayload.STATUS_CLAIMED:
-                statusText = "已领取";
+                statusText = getString(R.string.Web3RedPacketClaimed);
                 break;
             case RedPacketPayload.STATUS_EMPTY:
                 statusText = "已领完";
@@ -26295,7 +26295,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 statusText = "已过期";
                 break;
             default:
-                statusText = "查看红包";
+                statusText = getString(R.string.Web3RedPacketView);
                 break;
         }
         String amount = TextUtils.isEmpty(payload.totalAmount) ? "" : (" · " + payload.totalAmount + " " + payload.symbol);
