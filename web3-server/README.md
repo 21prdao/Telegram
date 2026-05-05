@@ -36,6 +36,8 @@ npm run dev
 - `DEFAULT_PROXY_PORT`（客户端默认代理端口）
 - `DEFAULT_PROXY_USERNAME` / `DEFAULT_PROXY_PASSWORD` / `DEFAULT_PROXY_SECRET`
 - `APP_VERSION_CODE` / `APP_VERSION_NAME` / `APP_DOWNLOAD_URL` / `APP_VERSION_MESSAGE`
+- `APP_RELEASE_DATE`（可选，Unix 秒时间戳）
+- `APP_APK_SIZE_BYTES`（可选，APK 字节大小）
 
 
 ### 管理后台
@@ -122,7 +124,7 @@ curl "http://127.0.0.1:8787/api/v1/client/proxy"
 ### 客户端版本检查（新增）
 
 ```bash
-curl "http://127.0.0.1:8787/api/v1/client/version/check?platform=android&versionCode=100"
+curl "http://127.0.0.1:8787/api/v1/client/version/check?platform=android&versionCode=100&versionName=1.0.0"
 ```
 
 ## 3) 合约说明
