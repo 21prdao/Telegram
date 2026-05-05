@@ -154,6 +154,22 @@ contract TelegramRedPacketV2 is ReentrancyGuard {
         return packets[packetId].claimed[claimer];
     }
 
+    function getRemainingAmount(bytes32 packetId) external view returns (uint256) {
+        Packet storage p = packets[packetId];
+        if (p.creator == address(0) || p.refunded) {
+            return 0;
+        }
+        return p.amountPerClaim * (p.totalCount - p.claimedCount);
+    }
+
+    function canRefund(bytes32 packetId, address wallet) external view returns (bool) {
+        Packet storage p = packets[packetId];
+        if (p.creator == address(0) || p.refunded || wallet != p.creator) {
+            return false;
+        }
+        return block.timestamp > p.expiresAt || p.claimedCount == p.totalCount;
+    }
+
     function _validateCreate(bytes32 packetId, uint32 count, uint64 expiresAt, uint256 totalAmount) private view {
         require(packetId != bytes32(0), "packetId=0");
         require(count > 0 && count <= MAX_PACKET_COUNT, "invalid count");

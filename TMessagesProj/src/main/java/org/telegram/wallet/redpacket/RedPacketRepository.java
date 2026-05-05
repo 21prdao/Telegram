@@ -16,6 +16,7 @@ import org.telegram.wallet.model.RedPacketInfo;
 import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
 import org.telegram.wallet.model.RedPacketSendRecord;
 import org.telegram.wallet.model.RedPacketSendRecordDetail;
+import org.telegram.wallet.model.RedPacketRefundRecord;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -409,6 +410,20 @@ public class RedPacketRepository {
         }
         detail.txHash = firstNonEmpty(optString(data, "txHash", "createTxHash", "create_tx_hash"), "");
         detail.greeting = firstNonEmpty(optString(data, "greeting"), "");
+        detail.packetIdHex = firstNonEmpty(
+                optString(data, "packetIdHex", "packet_id_hex", "onChainPacketId", "onChainPacketIdHex"),
+                detail.packetId
+        );
+        detail.contractAddress = firstNonEmpty(optString(data, "contractAddress", "contract_address"), "");
+        detail.remainingAmountWei = firstNonEmpty(optString(data, "remainingAmountWei", "remaining_amount_wei"), "0");
+        detail.remainingAmountDisplay = firstNonEmpty(optString(data, "remainingAmountDisplay", "remainingAmount", "remaining_amount"), "");
+        detail.expiresAt = optLong(data, "expiresAt", "expires_at", "expireAt", "expire_at");
+        String detailStatus = firstNonEmpty(optString(data, "status", "packetStatus", "packet_status"), "").toLowerCase(Locale.US);
+        detail.refunded = optBoolean(data, "refunded") || "refunded".equals(detailStatus);
+        detail.canRefund = optBoolean(data, "canRefund", "refundable");
+        if (!hasAny(data, "canRefund", "refundable")) {
+            detail.canRefund = !detail.refunded && isExpired(detail.expiresAt);
+        }
 
         JSONArray claims = data.optJSONArray("claimRecords");
         if (claims == null) {
@@ -429,6 +444,44 @@ public class RedPacketRepository {
                 claim.txHash = firstNonEmpty(optString(item, "txHash", "tx_hash"), "");
                 detail.claimRecords.add(claim);
             }
+        }
+
+        JSONArray refunds = data.optJSONArray("refundRecords");
+        if (refunds == null) {
+            refunds = data.optJSONArray("refunds");
+        }
+        if (refunds != null) {
+            for (int i = 0; i < refunds.length(); i++) {
+                JSONObject item = refunds.optJSONObject(i);
+                if (item == null) continue;
+                RedPacketRefundRecord refund = new RedPacketRefundRecord();
+                refund.refundId = firstNonEmpty(optString(item, "refundId", "refund_id", "id"), "");
+                refund.amountWei = firstNonEmpty(optString(item, "amountWei", "amount_wei", "remainingAmountWei"), "0");
+                refund.amountDisplay = firstNonEmpty(optString(item, "amountDisplay", "amount", "remainingAmount"), "");
+                refund.packetIdHex = firstNonEmpty(optString(item, "packetIdHex", "packet_id_hex", "onChainPacketId", "onChainPacketIdHex"), detail.packetId);
+                refund.contractAddress = firstNonEmpty(optString(item, "contractAddress", "contract_address"), "");
+                refund.status = firstNonEmpty(optString(item, "status"), "");
+                refund.expiresAt = optLong(item, "expiresAt", "expires_at", "expireAt", "expire_at");
+                refund.refunded = optBoolean(item, "refunded") || "refunded".equalsIgnoreCase(refund.status);
+                refund.canRefund = optBoolean(item, "canRefund", "refundable");
+                if (!hasAny(item, "canRefund", "refundable")) {
+                    refund.canRefund = !refund.refunded && isExpired(refund.expiresAt);
+                }
+                detail.refundRecords.add(refund);
+            }
+        }
+        if (detail.refundRecords.isEmpty() && (detail.canRefund || detail.refunded)) {
+            RedPacketRefundRecord fallback = new RedPacketRefundRecord();
+            fallback.refundId = detail.packetId;
+            fallback.amountWei = detail.remainingAmountWei;
+            fallback.amountDisplay = detail.remainingAmountDisplay;
+            fallback.canRefund = detail.canRefund;
+            fallback.refunded = detail.refunded;
+            fallback.expiresAt = detail.expiresAt;
+            fallback.packetIdHex = detail.packetIdHex;
+            fallback.contractAddress = detail.contractAddress;
+            fallback.status = detail.status;
+            detail.refundRecords.add(fallback);
         }
         return detail;
     }
