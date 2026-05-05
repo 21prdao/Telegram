@@ -12,8 +12,6 @@ import android.graphics.drawable.RippleDrawable;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
-import android.util.TypedValue;
-import android.view.ViewGroup;
 import android.view.MotionEvent;
 import android.view.Window;
 import android.view.WindowManager;
@@ -428,29 +426,16 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         final EditTextBoldCursor pwdInput = createInput(context, "请输入支付密码");
         pwdInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        LinearLayout dialogContent = new LinearLayout(context);
-        dialogContent.setOrientation(LinearLayout.VERTICAL);
-        dialogContent.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(8), AndroidUtilities.dp(24), AndroidUtilities.dp(2));
-
-        TextView titleView = new TextView(context);
-        titleView.setText("支付验证");
-        titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-        titleView.setTypeface(AndroidUtilities.bold());
-        dialogContent.addView(titleView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        TextView messageView = new TextView(context);
-        messageView.setText("请输入支付密码后继续");
-        messageView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        LinearLayout.LayoutParams messageLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        messageLp.topMargin = AndroidUtilities.dp(8);
-        dialogContent.addView(messageView, messageLp);
-
-        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        inputLp.topMargin = AndroidUtilities.dp(16);
-        dialogContent.addView(pwdInput, inputLp);
+        FrameLayout inputContainer = new FrameLayout(context);
+        FrameLayout.LayoutParams inputLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        inputLp.leftMargin = AndroidUtilities.dp(8);
+        inputLp.rightMargin = AndroidUtilities.dp(8);
+        inputContainer.addView(pwdInput, inputLp);
 
         final AlertDialog dialog = new AlertDialog.Builder(context)
-                .setView(dialogContent)
+                .setTitle("支付验证")
+                .setMessage("请输入支付密码后继续")
+                .setView(inputContainer)
                 .setPositiveButton("确认", (dialogInterface, which) -> {
                     String pwd = trim(pwdInput.getText() == null ? null : pwdInput.getText().toString());
                     if (!WalletStorage.verifyPaymentPassword(context, pwd)) {
@@ -468,9 +453,6 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             int accentColor = getThemedColor(Theme.key_featuredStickers_buttonText);
             int inputBgColor = Theme.blendOver(bgColor, adjustAlpha(0xFF000000, Theme.isCurrentThemeDark() ? 0.18f : 0.06f));
             int inputStrokeColor = Theme.blendOver(bgColor, adjustAlpha(0xFFFFFFFF, Theme.isCurrentThemeDark() ? 0.12f : 0.18f));
-
-            titleView.setTextColor(textColor);
-            messageView.setTextColor(adjustAlpha(textColor, 0.78f));
 
             pwdInput.setTextColor(textColor);
             pwdInput.setHintTextColor(hintColor);
