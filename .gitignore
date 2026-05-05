@@ -15,7 +15,7 @@ TMessagesProj_App/afat/
 TMessagesProj_AppHockeyApp/afat/
 TMessagesProj_AppStandalone/afat/
 TMessagesProj_AppHuawei/afat/
-web3-server/node_modules/
+**/node_modules/
 /web3-server/data/
-/src/.env
+**/.env
 /src/approve.js
