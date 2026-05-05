@@ -33,6 +33,8 @@ const APP_VERSION_CODE = Number(process.env.APP_VERSION_CODE || 1);
 const APP_VERSION_NAME = process.env.APP_VERSION_NAME || '1.0.0';
 const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || '';
 const APP_VERSION_MESSAGE = process.env.APP_VERSION_MESSAGE || '';
+const APP_RELEASE_DATE = Number(process.env.APP_RELEASE_DATE || 0);
+const APP_APK_SIZE_BYTES = Number(process.env.APP_APK_SIZE_BYTES || 0);
 
 const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
@@ -760,18 +762,26 @@ app.get('/api/v1/client/proxy', async (_req, res) => {
 
 app.get('/api/v1/client/version/check', async (req, res) => {
   const clientVersionCode = Number(req.query.versionCode || 0);
+  const clientVersionName = String(req.query.versionName || '').trim();
   const hasUpdate = clientVersionCode > 0
     ? clientVersionCode < APP_VERSION_CODE
     : true;
+  const checkedAt = nowSeconds();
+  const releaseDate = APP_RELEASE_DATE > 0 ? APP_RELEASE_DATE : checkedAt;
+
   return res.json({
     ok: true,
     data: {
       hasUpdate,
+      currentVersionCode: clientVersionCode,
+      currentVersionName: clientVersionName,
       versionCode: APP_VERSION_CODE,
       versionName: APP_VERSION_NAME,
+      releaseDate,
+      apkSizeBytes: APP_APK_SIZE_BYTES > 0 ? APP_APK_SIZE_BYTES : null,
       downloadUrl: hasUpdate ? APP_DOWNLOAD_URL : '',
       message: APP_VERSION_MESSAGE,
-      checkedAt: nowSeconds(),
+      checkedAt,
     },
   });
 });

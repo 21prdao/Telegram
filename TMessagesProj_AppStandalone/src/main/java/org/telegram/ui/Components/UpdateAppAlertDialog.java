@@ -19,10 +19,13 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.util.Date;
+
 import androidx.core.widget.NestedScrollView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DocumentObject;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
@@ -260,7 +263,16 @@ public class UpdateAppAlertDialog extends BottomSheet {
         messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         messageTextView.setMovementMethod(new AndroidUtilities.LinkMovementMethodMy());
         messageTextView.setLinkTextColor(Theme.getColor(Theme.key_dialogTextLink));
-        messageTextView.setText(LocaleController.formatString("AppUpdateVersionAndSize", R.string.AppUpdateVersionAndSize, appUpdate.version, AndroidUtilities.formatFileSize(appUpdate.document.size)));
+        final String updateDate = appUpdate.document != null && appUpdate.document.date != 0
+            ? LocaleController.formatString(R.string.formatDateAtTime,
+                LocaleController.getInstance().getFormatterYear().format(new Date(appUpdate.document.date * 1000L)),
+                LocaleController.getInstance().getFormatterDay().format(new Date(appUpdate.document.date * 1000L)))
+            : "-";
+        final String updateSize = appUpdate.document != null ? AndroidUtilities.formatFileSize(appUpdate.document.size) : "-";
+        messageTextView.setText("当前版本：" + BuildVars.BUILD_VERSION_STRING + "\n"
+            + "更新版本：" + appUpdate.version + "\n"
+            + "更新日期：" + updateDate + "\n"
+            + "更新包大小：" + updateSize);
         messageTextView.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.TOP);
         linearLayout.addView(messageTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 23, 0, 23, 5));
 
