@@ -38,6 +38,7 @@ import org.telegram.wallet.chain.RedPacketContractService;
 import org.telegram.wallet.config.WalletConfig;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
+import org.telegram.wallet.model.RedPacketInfo;
 import org.telegram.wallet.model.RedPacketSendRecord;
 import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.redpacket.RedPacketMessageComposer;
