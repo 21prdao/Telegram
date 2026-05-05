@@ -14293,6 +14293,20 @@ You can also view red packet records you sent.</string>
     <string name="WalletRedPacketRecordsLoading">Loading red packet send records...</string>
     <string name="WalletRedPacketRecordsEmpty">No red packet send records yet.</string>
     <string name="Web3RedPacketTitleDefault">HTL Red Packet</string>
+    <string name="Web3RedPacketCreateTitle">Create Red Packet</string>
+    <string name="Web3RedPacketCreateSubtitle">Create an on-chain red packet first, then send a compatible message to this chat automatically.</string>
+    <string name="Web3RedPacketToken">Token</string>
+    <string name="Web3RedPacketTotalAmount">Total amount</string>
+    <string name="Web3RedPacketExampleAmount">e.g. 0.05</string>
+    <string name="Web3RedPacketCount">Count</string>
+    <string name="Web3RedPacketExampleCount">e.g. 5</string>
+    <string name="Web3RedPacketGreeting">Greeting</string>
+    <string name="Web3RedPacketDefaultGreeting">Wishing you prosperity and good fortune</string>
+    <string name="Web3RedPacketExpireDateMax30">Expiration date (up to 30 days)</string>
+    <string name="Web3RedPacketHintPrivate">In private chats, red packets default to 1 share and the full amount is sent to the recipient.</string>
+    <string name="Web3RedPacketHintGroup">For equal group red packets, total amount must be divisible by share count (everyone gets the same amount).</string>
+    <string name="Web3RedPacketCreateAndSend">Create and Send</string>
+    <string name="Web3RedPacketProcessing">Processing…</string>
     <string name="Web3RedPacketView">View Red Packet</string>
     <string name="Web3RedPacketClaimed">Claimed</string>
 </resources>

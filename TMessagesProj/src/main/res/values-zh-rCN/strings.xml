@@ -14293,6 +14293,22 @@
     <string name="WalletRedPacketRecordsLoading">正在加载红包发送记录...</string>
     <string name="WalletRedPacketRecordsEmpty">暂无红包发送记录</string>
     <string name="Web3RedPacketTitleDefault">HTL 红包</string>
+    <string name="Web3Wallet">Web3 钱包</string>
+    <string name="Web3WalletInfo">BNB Chain 钱包管理</string>
+    <string name="Web3RedPacketCreateTitle">发红包</string>
+    <string name="Web3RedPacketCreateSubtitle">先创建链上红包，再自动把红包兼容消息发到当前聊天</string>
+    <string name="Web3RedPacketToken">Token</string>
+    <string name="Web3RedPacketTotalAmount">总金额</string>
+    <string name="Web3RedPacketExampleAmount">例如 0.05</string>
+    <string name="Web3RedPacketCount">份数</string>
+    <string name="Web3RedPacketExampleCount">例如 5</string>
+    <string name="Web3RedPacketGreeting">祝福语</string>
+    <string name="Web3RedPacketDefaultGreeting">恭喜发财，大吉大利</string>
+    <string name="Web3RedPacketExpireDateMax30">到期日期（最多 30 天）</string>
+    <string name="Web3RedPacketHintPrivate">私聊红包默认 1 份，金额会全部发送给对方。</string>
+    <string name="Web3RedPacketHintGroup">群聊等额红包：总金额需能被份数整除（每人领取金额一致）。</string>
+    <string name="Web3RedPacketCreateAndSend">创建并发送</string>
+    <string name="Web3RedPacketProcessing">处理中…</string>
     <string name="Web3RedPacketView">查看红包</string>
     <string name="Web3RedPacketClaimed">已领取</string>
 </resources>

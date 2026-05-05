@@ -136,17 +136,17 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         setCustomView(rootLayout);
 
         TextView titleView = createText(context, 22, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT_BOLD);
-        titleView.setText("发红包");
+        titleView.setText(getString(R.string.Web3RedPacketCreateTitle));
         contentLayout.addView(titleView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         TextView subtitleView = createText(context, 14, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
         subtitleView.setPadding(0, AndroidUtilities.dp(8), 0, 0);
-        subtitleView.setText("先创建链上红包，再自动把红包兼容消息发到当前聊天");
+        subtitleView.setText(getString(R.string.Web3RedPacketCreateSubtitle));
         contentLayout.addView(subtitleView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        addFieldLabel(context, "Token");
+        addFieldLabel(context, getString(R.string.Web3RedPacketToken));
         tokenSelectorView = createActionButton(
                 context,
                 "",
@@ -158,29 +158,29 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         contentLayout.addView(tokenSelectorView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
-        addFieldLabel(context, "total amount");
-        totalAmountEdit = createInput(context, "例如 0.05");
+        addFieldLabel(context, getString(R.string.Web3RedPacketTotalAmount));
+        totalAmountEdit = createInput(context, getString(R.string.Web3RedPacketExampleAmount));
         totalAmountEdit.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         totalAmountEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
         contentLayout.addView(totalAmountEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
-        countLabelView = addFieldLabel(context, "count");
-        countEdit = createInput(context, "例如 5");
+        countLabelView = addFieldLabel(context, getString(R.string.Web3RedPacketCount));
+        countEdit = createInput(context, getString(R.string.Web3RedPacketExampleCount));
         countEdit.setInputType(InputType.TYPE_CLASS_NUMBER);
         countEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
         contentLayout.addView(countEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
         updateCountInputVisibility();
 
-        addFieldLabel(context, "greeting");
-        greetingEdit = createInput(context, "恭喜发财，大吉大利");
+        addFieldLabel(context, getString(R.string.Web3RedPacketGreeting));
+        greetingEdit = createInput(context, getString(R.string.Web3RedPacketDefaultGreeting));
         greetingEdit.setInputType(InputType.TYPE_CLASS_TEXT);
         greetingEdit.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
         contentLayout.addView(greetingEdit, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
-        addFieldLabel(context, "到期日期（最多 30 天）");
+        addFieldLabel(context, getString(R.string.Web3RedPacketExpireDateMax30));
         expiresAtSelectorView = createActionButton(
                 context,
                 "",
@@ -197,8 +197,8 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         TextView hintView = createText(context, 13, Theme.key_windowBackgroundWhiteGrayText2, Typeface.DEFAULT);
         hintView.setPadding(0, AndroidUtilities.dp(12), 0, 0);
         hintView.setText(isPrivateDialog()
-                ? "私聊红包默认 1 份，金额会全部发送给对方。"
-                : "群聊等额红包：总金额需能被份数整除（每人领取金额一致）。");
+                ? getString(R.string.Web3RedPacketHintPrivate)
+                : getString(R.string.Web3RedPacketHintGroup));
         contentLayout.addView(hintView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
@@ -210,7 +210,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         createButton = createActionButton(
                 context,
-                "创建并发送",
+                getString(R.string.Web3RedPacketCreateAndSend),
                 getThemedColor(Theme.key_featuredStickers_addButton),
                 getThemedColor(Theme.key_featuredStickers_buttonText)
         );
@@ -220,7 +220,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         cancelButton = createActionButton(
                 context,
-                "取消",
+                getString(R.string.Cancel),
                 adjustAlpha(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2), 0.16f),
                 getThemedColor(Theme.key_windowBackgroundWhiteBlackText)
         );
@@ -254,7 +254,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         loadingTextView = createText(context, 14, Theme.key_windowBackgroundWhiteBlackText, Typeface.DEFAULT);
         loadingTextView.setGravity(Gravity.CENTER_HORIZONTAL);
         loadingTextView.setPadding(0, AndroidUtilities.dp(10), 0, 0);
-        loadingTextView.setText("处理中…");
+        loadingTextView.setText(getString(R.string.Web3RedPacketProcessing));
         overlayContent.addView(loadingTextView, LayoutHelper.createLinear(
                 LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
@@ -441,7 +441,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                     }
                     performCreate();
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(getString(R.string.Cancel), null)
                 .create();
         dialog.setOnShowListener(d -> {
             int bgColor = getThemedColor(Theme.key_dialogBackground);
@@ -729,7 +729,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
     private void setLoading(boolean show, String message) {
         loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
-        loadingTextView.setText(TextUtils.isEmpty(message) ? "处理中…" : message);
+        loadingTextView.setText(TextUtils.isEmpty(message) ? getString(R.string.Web3RedPacketProcessing) : message);
 
         setViewEnabled(createButton, !show);
         setViewEnabled(cancelButton, !show);
@@ -951,7 +951,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 .setTitle("选择 Token")
                 .setSingleChoiceItems(labels, selectedTokenIndex, (dialog, which) -> selectedTokenIndex = which)
                 .setPositiveButton("确定", (dialog, which) -> updateTokenSelectorText())
-                .setNegativeButton("取消", null)
+                .setNegativeButton(getString(R.string.Cancel), null)
                 .show();
     }
 

@@ -14304,6 +14304,20 @@
     <string name="WalletRedPacketRecordsLoading">正在加载红包发送记录...</string>
     <string name="WalletRedPacketRecordsEmpty">暂无红包发送记录</string>
     <string name="Web3RedPacketTitleDefault">HTL 红包</string>
+    <string name="Web3RedPacketCreateTitle">發紅包</string>
+    <string name="Web3RedPacketCreateSubtitle">先建立鏈上紅包，再自動把紅包相容訊息發送到目前聊天</string>
+    <string name="Web3RedPacketToken">Token</string>
+    <string name="Web3RedPacketTotalAmount">總金額</string>
+    <string name="Web3RedPacketExampleAmount">例如 0.05</string>
+    <string name="Web3RedPacketCount">份數</string>
+    <string name="Web3RedPacketExampleCount">例如 5</string>
+    <string name="Web3RedPacketGreeting">祝福語</string>
+    <string name="Web3RedPacketDefaultGreeting">恭喜發財，大吉大利</string>
+    <string name="Web3RedPacketExpireDateMax30">到期日期（最多 30 天）</string>
+    <string name="Web3RedPacketHintPrivate">私聊紅包預設 1 份，金額會全部發送給對方。</string>
+    <string name="Web3RedPacketHintGroup">群聊等額紅包：總金額需可被份數整除（每人領取金額一致）。</string>
+    <string name="Web3RedPacketCreateAndSend">建立並發送</string>
+    <string name="Web3RedPacketProcessing">處理中…</string>
     <string name="Web3RedPacketView">查看红包</string>
     <string name="Web3RedPacketClaimed">已领取</string>
 </resources>
