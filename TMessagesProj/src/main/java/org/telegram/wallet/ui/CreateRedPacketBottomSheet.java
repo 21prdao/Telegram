@@ -1,5 +1,7 @@
 package org.telegram.wallet.ui;
 
+import static org.telegram.messenger.LocaleController.getString;
+
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.app.DatePickerDialog;
@@ -27,6 +29,7 @@ import androidx.appcompat.app.AlertDialog;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.R;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.BaseFragment;
