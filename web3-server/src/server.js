@@ -48,6 +48,8 @@ const contractInterface = new Interface([
   'event PacketCreated(bytes32 indexed packetId, address indexed creator, address indexed token, uint256 total, uint32 count, uint64 expiresAt)',
   'event Claimed(bytes32 indexed packetId, address indexed claimer, uint256 amount)',
   'event Claimed(bytes32 indexed packetId, address indexed claimer, address indexed token, uint256 amount)',
+  'event Refunded(bytes32 indexed packetId, address indexed creator, uint256 amount)',
+  'event Refunded(bytes32 indexed packetId, address indexed creator, address indexed token, uint256 amount)',
 ]);
 
 function nowSeconds() {
@@ -143,6 +145,23 @@ class MySqlDB {
       decimalNumbers: false,
       charset: 'utf8mb4',
     });
+  }
+
+
+  async ensureSchema() {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS red_packet_refunds (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        packet_id VARCHAR(128) NOT NULL,
+        creator_address VARCHAR(64) NOT NULL,
+        tx_hash VARCHAR(100) NOT NULL,
+        amount_wei VARCHAR(120) NOT NULL,
+        created_at BIGINT NOT NULL,
+        PRIMARY KEY (id),
+        KEY idx_packet_created (packet_id, created_at),
+        UNIQUE KEY uniq_packet_tx (packet_id, tx_hash)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
   }
 
   async getPacket(packetId) {
@@ -267,6 +286,44 @@ class MySqlDB {
     return this.getPacket(packet.packetId);
   }
 
+
+  async confirmRefund(packet, creatorAddress, txHash, amountWei) {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [packetRows] = await conn.query('SELECT * FROM red_packets WHERE packet_id = ? FOR UPDATE', [packet.packetId]);
+      if (!packetRows.length) throw new Error('packet not found');
+      const packetRow = packetRows[0];
+
+      if (String(packetRow.status) === 'refunded') {
+        throw new Error('already refunded');
+      }
+
+      await conn.query(
+        `INSERT INTO red_packet_refunds (packet_id, creator_address, tx_hash, amount_wei, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [packet.packetId, creatorAddress, txHash, amountWei, nowSeconds()],
+      );
+
+      await conn.query(
+        `UPDATE red_packets
+         SET status = 'refunded', remaining_count = 0, updated_at = ?
+         WHERE packet_id = ?`,
+        [nowSeconds(), packet.packetId],
+      );
+
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+
+    return this.getPacket(packet.packetId);
+  }
+
   async getPacketsForAdmin(limit = 100) {
     const [rows] = await this.pool.query(
       `SELECT packet_id, creator_wallet, token_symbol, total_amount_wei, count_total, remaining_count, greeting,
@@ -323,7 +380,7 @@ class MySqlDB {
 
   async getSendRecordDetail(packetId) {
     const [rows] = await this.pool.query(
-      `SELECT packet_id, token_symbol, total_amount_wei, count_total, status, created_at, create_tx_hash, greeting
+      `SELECT packet_id, packet_id_hex, token_symbol, total_amount_wei, count_total, remaining_count, amount_per_claim_wei, status, created_at, create_tx_hash, greeting, expires_at, contract_address, creator_wallet
        FROM red_packets WHERE packet_id = ? LIMIT 1`,
       [packetId],
     );
@@ -334,12 +391,27 @@ class MySqlDB {
        WHERE packet_id = ? ORDER BY id ASC`,
       [packetId],
     );
+    const [refunds] = await this.pool.query(
+      `SELECT id, creator_address, tx_hash, amount_wei, created_at FROM red_packet_refunds
+       WHERE packet_id = ? ORDER BY id ASC`,
+      [packetId],
+    );
+    const remainingCount = Number(row.remaining_count || 0);
+    const amountPerClaimWei = BigInt(String(row.amount_per_claim_wei || '0'));
+    const remainingAmountWei = (amountPerClaimWei * BigInt(Math.max(remainingCount, 0))).toString();
     return {
       packetId: row.packet_id,
       tokenSymbol: row.token_symbol || 'BNB',
       totalAmount: row.total_amount_wei,
       count: Number(row.count_total || 0),
       status: String(row.status || '').toUpperCase(),
+      packetIdHex: row.packet_id_hex || '',
+      contractAddress: row.contract_address || '',
+      creatorWallet: row.creator_wallet || '',
+      expiresAt: Number(row.expires_at || 0),
+      refunded: String(row.status || '') === 'refunded',
+      canRefund: String(row.status || '') !== 'refunded' && remainingCount > 0 && nowSeconds() > Number(row.expires_at || 0),
+      remainingAmountWei,
       createdAt: Number(row.created_at || 0) * 1000,
       txHash: row.create_tx_hash || '',
       greeting: row.greeting || '',
@@ -349,6 +421,19 @@ class MySqlDB {
         claimedAt: Number(c.created_at || 0) * 1000,
         amountWei: String(c.amount_wei || '0'),
         txHash: c.tx_hash || '',
+      })),
+      refundRecords: refunds.map((r) => ({
+        refundId: `refund-${r.id}`,
+        amountWei: String(r.amount_wei || '0'),
+        amountDisplay: '',
+        canRefund: false,
+        refunded: true,
+        packetIdHex: row.packet_id_hex || '',
+        contractAddress: row.contract_address || '',
+        status: 'REFUNDED',
+        txHash: r.tx_hash || '',
+        creatorAddress: r.creator_address || '',
+        createdAt: Number(r.created_at || 0) * 1000,
       })),
     };
   }
@@ -781,6 +866,55 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
   });
 });
 
+
+app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
+  const packet = await ensurePacket(req.params.packetId, res);
+  if (!packet) return;
+
+  const creatorAddress = normalizeAddress(req.body?.creatorAddress);
+  const txHash = String(req.body?.txHash || '').trim();
+  if (!creatorAddress) return badRequest(res, 'creatorAddress invalid');
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return badRequest(res, 'txHash invalid');
+  if (creatorAddress !== packet.creatorWallet) return badRequest(res, 'creator mismatch');
+  if (!packet.onchainCreated) return badRequest(res, 'packet not confirmed on chain');
+
+  const receipt = await getTransactionReceipt(txHash);
+  if (!receipt || receipt.status !== 1) return badRequest(res, 'transaction not confirmed');
+
+  const event = parseExpectedLog(receipt, 'Refunded');
+  if (!event) return badRequest(res, 'Refunded event not found');
+
+  const eventPacketIdHex = String(event.args.packetId).toLowerCase();
+  const eventCreator = normalizeAddress(String(event.args.creator));
+  const eventAmountRaw = event.args.amount ?? event.args[3];
+  const eventAmount = BigInt(eventAmountRaw).toString();
+
+  if (eventPacketIdHex !== packet.packetIdHex.toLowerCase()) return badRequest(res, 'Refunded packetId mismatch');
+  if (eventCreator !== creatorAddress) return badRequest(res, 'Refunded creator mismatch');
+
+  let updated;
+  try {
+    updated = await db.confirmRefund(packet, creatorAddress, txHash, eventAmount);
+  } catch (error) {
+    if (String(error.message).includes('already refunded')) {
+      return badRequest(res, 'already refunded');
+    }
+    throw error;
+  }
+
+  return res.json({
+    ok: true,
+    data: {
+      packetId: updated.packetId,
+      txHash,
+      refunded: true,
+      status: getPacketStatus(updated),
+      remainingCount: updated.remainingCount,
+      refundAmountWei: eventAmount,
+    },
+  });
+});
+
 app.use((err, _req, res, _next) => {
   // eslint-disable-next-line no-console
   console.error('[server-error]', err);
@@ -790,6 +924,7 @@ app.use((err, _req, res, _next) => {
 const port = Number(process.env.PORT || 8787);
 
 (async () => {
+  await db.ensureSchema();
   app.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`red-packet service listening on http://127.0.0.1:${port}`);
