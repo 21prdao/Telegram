@@ -45,7 +45,7 @@ public class WalletManageFragment extends Fragment implements WalletRefreshable 
         desc.setLineSpacing(dp(1), 1.0f);
         card.addView(desc, Web3Ui.topMargin(getActivity(), 14));
 
-        LinearLayout walletList = Web3Ui.actionButton(getActivity(), "钱包列表 / 切换钱包", Web3IconView.WALLET, true);
+        LinearLayout walletList = Web3Ui.actionButton(getActivity(), LocaleController.getString(R.string.Web3WalletListSwitchTitle), Web3IconView.WALLET, true);
         walletList.setOnClickListener(v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class)));
         card.addView(walletList, Web3Ui.topMargin(getActivity(), 16));
         LinearLayout tokenList = Web3Ui.actionButton(getActivity(), LocaleController.getString(R.string.WalletTokenList), Web3IconView.COINS, false);

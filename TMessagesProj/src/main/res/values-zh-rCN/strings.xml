@@ -14284,7 +14284,34 @@
     <string name="messages_few">%1$d 条消息</string>
     <string name="messages_many">%1$d 条消息</string>
     <string name="telegram_passport">ETZone 通行证</string>
-    <string name="WalletManageTitle">钱包管理</string>
+    
+    <string name="Web3WalletProTitle">Web3 钱包专业版</string>
+    <string name="Web3WalletTotalAssets">总资产</string>
+    <string name="Web3WalletAddressLabel">钱包地址：%1$s</string>
+    <string name="Web3WalletAddressNotCreated">未创建</string>
+    <string name="Web3WalletCopyAddress">复制地址</string>
+    <string name="Web3WalletCreate">创建</string>
+    <string name="Web3WalletImport">导入</string>
+    <string name="Web3WalletSwitch">切换</string>
+    <string name="Web3WalletChainLabel">链：%1$s</string>
+    <string name="Web3WalletQuickActions">快捷操作</string>
+    <string name="Web3WalletAddToken">添加代币</string>
+    <string name="Web3WalletTokenList">Token 列表</string>
+    <string name="Web3WalletNoTokenHint">暂无 Token，点击“添加代币”开始</string>
+    <string name="Web3WalletAddressCopied">地址已复制</string>
+    <string name="Web3WalletListSwitchTitle">钱包列表 / 切换钱包</string>
+    <string name="Web3WalletList">钱包列表</string>
+    <string name="Web3WalletTapToSwitch">点击列表项即可切换钱包</string>
+    <string name="Web3WalletNoWalletHint">暂无钱包，请先创建或导入</string>
+    <string name="Web3WalletDefaultName">钱包</string>
+    <string name="Web3WalletCurrentSuffix">（当前）</string>
+    <string name="Web3WalletSwitchedTo">已切换到 %1$s</string>
+    <string name="Web3WalletDeveloperInfo">开发者信息</string>
+    <string name="Web3WalletTabAssets">资产</string>
+    <string name="Web3WalletTabTransfer">转账</string>
+    <string name="Web3WalletTabSecurity">安全</string>
+    <string name="Web3WalletTabManage">管理</string>
+<string name="WalletManageTitle">钱包管理</string>
     <string name="WalletManageDesc">在独立页面中查看钱包列表、切换钱包和管理代币。
 并可查看我发出的红包记录。</string>
     <string name="WalletTokenList">代币列表</string>

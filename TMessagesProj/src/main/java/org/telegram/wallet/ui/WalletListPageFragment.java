@@ -10,6 +10,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.WalletAccount;
 
@@ -28,8 +30,8 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(18));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
-        root.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.WALLET, "钱包列表"), Web3Ui.matchWrap());
-        root.addView(Web3Ui.text(getActivity(), "点击列表项即可切换钱包", 14, p.secondaryText, false), Web3Ui.topMargin(getActivity(), 6));
+        root.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.WALLET, LocaleController.getString(R.string.Web3WalletList)), Web3Ui.matchWrap());
+        root.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletTapToSwitch), 14, p.secondaryText, false), Web3Ui.topMargin(getActivity(), 6));
         listContainer = new LinearLayout(getActivity());
         listContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(listContainer, Web3Ui.topMargin(getActivity(), 12));
@@ -43,7 +45,7 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         String selected = WalletStorage.getSelectedAddress(getActivity());
         List<WalletAccount> wallets = WalletStorage.getWallets(getActivity());
         if (wallets.isEmpty()) {
-            TextView empty = Web3Ui.text(getActivity(), "暂无钱包，请先创建或导入", 15, Web3Ui.palette().secondaryText, false);
+            TextView empty = Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletNoWalletHint), 15, Web3Ui.palette().secondaryText, false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(0, dp(24), 0, 0);
             listContainer.addView(empty, Web3Ui.matchWrap());
@@ -70,13 +72,13 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         infoLp.leftMargin = dp(12);
         card.addView(info, infoLp);
-        String name = wallet.name == null ? "钱包" : wallet.name;
-        info.addView(Web3Ui.text(getActivity(), name + (selected ? "（当前）" : ""), 18, selected ? 0xFFFFFFFF : p.primaryText, true), Web3Ui.matchWrap());
+        String name = wallet.name == null ? LocaleController.getString(R.string.Web3WalletDefaultName) : wallet.name;
+        info.addView(Web3Ui.text(getActivity(), name + (selected ? LocaleController.getString(R.string.Web3WalletCurrentSuffix) : ""), 18, selected ? 0xFFFFFFFF : p.primaryText, true), Web3Ui.matchWrap());
         info.addView(Web3Ui.text(getActivity(), WalletWorkflowCoordinator.shortAddress(wallet.address), 14, selected ? 0xEEFFFFFF : p.secondaryText, false), Web3Ui.matchWrap());
         card.addView(new Web3IconView(getActivity(), Web3IconView.CHEVRON, selected ? 0xFFFFFFFF : p.mutedText), new LinearLayout.LayoutParams(dp(18), dp(18)));
         card.setOnClickListener(v -> {
             WalletStorage.setSelectedAddress(getActivity(), wallet.address);
-            ((WalletWorkflowCoordinator.Host) getActivity()).toast("已切换到 " + name);
+            ((WalletWorkflowCoordinator.Host) getActivity()).toast(LocaleController.formatString(R.string.Web3WalletSwitchedTo, name));
             refresh();
         });
         return card;
