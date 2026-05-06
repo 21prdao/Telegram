@@ -104,7 +104,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         card.setBackground(Web3Ui.rounded(getActivity(), p.cardBg, 14));
         Web3Ui.setElevation(card, 0);
 
-        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.RED_PACKET, p.orange, p.dark ? 0x22111111 : 0x11F08C22, 40);
+        FrameLayout icon = Web3Ui.iconCircleDrawable(getActivity(), R.drawable.icon_wallet_3_1, p.dark ? 0x22111111 : 0x11F08C22, 40);
         card.addView(icon, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         LinearLayout copy = new LinearLayout(getActivity());
