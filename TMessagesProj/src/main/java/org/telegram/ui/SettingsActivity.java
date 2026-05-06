@@ -14,8 +14,12 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.database.Cursor;
 import android.content.SharedPreferences;
 import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageInfo;
@@ -36,9 +40,12 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.text.TextUtils;
+import android.util.Patterns;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -47,6 +54,7 @@ import android.webkit.CookieManager;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -181,6 +189,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     private View navigationBar;
 
     private int versionViewPressCount = 0;
+    private long pendingUpdateDownloadId = -1L;
+    private BroadcastReceiver updateDownloadReceiver;
+    private AlertDialog updateDownloadProgressDialog;
+    private Runnable updateDownloadProgressRunnable;
 
     public SettingsActivity() {
         this(null);
@@ -497,6 +509,16 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         getNotificationCenter().removeObserver(this, NotificationCenter.updateInterfaces);
         getNotificationCenter().removeObserver(this, NotificationCenter.starBalanceUpdated);
         getNotificationCenter().removeObserver(this, NotificationCenter.newSuggestionsAvailable);
+
+        if (updateDownloadReceiver != null) {
+            try {
+                ApplicationLoader.applicationContext.unregisterReceiver(updateDownloadReceiver);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            }
+            updateDownloadReceiver = null;
+        }
+        dismissUpdateDownloadProgressDialog();
     }
 
     @Override
@@ -860,8 +882,21 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                         if (getParentActivity() == null) {
                             return;
                         }
-                        if (hasUpdate && !TextUtils.isEmpty(updateUrl)) {
-                            Browser.openUrl(getParentActivity(), updateUrl);
+                        if (hasUpdate) {
+                            if (!TextUtils.isEmpty(updateUrl)) {
+                                if (enqueueAppUpdateDownload(updateUrl, latestVersion)) {
+                                    return;
+                                }
+                                Browser.openUrl(getParentActivity(), updateUrl);
+                                return;
+                            }
+                            java.util.regex.Matcher matcher = Patterns.WEB_URL.matcher(message == null ? "" : message);
+                            if (matcher.find()) {
+                                Browser.openUrl(getParentActivity(), matcher.group());
+                                return;
+                            }
+                            String updateMessage = !TextUtils.isEmpty(message) ? message : LocaleController.getString(R.string.AppUpdate);
+                            BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, updateMessage).show();
                             return;
                         }
                         BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.YourVersionIsLatest)).show();
@@ -877,6 +912,147 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 });
                 break;
             }
+        }
+    }
+
+    private boolean enqueueAppUpdateDownload(String updateUrl, String latestVersion) {
+        if (TextUtils.isEmpty(updateUrl) || getParentActivity() == null) {
+            return false;
+        }
+        try {
+            DownloadManager downloadManager = (DownloadManager) getParentActivity().getSystemService(Context.DOWNLOAD_SERVICE);
+            if (downloadManager == null) {
+                return false;
+            }
+            Uri uri = Uri.parse(updateUrl);
+            String fileName = uri.getLastPathSegment();
+            if (TextUtils.isEmpty(fileName) || !fileName.endsWith(".apk")) {
+                String safeVersion = TextUtils.isEmpty(latestVersion) ? "update" : latestVersion.replaceAll("[^a-zA-Z0-9._-]", "_");
+                fileName = "etzone_" + safeVersion + ".apk";
+            }
+            DownloadManager.Request request = new DownloadManager.Request(uri);
+            request.setMimeType("application/vnd.android.package-archive");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setTitle(LocaleController.getString(R.string.AppUpdate));
+            if (!TextUtils.isEmpty(latestVersion)) {
+                request.setDescription(latestVersion);
+            }
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            long downloadId = downloadManager.enqueue(request);
+            registerUpdateDownloadReceiver(downloadId);
+            showUpdateDownloadProgressDialog(downloadManager, downloadId);
+            return true;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
+        }
+    }
+
+    private void registerUpdateDownloadReceiver(long downloadId) {
+        pendingUpdateDownloadId = downloadId;
+        if (updateDownloadReceiver != null) {
+            return;
+        }
+        updateDownloadReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (!DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(intent.getAction())) {
+                    return;
+                }
+                long completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+                if (completedId != pendingUpdateDownloadId) {
+                    return;
+                }
+                pendingUpdateDownloadId = -1L;
+                dismissUpdateDownloadProgressDialog();
+                tryInstallDownloadedApk(completedId);
+            }
+        };
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ApplicationLoader.applicationContext.registerReceiver(updateDownloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            ApplicationLoader.applicationContext.registerReceiver(updateDownloadReceiver, filter);
+        }
+    }
+
+    private void tryInstallDownloadedApk(long downloadId) {
+        try {
+            DownloadManager downloadManager = (DownloadManager) ApplicationLoader.applicationContext.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (downloadManager == null) {
+                return;
+            }
+            Uri apkUri = downloadManager.getUriForDownloadedFile(downloadId);
+            if (apkUri == null) {
+                return;
+            }
+            Intent installIntent = new Intent(Intent.ACTION_VIEW);
+            installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            installIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            ApplicationLoader.applicationContext.startActivity(installIntent);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+    }
+
+    private void showUpdateDownloadProgressDialog(DownloadManager downloadManager, long downloadId) {
+        dismissUpdateDownloadProgressDialog();
+        Context context = getParentActivity();
+        if (context == null) {
+            return;
+        }
+        ProgressBar progressBar = new ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal);
+        progressBar.setMax(100);
+        progressBar.setProgress(0);
+        AlertDialog dialog = new AlertDialog.Builder(context)
+                .setTitle(LocaleController.getString(R.string.AppUpdate))
+                .setMessage(LocaleController.formatString(R.string.AppUpdateDownloading, 0))
+                .setView(progressBar)
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), (d, w) -> {
+                    try { downloadManager.remove(downloadId); } catch (Throwable ignore) {}
+                    dismissUpdateDownloadProgressDialog();
+                })
+                .create();
+        updateDownloadProgressDialog = dialog;
+        dialog.show();
+
+        updateDownloadProgressRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (updateDownloadProgressDialog == null || pendingUpdateDownloadId != downloadId) {
+                    return;
+                }
+                DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+                try (Cursor cursor = downloadManager.query(query)) {
+                    if (cursor != null && cursor.moveToFirst()) {
+                        int total = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                        int done = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                        int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                        int percent = total > 0 ? (int) (done * 100L / total) : 0;
+                        progressBar.setProgress(percent);
+                        updateDownloadProgressDialog.setMessage(LocaleController.formatString(R.string.AppUpdateDownloading, percent));
+                        if (status == DownloadManager.STATUS_FAILED || status == DownloadManager.STATUS_SUCCESSFUL) {
+                            return;
+                        }
+                    }
+                } catch (Throwable e) {
+                    FileLog.e(e);
+                    return;
+                }
+                AndroidUtilities.runOnUIThread(this, 500);
+            }
+        };
+        AndroidUtilities.runOnUIThread(updateDownloadProgressRunnable, 100);
+    }
+
+    private void dismissUpdateDownloadProgressDialog() {
+        if (updateDownloadProgressRunnable != null) {
+            AndroidUtilities.cancelRunOnUIThread(updateDownloadProgressRunnable);
+            updateDownloadProgressRunnable = null;
+        }
+        if (updateDownloadProgressDialog != null) {
+            updateDownloadProgressDialog.dismiss();
+            updateDownloadProgressDialog = null;
         }
     }
 

@@ -58,7 +58,7 @@ public class ServerApiManager {
                     throw new IllegalStateException("version data missing");
                 }
                 boolean hasUpdate = data.optBoolean("hasUpdate", false);
-                String updateUrl = data.optString("downloadUrl", "");
+                String updateUrl = firstNonEmpty(data, "downloadUrl", "updateUrl", "url", "apkUrl", "apkDownloadUrl", "download");
                 String latestVersion = data.optString("versionName", "");
                 String message = data.optString("message", "");
                 AndroidUtilities.runOnUIThread(() -> callback.onResult(hasUpdate, updateUrl, latestVersion, message));
@@ -67,6 +67,20 @@ public class ServerApiManager {
                 AndroidUtilities.runOnUIThread(() -> callback.onError(e.getMessage()));
             }
         });
+    }
+
+
+    private static String firstNonEmpty(JSONObject source, String... keys) {
+        if (source == null || keys == null) {
+            return "";
+        }
+        for (String key : keys) {
+            String value = source.optString(key, "");
+            if (!TextUtils.isEmpty(value)) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private static SharedConfig.ProxyInfo requestProxyInfo() throws Exception {
