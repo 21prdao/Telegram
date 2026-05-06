@@ -8,6 +8,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
+
 public class WalletListPageActivity extends Activity implements WalletWorkflowCoordinator.Host {
     private int containerId;
     private WalletWorkflowCoordinator coordinator;
@@ -16,7 +19,7 @@ public class WalletListPageActivity extends Activity implements WalletWorkflowCo
         super.onCreate(savedInstanceState);
         Web3Ui.applySystemBars(this);
         coordinator = new WalletWorkflowCoordinator(this, this);
-        setContentView(buildRoot("钱包列表 / 切换钱包"));
+        setContentView(buildRoot(LocaleController.getString(R.string.Web3WalletListSwitchTitle)));
         if (savedInstanceState == null) getFragmentManager().beginTransaction().replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page").commitAllowingStateLoss();
     }
     @Override protected void onResume() { super.onResume(); Web3Ui.applySystemBars(this); }

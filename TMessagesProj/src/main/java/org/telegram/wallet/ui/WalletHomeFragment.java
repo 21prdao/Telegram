@@ -21,6 +21,9 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
+
 import java.util.List;
 
 public class WalletHomeFragment extends Fragment implements WalletRefreshable {
@@ -49,7 +52,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout labelRow = new LinearLayout(getActivity());
         labelRow.setOrientation(LinearLayout.HORIZONTAL);
         labelRow.setGravity(Gravity.CENTER_VERTICAL);
-        labelRow.addView(Web3Ui.text(getActivity(), "总资产", 14, p.secondaryText, false));
+        labelRow.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletTotalAssets), 14, p.secondaryText, false));
         Web3IconView eye = new Web3IconView(getActivity(), Web3IconView.EYE, p.mutedText);
         LinearLayout.LayoutParams eyeLp = new LinearLayout.LayoutParams(dp(18), dp(18));
         eyeLp.leftMargin = dp(6);
@@ -70,29 +73,29 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout addressRow = new LinearLayout(getActivity());
         addressRow.setOrientation(LinearLayout.HORIZONTAL);
         addressRow.setGravity(Gravity.CENTER_VERTICAL);
-        walletAddressView = Web3Ui.text(getActivity(), "钱包地址：未创建", 14, p.secondaryText, false);
+        walletAddressView = Web3Ui.text(getActivity(), LocaleController.formatString(R.string.Web3WalletAddressLabel, LocaleController.getString(R.string.Web3WalletAddressNotCreated)), 14, p.secondaryText, false);
         addressRow.addView(walletAddressView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         addressRow.addView(new Web3IconView(getActivity(), Web3IconView.COPY, p.mutedText), new LinearLayout.LayoutParams(dp(20), dp(20)));
         addressRow.setOnClickListener(v -> copyAddress());
         assetCard.addView(addressRow, Web3Ui.topMargin(getActivity(), 8));
 
-        LinearLayout copyBtn = Web3Ui.actionButton(getActivity(), "复制地址", Web3IconView.COPY, true);
+        LinearLayout copyBtn = Web3Ui.actionButton(getActivity(), LocaleController.getString(R.string.Web3WalletCopyAddress), Web3IconView.COPY, true);
         copyBtn.setOnClickListener(v -> copyAddress());
         assetCard.addView(copyBtn, Web3Ui.topMargin(getActivity(), 12));
 
         LinearLayout walletOps = new LinearLayout(getActivity());
         walletOps.setOrientation(LinearLayout.HORIZONTAL);
         walletOps.setGravity(Gravity.CENTER);
-        walletOps.addView(createSecondaryAction("创建", Web3IconView.PLUS, v -> coordinator().showCreateWalletDialog(this::refresh)), weightLp(0, 4));
-        walletOps.addView(createSecondaryAction("导入", Web3IconView.IMPORT, v -> coordinator().showImportWalletDialog(this::refresh)), weightLp(4, 4));
-        walletOps.addView(createSecondaryAction("切换", Web3IconView.SWITCH, v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class))), weightLp(4, 0));
+        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletCreate), Web3IconView.PLUS, v -> coordinator().showCreateWalletDialog(this::refresh)), weightLp(0, 4));
+        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletImport), Web3IconView.IMPORT, v -> coordinator().showImportWalletDialog(this::refresh)), weightLp(4, 4));
+        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletSwitch), Web3IconView.SWITCH, v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class))), weightLp(4, 0));
         assetCard.addView(walletOps, Web3Ui.topMargin(getActivity(), 10));
 
         LinearLayout chainRow = new LinearLayout(getActivity());
         chainRow.setGravity(Gravity.CENTER_VERTICAL);
         chainRow.setOrientation(LinearLayout.HORIZONTAL);
         chainRow.addView(new Web3IconView(getActivity(), Web3IconView.CUBE, p.mutedText), new LinearLayout.LayoutParams(dp(20), dp(20)));
-        chainNameView = Web3Ui.text(getActivity(), "链：BNB Smart Chain", 13, p.mutedText, false);
+        chainNameView = Web3Ui.text(getActivity(), LocaleController.formatString(R.string.Web3WalletChainLabel, "BNB Smart Chain"), 13, p.mutedText, false);
         LinearLayout.LayoutParams chainLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         chainLp.leftMargin = dp(8);
         chainRow.addView(chainNameView, chainLp);
@@ -100,14 +103,14 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
 
         LinearLayout quickCard = Web3Ui.card(getActivity());
         root.addView(quickCard, Web3Ui.topMargin(getActivity(), 10));
-        quickCard.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.LIGHTNING, "快捷操作"), Web3Ui.matchWrap());
-        LinearLayout addTokenBtn = Web3Ui.actionButton(getActivity(), "添加代币", Web3IconView.PLUS, false);
+        quickCard.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.LIGHTNING, LocaleController.getString(R.string.Web3WalletQuickActions)), Web3Ui.matchWrap());
+        LinearLayout addTokenBtn = Web3Ui.actionButton(getActivity(), LocaleController.getString(R.string.Web3WalletAddToken), Web3IconView.PLUS, false);
         addTokenBtn.setOnClickListener(v -> openAddTokenPage());
         quickCard.addView(addTokenBtn, Web3Ui.topMargin(getActivity(), 10));
 
         LinearLayout tokenCard = Web3Ui.card(getActivity());
         root.addView(tokenCard, Web3Ui.topMargin(getActivity(), 10));
-        tokenCard.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.COINS, "Token 列表"), Web3Ui.matchWrap());
+        tokenCard.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.COINS, LocaleController.getString(R.string.Web3WalletTokenList)), Web3Ui.matchWrap());
         tokenListContainer = new LinearLayout(getActivity());
         tokenListContainer.setOrientation(LinearLayout.VERTICAL);
         tokenCard.addView(tokenListContainer, Web3Ui.topMargin(getActivity(), 8));
@@ -120,9 +123,9 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         coordinator().loadBalances((selectedAddress, totalAsset, chainName, tokenLines) -> {
             currentAddress = selectedAddress;
             currentChainName = TextUtils.isEmpty(chainName) ? "BNB Smart Chain" : chainName;
-            walletAddressView.setText(TextUtils.isEmpty(selectedAddress) ? "钱包地址：未创建" : "钱包地址：" + WalletWorkflowCoordinator.shortAddress(selectedAddress));
+            walletAddressView.setText(LocaleController.formatString(R.string.Web3WalletAddressLabel, TextUtils.isEmpty(selectedAddress) ? LocaleController.getString(R.string.Web3WalletAddressNotCreated) : WalletWorkflowCoordinator.shortAddress(selectedAddress)));
             applyTotalAsset(totalAsset);
-            chainNameView.setText("链：" + currentChainName);
+            chainNameView.setText(LocaleController.formatString(R.string.Web3WalletChainLabel, currentChainName));
             renderTokenLines(tokenLines);
         });
     }
@@ -131,7 +134,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         if (tokenListContainer == null) return;
         tokenListContainer.removeAllViews();
         if (tokenLines == null || tokenLines.isEmpty()) {
-            tokenListContainer.addView(Web3Ui.text(getActivity(), "暂无 Token，点击“添加代币”开始", 14, Web3Ui.palette().secondaryText, false), Web3Ui.matchWrap());
+            tokenListContainer.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletNoTokenHint), 14, Web3Ui.palette().secondaryText, false), Web3Ui.matchWrap());
             return;
         }
         for (String line : tokenLines) tokenListContainer.addView(createTokenRow(line), Web3Ui.topMargin(getActivity(), 6));
@@ -214,7 +217,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         ClipboardManager clipboard = (ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
             clipboard.setPrimaryClip(ClipData.newPlainText("wallet", currentAddress));
-            ((WalletWorkflowCoordinator.Host) getActivity()).toast("地址已复制");
+            ((WalletWorkflowCoordinator.Host) getActivity()).toast(LocaleController.getString(R.string.Web3WalletAddressCopied));
         }
     }
 

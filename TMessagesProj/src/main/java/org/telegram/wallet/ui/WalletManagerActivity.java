@@ -12,6 +12,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
+
 public class WalletManagerActivity extends Activity implements WalletWorkflowCoordinator.Host {
 
     private static final String TAG_HOME = "wallet_home";
@@ -69,7 +72,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         back.setOnClickListener(v -> finish());
         bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(56)));
 
-        TextView title = Web3Ui.text(this, "Web3 Wallet Pro", 19, p.primaryText, true);
+        TextView title = Web3Ui.text(this, LocaleController.getString(R.string.Web3WalletProTitle), 19, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -95,10 +98,10 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         dock.setPadding(dp(4), dp(2), dp(4), dp(2));
         dock.setBackgroundColor(p.pageBg);
 
-        homeTab = createTab(Web3IconView.WALLET, "资产");
-        sendTab = createTab(Web3IconView.SEND, "转账");
-        securityTab = createTab(Web3IconView.SHIELD, "安全");
-        manageTab = createTab(Web3IconView.MANAGE, "管理");
+        homeTab = createTab(Web3IconView.WALLET, LocaleController.getString(R.string.Web3WalletTabAssets));
+        sendTab = createTab(Web3IconView.SEND, LocaleController.getString(R.string.Web3WalletTabTransfer));
+        securityTab = createTab(Web3IconView.SHIELD, LocaleController.getString(R.string.Web3WalletTabSecurity));
+        manageTab = createTab(Web3IconView.MANAGE, LocaleController.getString(R.string.Web3WalletTabManage));
         homeTab.setOnClickListener(v -> switchTo(TAG_HOME));
         sendTab.setOnClickListener(v -> switchTo(TAG_SEND));
         securityTab.setOnClickListener(v -> switchTo(TAG_SECURITY));
@@ -146,7 +149,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     }
 
     private void showDeveloperInfoDialog() {
-        coordinator.checkConnectivity(status -> new android.app.AlertDialog.Builder(this).setTitle("开发者信息").setMessage(status).setPositiveButton("确定", null).show());
+        coordinator.checkConnectivity(status -> new android.app.AlertDialog.Builder(this).setTitle(LocaleController.getString(R.string.Web3WalletDeveloperInfo)).setMessage(status).setPositiveButton(LocaleController.getString(R.string.OK), null).show());
     }
 
     private void switchTo(String tag) {
