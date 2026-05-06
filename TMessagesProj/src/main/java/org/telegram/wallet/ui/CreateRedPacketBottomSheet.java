@@ -436,7 +436,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 .setTitle("支付验证")
                 .setMessage("请输入支付密码后继续")
                 .setView(inputContainer)
-                .setPositiveButton("确认", (dialogInterface, which) -> {
+                .setPositiveButton(getString(R.string.OK), (dialogInterface, which) -> {
                     String pwd = trim(pwdInput.getText() == null ? null : pwdInput.getText().toString());
                     if (!WalletStorage.verifyPaymentPassword(context, pwd)) {
                         showError("支付密码错误");
@@ -450,7 +450,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
             int bgColor = getThemedColor(Theme.key_dialogBackground);
             int textColor = getThemedColor(Theme.key_dialogTextBlack);
             int hintColor = getThemedColor(Theme.key_dialogTextHint);
-            int accentColor = getThemedColor(Theme.key_featuredStickers_buttonText);
+            int accentColor = getThemedColor(Theme.key_dialogButton);
             int inputBgColor = Theme.blendOver(bgColor, adjustAlpha(0xFF000000, Theme.isCurrentThemeDark() ? 0.18f : 0.06f));
             int inputStrokeColor = Theme.blendOver(bgColor, adjustAlpha(0xFFFFFFFF, Theme.isCurrentThemeDark() ? 0.12f : 0.18f));
 
