@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +28,19 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private LinearLayout sendTab;
     private LinearLayout securityTab;
     private LinearLayout manageTab;
+
+    private static final int[] TAB_ICON_SELECTED = {
+            R.drawable.icon_wallet_6_1,
+            R.drawable.icon_wallet_1_1,
+            R.drawable.icon_wallet_4_1,
+            R.drawable.icon_wallet_2_1
+    };
+    private static final int[] TAB_ICON_UNSELECTED = {
+            R.drawable.icon_wallet_6_2,
+            R.drawable.icon_wallet_1_2,
+            R.drawable.icon_wallet_4_2,
+            R.drawable.icon_wallet_2_2
+    };
     private WalletWorkflowCoordinator coordinator;
 
     @Override
@@ -98,10 +112,10 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         dock.setPadding(dp(4), dp(2), dp(4), dp(2));
         dock.setBackgroundColor(p.pageBg);
 
-        homeTab = createTab(Web3IconView.WALLET, LocaleController.getString(R.string.Web3WalletTabAssets));
-        sendTab = createTab(Web3IconView.SEND, LocaleController.getString(R.string.Web3WalletTabTransfer));
-        securityTab = createTab(Web3IconView.SHIELD, LocaleController.getString(R.string.Web3WalletTabSecurity));
-        manageTab = createTab(Web3IconView.MANAGE, LocaleController.getString(R.string.Web3WalletTabManage));
+        homeTab = createTab(TAB_ICON_SELECTED[0], LocaleController.getString(R.string.Web3WalletTabAssets));
+        sendTab = createTab(TAB_ICON_SELECTED[1], LocaleController.getString(R.string.Web3WalletTabTransfer));
+        securityTab = createTab(TAB_ICON_SELECTED[2], LocaleController.getString(R.string.Web3WalletTabSecurity));
+        manageTab = createTab(TAB_ICON_SELECTED[3], LocaleController.getString(R.string.Web3WalletTabManage));
         homeTab.setOnClickListener(v -> switchTo(TAG_HOME));
         sendTab.setOnClickListener(v -> switchTo(TAG_SEND));
         securityTab.setOnClickListener(v -> switchTo(TAG_SECURITY));
@@ -116,7 +130,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         return wrap;
     }
 
-    private LinearLayout createTab(int icon, String text) {
+    private LinearLayout createTab(int iconRes, String text) {
         Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout tab = new LinearLayout(this);
         tab.setOrientation(LinearLayout.VERTICAL);
@@ -124,7 +138,9 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         tab.setPadding(0, dp(2), 0, dp(2));
         tab.setBackgroundColor(0x00000000);
 
-        Web3IconView iconView = new Web3IconView(this, icon, p.mutedText);
+        ImageView iconView = new ImageView(this);
+        iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        iconView.setImageResource(iconRes);
         tab.addView(iconView, new LinearLayout.LayoutParams(dp(20), dp(20)));
 
         TextView tv = Web3Ui.text(this, text, 11, p.mutedText, true);
@@ -144,7 +160,10 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         Web3Ui.Palette p = Web3Ui.palette();
         int color = active ? p.orange : p.mutedText;
         tab.setBackgroundColor(0x00000000);
-        if (tab.getChildAt(0) instanceof Web3IconView) ((Web3IconView) tab.getChildAt(0)).setIconColor(color);
+        int index = tab == homeTab ? 0 : tab == sendTab ? 1 : tab == securityTab ? 2 : 3;
+        if (tab.getChildAt(0) instanceof ImageView) {
+            ((ImageView) tab.getChildAt(0)).setImageResource(active ? TAB_ICON_SELECTED[index] : TAB_ICON_UNSELECTED[index]);
+        }
         if (tab.getChildAt(1) instanceof TextView) ((TextView) tab.getChildAt(1)).setTextColor(color);
     }
 
