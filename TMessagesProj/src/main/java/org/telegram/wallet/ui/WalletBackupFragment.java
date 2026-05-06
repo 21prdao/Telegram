@@ -14,6 +14,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.telegram.messenger.R;
 import org.telegram.wallet.data.WalletStorage;
 
 public class WalletBackupFragment extends Fragment implements WalletRefreshable {
@@ -35,7 +36,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         LinearLayout head = new LinearLayout(getActivity());
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.SHIELD, p.orange, p.dark ? 0x24F08C22 : 0xFFFFF2DF, 42);
+        FrameLayout icon = Web3Ui.iconCircleDrawable(getActivity(), R.drawable.icon_wallet_4_1, p.dark ? 0x24F08C22 : 0xFFFFF2DF, 42);
         head.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(42)));
         TextView title = Web3Ui.text(getActivity(), "安全中心", 20, p.primaryText, true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -50,7 +51,7 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         TextView hint = Web3Ui.text(getActivity(), "建议：定期离线备份私钥，不要截图，不要上传网盘。", 14, p.secondaryText, false);
         hint.setLineSpacing(dp(2), 1.0f);
         card.addView(hint, Web3Ui.topMargin(getActivity(), 12));
-        LinearLayout walletRow = infoRow(Web3IconView.WALLET, "当前钱包：");
+        LinearLayout walletRow = infoRowDrawable(R.drawable.icon_wallet_6_1, "当前钱包：");
         selectedWalletView = (TextView) walletRow.getChildAt(1);
         card.addView(walletRow, Web3Ui.topMargin(getActivity(), 12));
         LinearLayout passwordRow = infoRow(Web3IconView.LOCK, "支付密码：");
@@ -66,6 +67,23 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         return scroll;
     }
 
+    private LinearLayout infoRowDrawable(int drawableRes, String prefix) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        LinearLayout row = new LinearLayout(getActivity());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.ImageView icon = new android.widget.ImageView(getActivity());
+        icon.setImageResource(drawableRes);
+        icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        row.addView(icon, new LinearLayout.LayoutParams(dp(20), dp(20)));
+        TextView tv = Web3Ui.text(getActivity(), prefix, 14, p.primaryText, false);
+        LinearLayout.LayoutParams tvLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tvLp.leftMargin = dp(10);
+        row.addView(tv, tvLp);
+        return row;
+    }
+
+
     private LinearLayout infoRow(int iconType, String prefix) {
         Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout row = new LinearLayout(getActivity());
@@ -78,7 +96,6 @@ public class WalletBackupFragment extends Fragment implements WalletRefreshable 
         row.addView(tv, tvLp);
         return row;
     }
-
     private void showPrivateKey() {
         String key = WalletStorage.getSelectedPrivateKey(getActivity());
         if (key == null) { ((WalletWorkflowCoordinator.Host) getActivity()).toast("请先创建或导入钱包"); return; }
