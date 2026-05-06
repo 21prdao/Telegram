@@ -15,6 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.telegram.messenger.R;
 import org.telegram.wallet.data.WalletStorage;
 
 public class SendTokenFragment extends Fragment implements WalletRefreshable {
@@ -38,7 +39,7 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
         LinearLayout head = new LinearLayout(getActivity());
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.SEND, p.orange, p.dark ? 0x24F08C22 : 0xFFFFF2DF, 38);
+        FrameLayout icon = Web3Ui.iconCircleDrawable(getActivity(), R.drawable.icon_wallet_1_1, p.dark ? 0x24F08C22 : 0xFFFFF2DF, 38);
         head.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
         TextView title = Web3Ui.text(getActivity(), "转账", 20, p.primaryText, true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -54,7 +55,7 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
         amountEdit = createInput("例如 0.01");
         amountEdit.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         card.addView(amountEdit, Web3Ui.topMargin(getActivity(), 8));
-        LinearLayout submitButton = Web3Ui.actionButton(getActivity(), "预览并提交", Web3IconView.SEND, true);
+        LinearLayout submitButton = Web3Ui.actionButtonDrawable(getActivity(), "预览并提交", R.drawable.icon_wallet_1_3, true);
         submitButton.setOnClickListener(v -> onSubmit());
         card.addView(submitButton, Web3Ui.topMargin(getActivity(), 16));
         refresh();

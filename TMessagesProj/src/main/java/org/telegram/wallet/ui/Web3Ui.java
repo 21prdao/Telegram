@@ -12,6 +12,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -216,6 +217,40 @@ public final class Web3Ui {
         FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(context, sizeDp * 0.56f), dp(context, sizeDp * 0.56f), Gravity.CENTER);
         box.addView(iconView, iconLp);
         return box;
+    }
+
+    public static FrameLayout iconCircleDrawable(Context context, int drawableRes, int bgColor, int sizeDp) {
+        FrameLayout box = new FrameLayout(context);
+        box.setBackground(rounded(context, bgColor, sizeDp / 2f));
+        ImageView iconView = new ImageView(context);
+        iconView.setImageResource(drawableRes);
+        iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(context, sizeDp * 0.56f), dp(context, sizeDp * 0.56f), Gravity.CENTER);
+        box.addView(iconView, iconLp);
+        return box;
+    }
+
+    public static LinearLayout actionButtonDrawable(Context context, String label, int drawableRes, boolean primary) {
+        Palette p = palette();
+        LinearLayout button = new LinearLayout(context);
+        button.setOrientation(LinearLayout.HORIZONTAL);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(context, 12), 0, dp(context, 12), 0);
+        button.setMinimumHeight(dp(context, primary ? 50 : 46));
+        button.setBackground(primary ? orangeGradient(context, 12) : rounded(context, p.softCardBg, 12));
+        if (drawableRes != 0) {
+            ImageView iconView = new ImageView(context);
+            iconView.setImageResource(drawableRes);
+            iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(context, 18), dp(context, 18));
+            iconLp.rightMargin = dp(context, 8);
+            button.addView(iconView, iconLp);
+        }
+        TextView tv = text(context, label, 15, primary ? Color.WHITE : p.primaryText, true);
+        tv.setGravity(Gravity.CENTER);
+        button.addView(tv, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        setElevation(button, 0);
+        return button;
     }
 
     public static LinearLayout actionButton(Context context, String label, int icon, boolean primary) {

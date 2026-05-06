@@ -110,7 +110,9 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
 
         LinearLayout tokenCard = Web3Ui.card(getActivity());
         root.addView(tokenCard, Web3Ui.topMargin(getActivity(), 10));
-        tokenCard.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.COINS, LocaleController.getString(R.string.Web3WalletTokenList)), Web3Ui.matchWrap());
+        tokenCard.addView(Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.Web3WalletTokenList)), Web3Ui.matchWrap());
+        FrameLayout tokenHeaderIcon = Web3Ui.iconCircleDrawable(getActivity(), R.drawable.icon_wallet_5_1, p.dark ? 0x22111111 : 0x11F08C22, 36);
+        ((LinearLayout) tokenCard.getChildAt(0)).addView(tokenHeaderIcon, 0);
         tokenListContainer = new LinearLayout(getActivity());
         tokenListContainer.setOrientation(LinearLayout.VERTICAL);
         tokenCard.addView(tokenListContainer, Web3Ui.topMargin(getActivity(), 8));
