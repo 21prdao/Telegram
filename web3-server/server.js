@@ -39,6 +39,14 @@ const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || '';
 const APP_VERSION_MESSAGE = process.env.APP_VERSION_MESSAGE || '';
 const APP_RELEASE_DATE = Number(process.env.APP_RELEASE_DATE || 0);
 const APP_APK_SIZE_BYTES = Number(process.env.APP_APK_SIZE_BYTES || 0);
+const DEFAULT_WALLET_TOKENS = [
+  { symbol: 'ETZ', contractAddress: '0xc78dabf21594c76ad98a0b3ed103fcfcd9499999', decimals: 18 },
+  { symbol: 'Piao', contractAddress: '0x68973e906a64b283ac90eb88cd561ba6c6681103', decimals: 18 },
+  { symbol: 'Tea', contractAddress: '0x3142Db225d0262973715606c85B2B50a66f9b00C', decimals: 18 },
+  { symbol: 'Dimei', contractAddress: '0xb299d5bdf3c17d14aafb305f97b16c5aa0999921', decimals: 18 },
+  { symbol: 'Mu', contractAddress: '0x7677421f49776addcfc18cb851df0c24d02d8888', decimals: 18 },
+  { symbol: 'Goods', contractAddress: '0x80B75C9c6773D255c32ADA8E971c0C4ba03088d0', decimals: 18 },
+];
 
 const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
@@ -1254,6 +1262,10 @@ app.get('/healthz', async (_, res) => {
     dbOk,
     ts: nowSeconds(),
   });
+});
+
+app.get('/api/v1/wallet/default-tokens', (_req, res) => {
+  return res.json({ ok: true, data: { tokens: DEFAULT_WALLET_TOKENS } });
 });
 
 function adminAsync(handler) {

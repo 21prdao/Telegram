@@ -158,6 +158,38 @@ public final class WalletStorage {
         return favorites;
     }
 
+
+    public static List<TokenAsset> mergeTokens(List<TokenAsset> defaults, List<TokenAsset> customTokens) {
+        List<TokenAsset> merged = new ArrayList<>();
+        if (defaults != null) {
+            for (TokenAsset token : defaults) {
+                addUniqueToken(merged, token);
+            }
+        }
+        if (customTokens != null) {
+            for (TokenAsset token : customTokens) {
+                addUniqueToken(merged, token);
+            }
+        }
+        return merged;
+    }
+
+    private static void addUniqueToken(List<TokenAsset> result, TokenAsset source) {
+        if (source == null || TextUtils.isEmpty(source.contractAddress)) {
+            return;
+        }
+        for (TokenAsset existing : result) {
+            if (source.contractAddress.equalsIgnoreCase(existing.contractAddress)) {
+                return;
+            }
+        }
+        TokenAsset token = new TokenAsset();
+        token.symbol = TextUtils.isEmpty(source.symbol) ? "TOKEN" : source.symbol;
+        token.contractAddress = source.contractAddress;
+        token.decimals = source.decimals > 0 ? source.decimals : 18;
+        token.favorite = source.favorite;
+        result.add(token);
+    }
     public static void addOrUpdateCustomToken(Context context, String symbol, String contractAddress, int decimals, boolean favorite) {
         if (TextUtils.isEmpty(symbol) || TextUtils.isEmpty(contractAddress)) {
             return;
@@ -183,6 +215,7 @@ public final class WalletStorage {
         }
         persistTokens(context, all);
     }
+
 
     private static String generatePrivateKeyHex() {
         BigInteger curveN = Sign.CURVE_PARAMS.getN();

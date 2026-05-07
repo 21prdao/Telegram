@@ -17,6 +17,7 @@ import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
 import org.telegram.wallet.model.RedPacketSendRecord;
 import org.telegram.wallet.model.RedPacketSendRecordDetail;
 import org.telegram.wallet.model.RedPacketRefundRecord;
+import org.telegram.wallet.model.TokenAsset;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -208,6 +209,31 @@ public class RedPacketRepository {
         );
 
         return response;
+    }
+
+
+    public List<TokenAsset> getDefaultTokens() throws Exception {
+        JSONObject root = requestJson("GET", "/wallet/default-tokens", null);
+        JSONObject data = unwrapData(root);
+        JSONArray list = data != null ? data.optJSONArray("tokens") : null;
+        List<TokenAsset> result = new ArrayList<>();
+        if (list == null) {
+            return result;
+        }
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject item = list.optJSONObject(i);
+            if (item == null) continue;
+            TokenAsset token = new TokenAsset();
+            token.symbol = firstNonEmpty(optString(item, "symbol", "tokenSymbol"), "TOKEN");
+            token.contractAddress = firstNonEmpty(optString(item, "contractAddress", "tokenAddress"), "");
+            token.decimals = optInt(item, "decimals", "tokenDecimals");
+            if (token.decimals <= 0) token.decimals = 18;
+            token.favorite = true;
+            if (!TextUtils.isEmpty(token.contractAddress)) {
+                result.add(token);
+            }
+        }
+        return result;
     }
 
     public CreateRedPacketPrepareResponse prepareCreate(

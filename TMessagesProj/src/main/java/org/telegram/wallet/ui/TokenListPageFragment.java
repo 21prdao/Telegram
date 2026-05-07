@@ -120,17 +120,39 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     }
 
     private void renderTokens() {
-        List<TokenAsset> tokens = WalletStorage.getTokens(getActivity());
-        if (tokens.isEmpty()) {
-            TextView empty = Web3Ui.text(getActivity(), "暂无自定义代币", 15, Web3Ui.palette().secondaryText, false);
+        List<TokenAsset> localTokens = WalletStorage.getTokens(getActivity());
+        if (localTokens.isEmpty()) {
+            TextView empty = Web3Ui.text(getActivity(), "暂无代币", 15, Web3Ui.palette().secondaryText, false);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(0, dp(28), 0, 0);
             listContainer.addView(empty, Web3Ui.matchWrap());
-            return;
         }
-        for (TokenAsset token : tokens) {
+        for (TokenAsset token : localTokens) {
             listContainer.addView(createTokenCard(token), Web3Ui.topMargin(getActivity(), 8));
         }
+        new Thread(() -> {
+            try {
+                List<TokenAsset> defaults = RedPacketRepository.getInstance().getDefaultTokens();
+                List<TokenAsset> merged = WalletStorage.mergeTokens(defaults, localTokens);
+                if (getActivity() == null) {
+                    return;
+                }
+                getActivity().runOnUiThread(() -> {
+                    listContainer.removeAllViews();
+                    if (merged.isEmpty()) {
+                        TextView empty = Web3Ui.text(getActivity(), "暂无代币", 15, Web3Ui.palette().secondaryText, false);
+                        empty.setGravity(Gravity.CENTER);
+                        empty.setPadding(0, dp(28), 0, 0);
+                        listContainer.addView(empty, Web3Ui.matchWrap());
+                        return;
+                    }
+                    for (TokenAsset token : merged) {
+                        listContainer.addView(createTokenCard(token), Web3Ui.topMargin(getActivity(), 8));
+                    }
+                });
+            } catch (Throwable ignore) {
+            }
+        }, "wallet-token-list").start();
     }
 
     private LinearLayout createTokenCard(TokenAsset token) {
