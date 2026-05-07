@@ -10653,7 +10653,6 @@ After setup, you can continue sending red packets.</string>
     <string name="Web3WalletTabTransfer">Transfer</string>
     <string name="Web3WalletTabSecurity">Security</string>
     <string name="Web3WalletTabManage">Manage</string>
-<string name="WalletManageTitle">Wallet Management</string>
     <string name="BotVerifyUserTitle">Verify User</string>
     <string name="BotVerifyBotTitle">Verify Bot</string>
     <string name="BotVerifyChannelTitle">Verify Channel</string>
