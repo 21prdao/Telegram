@@ -19,25 +19,21 @@ import org.telegram.messenger.R;
 public class WalletManagerActivity extends Activity implements WalletWorkflowCoordinator.Host {
 
     private static final String TAG_HOME = "wallet_home";
-    private static final String TAG_SEND = "wallet_send";
     private static final String TAG_SECURITY = "wallet_security";
     private static final String TAG_MANAGE = "wallet_manage";
 
     private int containerId;
     private LinearLayout homeTab;
-    private LinearLayout sendTab;
     private LinearLayout securityTab;
     private LinearLayout manageTab;
 
     private static final int[] TAB_ICON_SELECTED = {
             R.drawable.icon_wallet_6_1,
-            R.drawable.icon_wallet_1_1,
             R.drawable.icon_wallet_4_1,
             R.drawable.icon_wallet_2_1
     };
     private static final int[] TAB_ICON_UNSELECTED = {
-            R.drawable.icon_wallet_6_2,
-            R.drawable.icon_wallet_1_2,
+            R.drawable.icon_wallet_6_3,
             R.drawable.icon_wallet_4_2,
             R.drawable.icon_wallet_2_2
     };
@@ -91,9 +87,8 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         title.setTypeface(Typeface.DEFAULT_BOLD);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        FrameLayout settings = Web3Ui.iconButton(this, Web3IconView.SETTINGS);
-        settings.setOnClickListener(v -> showDeveloperInfoDialog());
-        bar.addView(settings, new LinearLayout.LayoutParams(dp(44), dp(56)));
+        View spacer = new View(this);
+        bar.addView(spacer, new LinearLayout.LayoutParams(dp(44), dp(56)));
         return bar;
     }
 
@@ -113,15 +108,12 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         dock.setBackgroundColor(p.pageBg);
 
         homeTab = createTab(TAB_ICON_SELECTED[0], LocaleController.getString(R.string.Web3WalletTabAssets));
-        sendTab = createTab(TAB_ICON_SELECTED[1], LocaleController.getString(R.string.Web3WalletTabTransfer));
-        securityTab = createTab(TAB_ICON_SELECTED[2], LocaleController.getString(R.string.Web3WalletTabSecurity));
-        manageTab = createTab(TAB_ICON_SELECTED[3], LocaleController.getString(R.string.Web3WalletTabManage));
+        securityTab = createTab(TAB_ICON_SELECTED[1], LocaleController.getString(R.string.Web3WalletTabSecurity));
+        manageTab = createTab(TAB_ICON_SELECTED[2], LocaleController.getString(R.string.Web3WalletTabManage));
         homeTab.setOnClickListener(v -> switchTo(TAG_HOME));
-        sendTab.setOnClickListener(v -> switchTo(TAG_SEND));
         securityTab.setOnClickListener(v -> switchTo(TAG_SECURITY));
         manageTab.setOnClickListener(v -> switchTo(TAG_MANAGE));
         dock.addView(homeTab, tabLp());
-        dock.addView(sendTab, tabLp());
         dock.addView(securityTab, tabLp());
         dock.addView(manageTab, tabLp());
         FrameLayout.LayoutParams dockLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.BOTTOM);
@@ -160,7 +152,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         Web3Ui.Palette p = Web3Ui.palette();
         int color = active ? p.orange : p.mutedText;
         tab.setBackgroundColor(0x00000000);
-        int index = tab == homeTab ? 0 : tab == sendTab ? 1 : tab == securityTab ? 2 : 3;
+        int index = tab == homeTab ? 0 : tab == securityTab ? 1 : 2;
         if (tab.getChildAt(0) instanceof ImageView) {
             ((ImageView) tab.getChildAt(0)).setImageResource(active ? TAB_ICON_SELECTED[index] : TAB_ICON_UNSELECTED[index]);
         }
@@ -181,7 +173,6 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         FragmentManager fm = getFragmentManager();
         Fragment existing = fm.findFragmentByTag(tag);
         if (existing != null) return existing;
-        if (TAG_SEND.equals(tag)) return SendTokenFragment.newInstance();
         if (TAG_SECURITY.equals(tag)) return WalletBackupFragment.newInstance();
         if (TAG_MANAGE.equals(tag)) return WalletManageFragment.newInstance();
         return WalletHomeFragment.newInstance();
@@ -189,7 +180,6 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
     private void updateTabState(String currentTag) {
         setTabActive(homeTab, TAG_HOME.equals(currentTag));
-        setTabActive(sendTab, TAG_SEND.equals(currentTag));
         setTabActive(securityTab, TAG_SECURITY.equals(currentTag));
         setTabActive(manageTab, TAG_MANAGE.equals(currentTag));
     }

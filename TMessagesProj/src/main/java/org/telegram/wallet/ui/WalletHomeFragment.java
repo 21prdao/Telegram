@@ -49,15 +49,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout assetCard = Web3Ui.card(getActivity());
         root.addView(assetCard, Web3Ui.matchWrap());
 
-        LinearLayout labelRow = new LinearLayout(getActivity());
-        labelRow.setOrientation(LinearLayout.HORIZONTAL);
-        labelRow.setGravity(Gravity.CENTER_VERTICAL);
-        labelRow.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletTotalAssets), 14, p.secondaryText, false));
-        Web3IconView eye = new Web3IconView(getActivity(), Web3IconView.EYE, p.mutedText);
-        LinearLayout.LayoutParams eyeLp = new LinearLayout.LayoutParams(dp(18), dp(18));
-        eyeLp.leftMargin = dp(6);
-        labelRow.addView(eye, eyeLp);
-        assetCard.addView(labelRow, Web3Ui.matchWrap());
+        assetCard.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletTotalAssets), 14, p.secondaryText, false), Web3Ui.matchWrap());
 
         LinearLayout heroRow = new LinearLayout(getActivity());
         heroRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -86,9 +78,9 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout walletOps = new LinearLayout(getActivity());
         walletOps.setOrientation(LinearLayout.HORIZONTAL);
         walletOps.setGravity(Gravity.CENTER);
-        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletCreate), Web3IconView.PLUS, v -> coordinator().showCreateWalletDialog(this::refresh)), weightLp(0, 4));
-        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletImport), Web3IconView.IMPORT, v -> coordinator().showImportWalletDialog(this::refresh)), weightLp(4, 4));
-        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletSwitch), Web3IconView.SWITCH, v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class))), weightLp(4, 0));
+        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletCreate), 0, v -> coordinator().showCreateWalletDialog(this::refresh)), weightLp(0, 4));
+        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletImport), 0, v -> coordinator().showImportWalletDialog(this::refresh)), weightLp(4, 4));
+        walletOps.addView(createSecondaryAction(LocaleController.getString(R.string.Web3WalletSwitch), 0, v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class))), weightLp(4, 0));
         assetCard.addView(walletOps, Web3Ui.topMargin(getActivity(), 10));
 
         LinearLayout chainRow = new LinearLayout(getActivity());
@@ -101,18 +93,15 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         chainRow.addView(chainNameView, chainLp);
         assetCard.addView(chainRow, Web3Ui.topMargin(getActivity(), 10));
 
-        LinearLayout quickCard = Web3Ui.card(getActivity());
-        root.addView(quickCard, Web3Ui.topMargin(getActivity(), 10));
-        quickCard.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.LIGHTNING, LocaleController.getString(R.string.Web3WalletQuickActions)), Web3Ui.matchWrap());
-        LinearLayout addTokenBtn = Web3Ui.actionButton(getActivity(), LocaleController.getString(R.string.Web3WalletAddToken), Web3IconView.PLUS, false);
-        addTokenBtn.setOnClickListener(v -> openAddTokenPage());
-        quickCard.addView(addTokenBtn, Web3Ui.topMargin(getActivity(), 10));
-
         LinearLayout tokenCard = Web3Ui.card(getActivity());
         root.addView(tokenCard, Web3Ui.topMargin(getActivity(), 10));
-        tokenCard.addView(Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.Web3WalletTokenList)), Web3Ui.matchWrap());
+        LinearLayout tokenHeader = Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.Web3WalletTokenList));
         FrameLayout tokenHeaderIcon = Web3Ui.iconCircleDrawable(getActivity(), R.drawable.icon_wallet_5_1, p.dark ? 0x22111111 : 0x11F08C22, 36);
-        ((LinearLayout) tokenCard.getChildAt(0)).addView(tokenHeaderIcon, 0);
+        tokenHeader.addView(tokenHeaderIcon, 0);
+        FrameLayout addTokenIconBtn = Web3Ui.iconCircle(getActivity(), Web3IconView.PLUS, p.orange, p.dark ? 0x182F3A4A : 0xFFEFF3F8, 30);
+        addTokenIconBtn.setOnClickListener(v -> openAddTokenPage());
+        tokenHeader.addView(addTokenIconBtn);
+        tokenCard.addView(tokenHeader, Web3Ui.matchWrap());
         tokenListContainer = new LinearLayout(getActivity());
         tokenListContainer.setOrientation(LinearLayout.VERTICAL);
         tokenCard.addView(tokenListContainer, Web3Ui.topMargin(getActivity(), 8));
@@ -183,9 +172,6 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         usd.setGravity(Gravity.RIGHT);
         right.addView(usd);
         row.addView(right);
-        LinearLayout.LayoutParams chevronLp = new LinearLayout.LayoutParams(dp(18), dp(18));
-        chevronLp.leftMargin = dp(8);
-        row.addView(new Web3IconView(getActivity(), Web3IconView.CHEVRON, p.mutedText), chevronLp);
         return row;
     }
 

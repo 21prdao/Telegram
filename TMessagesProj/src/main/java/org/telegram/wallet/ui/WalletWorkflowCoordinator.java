@@ -14,6 +14,7 @@ import org.telegram.wallet.config.WalletConfig;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.model.WalletAccount;
+import org.telegram.wallet.redpacket.RedPacketRepository;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.utils.Convert;
 
@@ -161,8 +162,13 @@ public class WalletWorkflowCoordinator {
                 );
                 java.util.ArrayList<String> tokenLines = new java.util.ArrayList<>();
                 Bep20Service bep20Service = new Bep20Service();
+                List<TokenAsset> mergedTokens = tokens;
+                try {
+                    mergedTokens = WalletStorage.mergeTokens(RedPacketRepository.getInstance().getDefaultTokens(), tokens);
+                } catch (Throwable ignore) {
+                }
                 tokenLines.add("BNB: " + bnb.toPlainString());
-                for (TokenAsset token : tokens) {
+                for (TokenAsset token : mergedTokens) {
                     String bal = bep20Service.getBalance(selected, token.contractAddress, token.decimals);
                     tokenLines.add(token.symbol + ": " + bal + "  (" + shortAddress(token.contractAddress) + ")");
                 }
