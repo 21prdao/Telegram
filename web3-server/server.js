@@ -412,6 +412,7 @@ class MySqlDB {
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         packet_id VARCHAR(128) NOT NULL,
         claimer_address VARCHAR(64) NOT NULL,
+        claimer_name VARCHAR(255) NOT NULL DEFAULT '',
         tx_hash VARCHAR(100) NOT NULL,
         amount_wei VARCHAR(120) NOT NULL,
         created_at BIGINT NOT NULL,
@@ -422,6 +423,10 @@ class MySqlDB {
         KEY idx_claimer_created (claimer_address, created_at),
         KEY idx_claim_tx_hash (tx_hash)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    await this.pool.query(`
+      ALTER TABLE red_packet_claims
+      ADD COLUMN IF NOT EXISTS claimer_name VARCHAR(255) NOT NULL DEFAULT '' AFTER claimer_address
     `);
 
     await this.pool.query(`
@@ -522,7 +527,7 @@ class MySqlDB {
     return packet;
   }
 
-  async confirmClaim(packet, claimerAddress, txHash) {
+  async confirmClaim(packet, claimerAddress, txHash, claimerName = '') {
     const conn = await this.pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -538,9 +543,9 @@ class MySqlDB {
       if (existClaims.length) throw new Error('already claimed');
 
       await conn.query(
-        `INSERT INTO red_packet_claims (packet_id, claimer_address, tx_hash, amount_wei, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [packet.packetId, claimerAddress, txHash, packet.amountPerClaimWei, nowSeconds()],
+        `INSERT INTO red_packet_claims (packet_id, claimer_address, claimer_name, tx_hash, amount_wei, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [packet.packetId, claimerAddress, claimerName, txHash, packet.amountPerClaimWei, nowSeconds()],
       );
 
       const remainingCount = Number(packetRow.remaining_count) - 1;
@@ -664,7 +669,7 @@ class MySqlDB {
     if (!rows.length) return null;
     const row = rows[0];
     const [claims] = await this.pool.query(
-      `SELECT claimer_address, tx_hash, amount_wei, created_at FROM red_packet_claims
+      `SELECT claimer_address, claimer_name, tx_hash, amount_wei, created_at FROM red_packet_claims
        WHERE packet_id = ? ORDER BY id ASC`,
       [row.packet_id],
     );
@@ -693,7 +698,7 @@ class MySqlDB {
       txHash: row.create_tx_hash || '',
       greeting: row.greeting || '',
       claimRecords: claims.map((c) => ({
-        claimerName: c.claimer_address,
+        claimerName: c.claimer_name || c.claimer_address,
         claimerAddress: c.claimer_address,
         claimedAt: Number(c.created_at || 0) * 1000,
         amountWei: String(c.amount_wei || '0'),
@@ -1775,6 +1780,9 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
   if (!packet) return;
 
   const claimerAddress = normalizeAddress(req.body?.claimerAddress);
+  const claimerName = String(req.body?.claimerName || req.body?.telegramName || req.body?.telegramId || '')
+    .trim()
+    .slice(0, 255);
   const txHash = String(req.body?.txHash || '').trim();
   if (!claimerAddress) return badRequest(res, 'claimerAddress invalid');
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return badRequest(res, 'txHash invalid');
@@ -1799,7 +1807,7 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
 
   let updated;
   try {
-    updated = await db.confirmClaim(packet, claimerAddress, txHash);
+    updated = await db.confirmClaim(packet, claimerAddress, txHash, claimerName);
   } catch (error) {
     if (String(error.message).includes('already claimed')) {
       return badRequest(res, 'already claimed');

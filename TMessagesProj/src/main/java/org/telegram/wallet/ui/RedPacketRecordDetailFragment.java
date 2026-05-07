@@ -70,9 +70,9 @@ public class RedPacketRecordDetailFragment extends Fragment {
 
     private void render(RedPacketSendRecordDetail detail) {
         root.removeAllViews();
-        SimpleDateFormat format = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
         root.addView(Web3Ui.text(getActivity(), "红包详情", 18, Web3Ui.palette().primaryText, true));
-        root.addView(Web3Ui.text(getActivity(), "Token: " + detail.tokenSymbol + "  总额: " + detail.totalAmount, 14, Web3Ui.palette().secondaryText, false));
+        root.addView(Web3Ui.text(getActivity(), "Token: " + detail.tokenSymbol + "  实际数量: " + detail.totalAmount + " " + detail.tokenSymbol, 14, Web3Ui.palette().secondaryText, false));
         root.addView(Web3Ui.text(getActivity(), "发出时间: " + format.format(new Date(detail.createdAt)), 14, Web3Ui.palette().secondaryText, false));
         root.addView(Web3Ui.text(getActivity(), "领取记录", 16, Web3Ui.palette().primaryText, true), Web3Ui.topMargin(getActivity(), 10));
         if (detail.claimRecords.isEmpty()) {
@@ -81,9 +81,9 @@ public class RedPacketRecordDetailFragment extends Fragment {
         for (RedPacketClaimRecord claim : detail.claimRecords) {
             LinearLayout card = Web3Ui.card(getActivity());
             card.setOrientation(LinearLayout.VERTICAL);
-            card.addView(line("Telegram名字", TextUtils.isEmpty(claim.claimerName) ? WalletWorkflowCoordinator.shortAddress(claim.claimerAddress) : claim.claimerName));
+            card.addView(line("ETZone名字", TextUtils.isEmpty(claim.claimerName) ? WalletWorkflowCoordinator.shortAddress(claim.claimerAddress) : claim.claimerName));
             card.addView(line("时间", format.format(new Date(claim.claimedAt))));
-            card.addView(line("领取数量", claim.amountWei));
+            card.addView(line("领取数量", claim.amountWei + " " + detail.tokenSymbol));
             card.addView(line("Tx", TextUtils.isEmpty(claim.txHash) ? "-" : Web3Ui.shortHash(claim.txHash)));
             root.addView(card, Web3Ui.topMargin(getActivity(), 8));
         }
