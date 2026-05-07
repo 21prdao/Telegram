@@ -95,12 +95,18 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
 
         LinearLayout tokenCard = Web3Ui.card(getActivity());
         root.addView(tokenCard, Web3Ui.topMargin(getActivity(), 10));
-        LinearLayout tokenHeader = Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.Web3WalletTokenList));
+        LinearLayout tokenHeader = new LinearLayout(getActivity());
+        tokenHeader.setOrientation(LinearLayout.HORIZONTAL);
+        tokenHeader.setGravity(Gravity.CENTER_VERTICAL);
         FrameLayout tokenHeaderIcon = Web3Ui.iconCircleDrawable(getActivity(), R.drawable.icon_wallet_5_1, p.dark ? 0x22111111 : 0x11F08C22, 36);
-        tokenHeader.addView(tokenHeaderIcon, 0);
+        tokenHeader.addView(tokenHeaderIcon, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        TextView tokenTitle = Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletTokenList), 21, p.primaryText, true);
+        LinearLayout.LayoutParams tokenTitleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        tokenTitleLp.leftMargin = dp(8);
+        tokenHeader.addView(tokenTitle, tokenTitleLp);
         FrameLayout addTokenIconBtn = Web3Ui.iconCircle(getActivity(), Web3IconView.PLUS, p.orange, p.dark ? 0x182F3A4A : 0xFFEFF3F8, 30);
         addTokenIconBtn.setOnClickListener(v -> openAddTokenPage());
-        tokenHeader.addView(addTokenIconBtn);
+        tokenHeader.addView(addTokenIconBtn, new LinearLayout.LayoutParams(dp(30), dp(30)));
         tokenCard.addView(tokenHeader, Web3Ui.matchWrap());
         tokenListContainer = new LinearLayout(getActivity());
         tokenListContainer.setOrientation(LinearLayout.VERTICAL);

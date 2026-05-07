@@ -351,6 +351,10 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         }
         if (getActivity() instanceof WalletManagerActivity) {
             ((WalletManagerActivity) getActivity()).openRedPacketRecordDetailPage(record.packetId);
+            return;
+        }
+        if (getActivity() instanceof TokenListPageActivity) {
+            ((TokenListPageActivity) getActivity()).openRedPacketRecordDetailPage(record.packetId);
         }
     }
 
