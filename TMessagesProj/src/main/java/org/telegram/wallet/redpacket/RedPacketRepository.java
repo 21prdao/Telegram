@@ -398,7 +398,10 @@ public class RedPacketRepository {
                 continue;
             }
             RedPacketSendRecord record = new RedPacketSendRecord();
-            record.packetId = firstNonEmpty(optString(item, "packetId", "packet_id"), "");
+            record.packetId = firstNonEmpty(
+                    optString(item, "packetId", "packet_id", "packetIdHex", "packet_id_hex", "onChainPacketId", "onChainPacketIdHex"),
+                    ""
+            );
             record.tokenSymbol = firstNonEmpty(optString(item, "tokenSymbol", "token_symbol"), "BNB");
             record.totalAmount = firstNonEmpty(
                     optString(item, "totalAmount", "totalAmountWei", "total_amount_wei"),
