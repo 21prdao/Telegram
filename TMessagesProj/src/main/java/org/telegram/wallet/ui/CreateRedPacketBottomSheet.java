@@ -448,8 +448,10 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 .create();
         dialog.setOnShowListener(d -> {
             int bgColor = getThemedColor(Theme.key_dialogBackground);
-            int textColor = getThemedColor(Theme.key_dialogTextBlack);
-            int hintColor = getThemedColor(Theme.key_dialogTextHint);
+            int resolvedTextColor = getThemedColor(Theme.key_dialogTextBlack);
+            int textColor = Theme.isCurrentThemeDark() ? resolvedTextColor : 0xFF1F2937;
+            int resolvedHintColor = getThemedColor(Theme.key_dialogTextHint);
+            int hintColor = Theme.isCurrentThemeDark() ? resolvedHintColor : 0xFF8A94A6;
             int accentColor = getThemedColor(Theme.key_dialogButton);
             int inputBgColor = Theme.blendOver(bgColor, adjustAlpha(0xFF000000, Theme.isCurrentThemeDark() ? 0.18f : 0.06f));
             int inputStrokeColor = Theme.blendOver(bgColor, adjustAlpha(0xFFFFFFFF, Theme.isCurrentThemeDark() ? 0.12f : 0.18f));
@@ -465,6 +467,15 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 bg.setColor(bgColor);
                 bg.setCornerRadius(AndroidUtilities.dp(18));
                 window.setBackgroundDrawable(bg);
+            }
+
+            TextView titleView = dialog.findViewById(android.R.id.alertTitle);
+            if (titleView != null) {
+                titleView.setTextColor(textColor);
+            }
+            TextView messageView = dialog.findViewById(android.R.id.message);
+            if (messageView != null) {
+                messageView.setTextColor(adjustAlpha(textColor, 0.82f));
             }
 
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(accentColor);
