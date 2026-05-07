@@ -907,13 +907,31 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         Context context = getContext();
         if (context != null) {
-            List<TokenAsset> customTokens = WalletStorage.getTokens(context);
-            for (TokenAsset token : customTokens) {
+            List<TokenAsset> localTokens = WalletStorage.getTokens(context);
+            for (TokenAsset token : localTokens) {
                 if (token == null || TextUtils.isEmpty(token.contractAddress)) {
                     continue;
                 }
                 tokenOptions.add(TokenOption.custom(token.symbol, token.contractAddress, token.decimals));
             }
+            new Thread(() -> {
+                try {
+                    List<TokenAsset> defaultTokens = RedPacketRepository.getInstance().getDefaultTokens();
+                    List<TokenAsset> mergedTokens = WalletStorage.mergeTokens(defaultTokens, localTokens);
+                    AndroidUtilities.runOnUIThread(() -> {
+                        tokenOptions.clear();
+                        tokenOptions.add(TokenOption.bnb());
+                        for (TokenAsset token : mergedTokens) {
+                            tokenOptions.add(TokenOption.custom(token.symbol, token.contractAddress, token.decimals));
+                        }
+                        if (selectedTokenIndex >= tokenOptions.size()) {
+                            selectedTokenIndex = 0;
+                        }
+                        updateTokenSelectorText();
+                    });
+                } catch (Throwable ignore) {
+                }
+            }, "wallet-default-tokens").start();
         }
 
         if (selectedTokenIndex >= tokenOptions.size()) {
