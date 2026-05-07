@@ -30,7 +30,7 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(18));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
-        root.addView(Web3Ui.sectionTitle(getActivity(), Web3IconView.WALLET, LocaleController.getString(R.string.Web3WalletList)), Web3Ui.matchWrap());
+        root.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletList), 22, p.primaryText, true), Web3Ui.matchWrap());
         root.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletTapToSwitch), 14, p.secondaryText, false), Web3Ui.topMargin(getActivity(), 6));
         listContainer = new LinearLayout(getActivity());
         listContainer.setOrientation(LinearLayout.VERTICAL);
@@ -65,12 +65,9 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         card.setPadding(dp(12), dp(12), dp(12), dp(12));
         card.setBackground(selected ? Web3Ui.orangeGradient(getActivity(), 14) : Web3Ui.rounded(getActivity(), p.cardBg, 14));
         Web3Ui.setElevation(card, 0);
-        FrameLayout icon = Web3Ui.iconCircle(getActivity(), Web3IconView.WALLET, selected ? 0xFFFFFFFF : p.secondaryText, selected ? 0x22FFFFFF : (p.dark ? 0x182F3A4A : 0xFFEFF3F8), 42);
-        card.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(42)));
         LinearLayout info = new LinearLayout(getActivity());
         info.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        infoLp.leftMargin = dp(12);
         card.addView(info, infoLp);
         String name = wallet.name == null ? LocaleController.getString(R.string.Web3WalletDefaultName) : wallet.name;
         info.addView(Web3Ui.text(getActivity(), name + (selected ? LocaleController.getString(R.string.Web3WalletCurrentSuffix) : ""), 18, selected ? 0xFFFFFFFF : p.primaryText, true), Web3Ui.matchWrap());

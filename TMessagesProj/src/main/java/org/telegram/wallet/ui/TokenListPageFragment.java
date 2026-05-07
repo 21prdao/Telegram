@@ -343,6 +343,12 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
 
 
     private void openRecordDetail(RedPacketSendRecord record) {
+        if (record == null || TextUtils.isEmpty(record.packetId)) {
+            if (getActivity() instanceof WalletWorkflowCoordinator.Host) {
+                ((WalletWorkflowCoordinator.Host) getActivity()).toast("该红包记录缺少ID，暂时无法查看详情");
+            }
+            return;
+        }
         if (getActivity() instanceof WalletManagerActivity) {
             ((WalletManagerActivity) getActivity()).openRedPacketRecordDetailPage(record.packetId);
         }
