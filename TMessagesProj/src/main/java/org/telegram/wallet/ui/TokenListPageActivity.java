@@ -1,6 +1,7 @@
 package org.telegram.wallet.ui;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.FrameLayout;
@@ -65,7 +66,11 @@ public class TokenListPageActivity extends Activity implements WalletWorkflowCoo
         return root;
     }
 
-    public void openRedPacketRecordDetailPage(String packetId) { getFragmentManager().beginTransaction().replace(containerId, RedPacketRecordDetailFragment.newInstance(packetId), "redpacket_record_detail_page").addToBackStack("redpacket_record_detail_page").commitAllowingStateLoss(); }
+    public void openRedPacketRecordDetailPage(String packetId) {
+        Intent intent = new Intent(this, RedPacketRecordDetailActivity.class);
+        intent.putExtra(RedPacketRecordDetailActivity.EXTRA_PACKET_ID, packetId);
+        startActivity(intent);
+    }
 
     private void refreshCurrentFragment() { android.app.Fragment fragment = getFragmentManager().findFragmentById(containerId); if (fragment instanceof WalletRefreshable) ((WalletRefreshable) fragment).refresh(); }
     private int dp(int value) { return Web3Ui.dp(this, value); }
