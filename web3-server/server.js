@@ -658,20 +658,20 @@ class MySqlDB {
   async getSendRecordDetail(packetId) {
     const [rows] = await this.pool.query(
       `SELECT packet_id, packet_id_hex, token_symbol, total_amount_wei, count_total, remaining_count, amount_per_claim_wei, status, created_at, create_tx_hash, greeting, expires_at, contract_address, creator_wallet
-       FROM red_packets WHERE packet_id = ? LIMIT 1`,
-      [packetId],
+       FROM red_packets WHERE packet_id = ? OR packet_id_hex = ? LIMIT 1`,
+      [packetId, packetId],
     );
     if (!rows.length) return null;
     const row = rows[0];
     const [claims] = await this.pool.query(
       `SELECT claimer_address, tx_hash, amount_wei, created_at FROM red_packet_claims
        WHERE packet_id = ? ORDER BY id ASC`,
-      [packetId],
+      [row.packet_id],
     );
     const [refunds] = await this.pool.query(
       `SELECT id, creator_address, tx_hash, amount_wei, created_at FROM red_packet_refunds
        WHERE packet_id = ? ORDER BY id ASC`,
-      [packetId],
+      [row.packet_id],
     );
     const remainingCount = Number(row.remaining_count || 0);
     const amountPerClaimWei = BigInt(String(row.amount_per_claim_wei || '0'));

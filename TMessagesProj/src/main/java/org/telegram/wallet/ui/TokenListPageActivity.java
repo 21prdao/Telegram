@@ -65,6 +65,8 @@ public class TokenListPageActivity extends Activity implements WalletWorkflowCoo
         return root;
     }
 
+    public void openRedPacketRecordDetailPage(String packetId) { getFragmentManager().beginTransaction().replace(containerId, RedPacketRecordDetailFragment.newInstance(packetId), "redpacket_record_detail_page").addToBackStack("redpacket_record_detail_page").commitAllowingStateLoss(); }
+
     private void refreshCurrentFragment() { android.app.Fragment fragment = getFragmentManager().findFragmentById(containerId); if (fragment instanceof WalletRefreshable) ((WalletRefreshable) fragment).refresh(); }
     private int dp(int value) { return Web3Ui.dp(this, value); }
     @Override public WalletWorkflowCoordinator coordinator() { return coordinator; }
