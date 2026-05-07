@@ -432,8 +432,14 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         inputLp.rightMargin = AndroidUtilities.dp(8);
         inputContainer.addView(pwdInput, inputLp);
 
+        final TextView titleView = new TextView(context);
+        titleView.setText("支付验证");
+        titleView.setTextSize(AndroidUtilities.dp(8));
+        titleView.setTextColor(Color.parseColor("#F08C22"));
+        titleView.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(20), AndroidUtilities.dp(24), AndroidUtilities.dp(8));
+
         final AlertDialog dialog = new AlertDialog.Builder(context)
-                .setTitle("支付验证")
+                .setCustomTitle(titleView)
                 .setMessage("请输入支付密码后继续")
                 .setView(inputContainer)
                 .setPositiveButton(getString(R.string.OK), (dialogInterface, which) -> {
@@ -469,10 +475,8 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 window.setBackgroundDrawable(bg);
             }
 
-            TextView titleView = dialog.findViewById(android.R.id.alertTitle);
-            if (titleView != null) {
-                titleView.setTextColor(textColor);
-            }
+            titleView.setTextColor(textColor);
+
             TextView messageView = dialog.findViewById(android.R.id.message);
             if (messageView != null) {
                 messageView.setTextColor(adjustAlpha(textColor, 0.82f));
