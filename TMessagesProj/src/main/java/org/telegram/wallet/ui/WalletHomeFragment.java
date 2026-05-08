@@ -23,6 +23,7 @@ import android.widget.TextView;
 
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
+import org.telegram.wallet.data.WalletStorage;
 
 import java.util.List;
 
@@ -117,6 +118,15 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
 
     @Override public void refresh() {
         if (getActivity() == null) return;
+        WalletStorage.HomeSnapshot snapshot = WalletStorage.getHomeSnapshot(getActivity());
+        if (snapshot != null) {
+            currentAddress = TextUtils.isEmpty(snapshot.selectedAddress) ? WalletStorage.getSelectedAddress(getActivity()) : snapshot.selectedAddress;
+            currentChainName = TextUtils.isEmpty(snapshot.chainName) ? "BNB Smart Chain" : snapshot.chainName;
+            walletAddressView.setText(LocaleController.formatString(R.string.Web3WalletAddressLabel, TextUtils.isEmpty(currentAddress) ? LocaleController.getString(R.string.Web3WalletAddressNotCreated) : WalletWorkflowCoordinator.shortAddress(currentAddress)));
+            applyTotalAsset(snapshot.totalAsset);
+            chainNameView.setText(LocaleController.formatString(R.string.Web3WalletChainLabel, currentChainName));
+            renderTokenLines(snapshot.tokenLines);
+        }
         coordinator().loadBalances((selectedAddress, totalAsset, chainName, tokenLines) -> {
             currentAddress = selectedAddress;
             currentChainName = TextUtils.isEmpty(chainName) ? "BNB Smart Chain" : chainName;
@@ -124,6 +134,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
             applyTotalAsset(totalAsset);
             chainNameView.setText(LocaleController.formatString(R.string.Web3WalletChainLabel, currentChainName));
             renderTokenLines(tokenLines);
+            WalletStorage.saveHomeSnapshot(getActivity(), selectedAddress, totalAsset, currentChainName, tokenLines);
         });
     }
 

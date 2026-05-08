@@ -13,6 +13,7 @@ import android.widget.ScrollView;
 import android.content.Intent;
 import android.net.Uri;
 import android.widget.TextView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -42,6 +43,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private static final int RECORD_PAGE_SIZE = 10;
     private int currentRecordOffset = 0;
     private boolean hasMoreRecords = true;
+    private SwipeRefreshLayout swipeRefreshLayout;
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -82,6 +84,17 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         listContainer = new LinearLayout(getActivity());
         listContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(listContainer, Web3Ui.topMargin(getActivity(), showRedPacketRecords ? 8 : 12));
+        if (showRedPacketRecords) {
+            swipeRefreshLayout = new SwipeRefreshLayout(getActivity());
+            swipeRefreshLayout.addView(scroll, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            swipeRefreshLayout.setOnRefreshListener(() -> {
+                currentRecordOffset = 0;
+                hasMoreRecords = true;
+                syncRedPacketRecordsFromServer(false);
+            });
+            refresh();
+            return swipeRefreshLayout;
+        }
         refresh();
         return scroll;
     }
@@ -231,13 +244,6 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             listContainer.addView(moreBtn, Web3Ui.topMargin(getActivity(), 10));
         }
 
-        LinearLayout refreshBtn = Web3Ui.actionButton(getActivity(), "下拉刷新/点击刷新", 0, false);
-        refreshBtn.setOnClickListener(v -> {
-            currentRecordOffset = 0;
-            hasMoreRecords = true;
-            syncRedPacketRecordsFromServer(false);
-        });
-        listContainer.addView(refreshBtn, Web3Ui.topMargin(getActivity(), 8));
     }
 
     private LinearLayout createRedPacketCard(RedPacketSendRecord record, SimpleDateFormat format) {
@@ -419,6 +425,9 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
 
             getActivity().runOnUiThread(() -> {
                 syncingRecords = false;
+                if (swipeRefreshLayout != null) {
+                    swipeRefreshLayout.setRefreshing(false);
+                }
                 if (finalSuccess) {
                     if (!append) {
                         remoteRedPacketRecords = finalRemote != null ? finalRemote : new ArrayList<>();
