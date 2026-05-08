@@ -28,8 +28,10 @@ import androidx.appcompat.app.AlertDialog;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SendMessagesHelper;
+import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
@@ -680,10 +682,16 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         selectedToken.isBnb() ? null : selectedToken.contractAddress
                 );
 
+                TLRPC.User me = UserConfig.getInstance(currentAccount).getCurrentUser();
+                String tgName = me == null ? "" : ((me.first_name == null ? "" : me.first_name) + (me.last_name == null ? "" : (" " + me.last_name))).trim();
+                String tgId = me == null ? "" : String.valueOf(me.id);
+
                 RedPacketRepository.getInstance().confirmCreate(
                         prepare.packetId,
                         creatorWallet,
-                        txHash
+                        txHash,
+                        tgName,
+                        tgId
                 );
                 RedPacketInfo latestPacket = RedPacketRepository.getInstance().getPacket(prepare.packetId, creatorWallet);
                 String latestStatus = latestPacket == null ? "" : safeLower(latestPacket.status);
