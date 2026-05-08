@@ -339,6 +339,8 @@ public class RedPacketRepository {
         JSONObject body = new JSONObject();
         body.put("creatorWallet", creatorWallet);
         body.put("txHash", txHash);
+        body.put("claimerName", claimerName == null ? "" : claimerName);
+        body.put("telegramId", telegramId == null ? "" : telegramId);
 
         try {
             requestJson(
