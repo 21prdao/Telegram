@@ -39,9 +39,8 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private volatile boolean syncingRecords;
     private volatile long lastRedPacketFetchAt;
     private volatile List<RedPacketSendRecord> remoteRedPacketRecords = new ArrayList<>();
+    private int visibleRecordCount = 10;
     private static final int RECORD_PAGE_SIZE = 10;
-    private int currentRecordOffset = 0;
-    private boolean hasMoreRecords = true;
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -93,9 +92,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         }
         listContainer.removeAllViews();
         if (showRedPacketRecords) {
-            currentRecordOffset = 0;
-            hasMoreRecords = true;
-            syncRedPacketRecordsFromServer(false);
+            syncRedPacketRecordsFromServer();
             renderRedPacketRecords();
         } else {
             renderTokens();
@@ -221,21 +218,24 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         }
 
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
-        for (int i = 0; i < records.size(); i++) {
+        int max = Math.min(visibleRecordCount, records.size());
+        for (int i = 0; i < max; i++) {
             listContainer.addView(createRedPacketCard(records.get(i), format), Web3Ui.topMargin(getActivity(), 8));
         }
-        if (hasMoreRecords) {
-            LinearLayout moreBtn = Web3Ui.actionButton(getActivity(), syncingRecords ? "加载中..." : "加载更多", 0, true);
-            moreBtn.setEnabled(!syncingRecords);
-            moreBtn.setOnClickListener(v -> syncRedPacketRecordsFromServer(true));
+        if (max < records.size()) {
+            LinearLayout moreBtn = Web3Ui.actionButton(getActivity(), "加载更多", 0, true);
+            moreBtn.setOnClickListener(v -> {
+                visibleRecordCount += RECORD_PAGE_SIZE;
+                listContainer.removeAllViews();
+                renderRedPacketRecords();
+            });
             listContainer.addView(moreBtn, Web3Ui.topMargin(getActivity(), 10));
         }
 
         LinearLayout refreshBtn = Web3Ui.actionButton(getActivity(), "下拉刷新/点击刷新", 0, false);
         refreshBtn.setOnClickListener(v -> {
-            currentRecordOffset = 0;
-            hasMoreRecords = true;
-            syncRedPacketRecordsFromServer(false);
+            visibleRecordCount = RECORD_PAGE_SIZE;
+            syncRedPacketRecordsFromServer();
         });
         listContainer.addView(refreshBtn, Web3Ui.topMargin(getActivity(), 8));
     }
@@ -381,15 +381,12 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         } catch (Throwable ignore) {}
     }
 
-    private void syncRedPacketRecordsFromServer(boolean append) {
+    private void syncRedPacketRecordsFromServer() {
         if (getActivity() == null || syncingRecords) {
             return;
         }
         long now = System.currentTimeMillis();
-        if (!append && now - lastRedPacketFetchAt < RED_PACKET_FETCH_DEBOUNCE_MS) {
-            return;
-        }
-        if (append && !hasMoreRecords) {
+        if (now - lastRedPacketFetchAt < RED_PACKET_FETCH_DEBOUNCE_MS) {
             return;
         }
         String address = WalletStorage.getSelectedAddress(getActivity());
@@ -404,8 +401,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             List<RedPacketSendRecord> remote = null;
             boolean success = false;
             try {
-                int offset = append ? currentRecordOffset : 0;
-                remote = RedPacketRepository.getInstance().getSendRecords(address, RECORD_PAGE_SIZE, offset);
+                remote = RedPacketRepository.getInstance().getSendRecords(address, 100);
                 success = true;
             } catch (Throwable ignore) {
             }
@@ -420,20 +416,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             getActivity().runOnUiThread(() -> {
                 syncingRecords = false;
                 if (finalSuccess) {
-                    if (!append) {
-                        remoteRedPacketRecords = finalRemote != null ? finalRemote : new ArrayList<>();
-                    } else if (finalRemote != null && !finalRemote.isEmpty()) {
-                        List<RedPacketSendRecord> merged = new ArrayList<>(remoteRedPacketRecords);
-                        merged.addAll(finalRemote);
-                        remoteRedPacketRecords = merged;
-                    }
-                    int fetched = finalRemote == null ? 0 : finalRemote.size();
-                    if (!append) {
-                        currentRecordOffset = fetched;
-                    } else {
-                        currentRecordOffset += fetched;
-                    }
-                    hasMoreRecords = fetched >= RECORD_PAGE_SIZE;
+                    remoteRedPacketRecords = finalRemote != null ? finalRemote : new ArrayList<>();
                 }
                 if (showRedPacketRecords && listContainer != null) {
                     listContainer.removeAllViews();
