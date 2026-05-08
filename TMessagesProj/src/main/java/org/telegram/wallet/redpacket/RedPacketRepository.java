@@ -381,12 +381,13 @@ public class RedPacketRepository {
         }
     }
 
-    public List<RedPacketSendRecord> getSendRecords(String creatorWallet, int limit) throws Exception {
+    public List<RedPacketSendRecord> getSendRecords(String creatorWallet, int limit, int offset) throws Exception {
         if (TextUtils.isEmpty(creatorWallet)) {
             throw new IllegalArgumentException("creatorWallet is empty");
         }
         int safeLimit = Math.max(1, Math.min(limit, 200));
-        String path = "/red-packets/send-records?creatorWallet=" + Uri.encode(creatorWallet) + "&limit=" + safeLimit;
+        int safeOffset = Math.max(0, offset);
+        String path = "/red-packets/send-records?creatorWallet=" + Uri.encode(creatorWallet) + "&limit=" + safeLimit + "&offset=" + safeOffset;
         JSONObject root = requestJson("GET", path, null);
         JSONArray recordsArr = root.optJSONArray("data");
         if (recordsArr == null) {
