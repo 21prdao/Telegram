@@ -10,6 +10,8 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.content.Intent;
+import android.net.Uri;
 import android.widget.TextView;
 
 import org.telegram.messenger.LocaleController;
@@ -37,6 +39,8 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private volatile boolean syncingRecords;
     private volatile long lastRedPacketFetchAt;
     private volatile List<RedPacketSendRecord> remoteRedPacketRecords = new ArrayList<>();
+    private int visibleRecordCount = 10;
+    private static final int RECORD_PAGE_SIZE = 10;
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -213,21 +217,27 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             return;
         }
 
-        SimpleDateFormat format = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
-        for (RedPacketSendRecord record : records) {
-            listContainer.addView(createRedPacketCard(record, format), Web3Ui.topMargin(getActivity(), 8));
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        int max = Math.min(visibleRecordCount, records.size());
+        for (int i = 0; i < max; i++) {
+            listContainer.addView(createRedPacketCard(records.get(i), format), Web3Ui.topMargin(getActivity(), 8));
+        }
+        if (max < records.size()) {
+            LinearLayout moreBtn = Web3Ui.actionButton(getActivity(), "加载更多", 0, true);
+            moreBtn.setOnClickListener(v -> {
+                visibleRecordCount += RECORD_PAGE_SIZE;
+                listContainer.removeAllViews();
+                renderRedPacketRecords();
+            });
+            listContainer.addView(moreBtn, Web3Ui.topMargin(getActivity(), 10));
         }
 
-        LinearLayout footer = new LinearLayout(getActivity());
-        footer.setOrientation(LinearLayout.HORIZONTAL);
-        footer.setGravity(Gravity.CENTER);
-        footer.addView(new Web3IconView(getActivity(), Web3IconView.SHIELD, Web3Ui.palette().mutedText), new LinearLayout.LayoutParams(dp(16), dp(16)));
-
-        TextView text = Web3Ui.text(getActivity(), "区块链交易 · 安全透明 · 不可篡改", 12, Web3Ui.palette().mutedText, false);
-        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        textLp.leftMargin = dp(6);
-        footer.addView(text, textLp);
-        listContainer.addView(footer, Web3Ui.topMargin(getActivity(), 10));
+        LinearLayout refreshBtn = Web3Ui.actionButton(getActivity(), "下拉刷新/点击刷新", 0, false);
+        refreshBtn.setOnClickListener(v -> {
+            visibleRecordCount = RECORD_PAGE_SIZE;
+            syncRedPacketRecordsFromServer();
+        });
+        listContainer.addView(refreshBtn, Web3Ui.topMargin(getActivity(), 8));
     }
 
     private LinearLayout createRedPacketCard(RedPacketSendRecord record, SimpleDateFormat format) {
@@ -274,8 +284,8 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         TextView statusView = compactStatusBadge(record.status);
         topRow.addView(statusView);
 
-        content.addView(metaRowCompact(Web3IconView.CLOCK, "时间", format.format(new Date(record.createdAt))), Web3Ui.topMargin(getActivity(), 6));
-        content.addView(metaRowCompact(Web3IconView.LINK, "Tx", TextUtils.isEmpty(record.txHash) ? "-" : Web3Ui.shortHash(record.txHash)), Web3Ui.topMargin(getActivity(), 2));
+        content.addView(metaRowCompact(Web3IconView.CLOCK, "时间", format.format(new Date(record.createdAt)), null), Web3Ui.topMargin(getActivity(), 6));
+        content.addView(metaRowCompact(Web3IconView.LINK, "Tx", TextUtils.isEmpty(record.txHash) ? "-" : Web3Ui.shortHash(record.txHash), record.txHash), Web3Ui.topMargin(getActivity(), 2));
 
         LinearLayout.LayoutParams chevronLp = new LinearLayout.LayoutParams(dp(16), dp(16));
         chevronLp.leftMargin = dp(6);
@@ -317,7 +327,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         return tv;
     }
 
-    private LinearLayout metaRowCompact(int icon, String label, String value) {
+    private LinearLayout metaRowCompact(int icon, String label, String value, String linkValue) {
         Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout row = new LinearLayout(getActivity());
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -334,6 +344,13 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         LinearLayout.LayoutParams valueLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         valueLp.leftMargin = dp(8);
         row.addView(valueView, valueLp);
+        if ("Tx".equals(label) && !TextUtils.isEmpty(linkValue) && linkValue.startsWith("0x")) {
+            TextView go = Web3Ui.text(getActivity(), "链接", 12, p.green, true);
+            LinearLayout.LayoutParams goLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            goLp.leftMargin = dp(8);
+            go.setOnClickListener(v -> openTx(linkValue));
+            row.addView(go, goLp);
+        }
         return row;
     }
 
@@ -356,6 +373,12 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         if (getActivity() instanceof TokenListPageActivity) {
             ((TokenListPageActivity) getActivity()).openRedPacketRecordDetailPage(record.packetId);
         }
+    }
+
+    private void openTx(String hash) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://bscscan.com/tx/" + hash)));
+        } catch (Throwable ignore) {}
     }
 
     private void syncRedPacketRecordsFromServer() {
