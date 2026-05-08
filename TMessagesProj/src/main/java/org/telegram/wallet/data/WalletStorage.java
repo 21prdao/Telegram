@@ -30,6 +30,7 @@ public final class WalletStorage {
     private static final String KEY_WALLETS = "wallets_json";
     private static final String KEY_SELECTED = "selected_wallet";
     private static final String KEY_TOKENS = "tokens_json";
+    private static final String KEY_HOME_SNAPSHOT = "wallet_home_snapshot";
     private static final String KEY_PAY_PWD_HASH = "payment_password_hash";
     private static final String KEY_RED_PACKET_RECORDS = "red_packet_send_records";
 
@@ -156,6 +157,61 @@ public final class WalletStorage {
             }
         }
         return favorites;
+    }
+
+    public static void saveHomeSnapshot(Context context, @Nullable String selectedAddress, @Nullable String totalAsset, @Nullable String chainName, @Nullable List<String> tokenLines) {
+        try {
+            JSONObject object = new JSONObject();
+            object.put("selectedAddress", selectedAddress == null ? "" : selectedAddress);
+            object.put("totalAsset", totalAsset == null ? "--" : totalAsset);
+            object.put("chainName", chainName == null ? "BNB Smart Chain" : chainName);
+            JSONArray tokenArray = new JSONArray();
+            if (tokenLines != null) {
+                for (String tokenLine : tokenLines) {
+                    tokenArray.put(tokenLine);
+                }
+            }
+            object.put("tokenLines", tokenArray);
+            prefs(context).edit().putString(KEY_HOME_SNAPSHOT, object.toString()).apply();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    public static HomeSnapshot getHomeSnapshot(Context context) {
+        String json = prefs(context).getString(KEY_HOME_SNAPSHOT, null);
+        HomeSnapshot snapshot = new HomeSnapshot();
+        if (TextUtils.isEmpty(json)) {
+            snapshot.totalAsset = "--";
+            snapshot.chainName = "BNB Smart Chain";
+            snapshot.tokenLines = new ArrayList<>();
+            return snapshot;
+        }
+        try {
+            JSONObject object = new JSONObject(json);
+            snapshot.selectedAddress = object.optString("selectedAddress", "");
+            snapshot.totalAsset = object.optString("totalAsset", "--");
+            snapshot.chainName = object.optString("chainName", "BNB Smart Chain");
+            JSONArray tokenArray = object.optJSONArray("tokenLines");
+            ArrayList<String> tokenLines = new ArrayList<>();
+            if (tokenArray != null) {
+                for (int i = 0; i < tokenArray.length(); i++) {
+                    tokenLines.add(tokenArray.optString(i, ""));
+                }
+            }
+            snapshot.tokenLines = tokenLines;
+        } catch (Throwable ignore) {
+            snapshot.totalAsset = "--";
+            snapshot.chainName = "BNB Smart Chain";
+            snapshot.tokenLines = new ArrayList<>();
+        }
+        return snapshot;
+    }
+
+    public static final class HomeSnapshot {
+        public String selectedAddress;
+        public String totalAsset;
+        public String chainName;
+        public List<String> tokenLines = new ArrayList<>();
     }
 
 
