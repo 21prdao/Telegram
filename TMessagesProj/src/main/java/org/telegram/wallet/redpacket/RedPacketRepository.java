@@ -317,6 +317,10 @@ public class RedPacketRepository {
                 optString(data, "tokenSymbol", "symbol"),
                 "BNB"
         );
+        response.createSignatureHex = firstNonEmpty(
+                optString(data, "createSignatureHex", "createSignature", "signatureHex", "signature"),
+                null
+        );
 
         if (TextUtils.isEmpty(response.packetId)) {
             throw new IllegalStateException("prepareCreate succeeded but packetId is empty");

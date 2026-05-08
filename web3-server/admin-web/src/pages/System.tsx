@@ -4,6 +4,18 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { adminRequest } from '../api';
 import { formatTime } from '../utils';
 
+type RpcStatusRow = {
+  name?: string;
+  url: string;
+  enabled?: boolean;
+  ok: boolean;
+  latencyMs: number | null;
+  blockNumber: number | null;
+  chainId: number | null;
+  error?: string;
+  checkedAt?: number;
+};
+
 type SystemInfo = {
   now: number;
   serverStartedAt: number;
@@ -16,6 +28,7 @@ type SystemInfo = {
     version: string;
     tables: Array<{ tableName: string; estimatedRows: number }>;
   };
+  rpcStatus?: RpcStatusRow[];
   config: Record<string, any>;
 };
 
@@ -25,8 +38,16 @@ type WalletToken = {
   decimals: number;
 };
 
+type RpcEndpoint = {
+  name?: string;
+  url: string;
+  enabled?: boolean;
+};
+
 type RuntimeSettingsValues = {
   publicHost: string;
+  rpcUrls: RpcEndpoint[];
+  redPacketContract: string;
   maxExpiresInSeconds: number;
   appUploadPublicPath: string;
   appUploadDir: string;
@@ -62,9 +83,10 @@ type RuntimeSettingsPayload = {
   updatedAt: number;
 };
 
-type RuntimeSettingsFormValues = Omit<RuntimeSettingsValues, 'fallbackReleaseDate' | 'walletTokens'> & {
+type RuntimeSettingsFormValues = Omit<RuntimeSettingsValues, 'fallbackReleaseDate' | 'walletTokens' | 'rpcUrls'> & {
   fallbackReleaseDate?: Dayjs | null;
   walletTokensText?: string;
+  rpcUrlsText?: string;
 };
 
 function BoolTag({ value }: { value: boolean }) {
@@ -81,6 +103,34 @@ function parseWalletTokens(text?: string): WalletToken[] {
   return parsed;
 }
 
+function stringifyRpcUrls(rpcUrls?: RpcEndpoint[]): string {
+  if (!Array.isArray(rpcUrls)) return '';
+  const hasMeta = rpcUrls.some((item, index) => {
+    if (!item) return false;
+    const defaultName = `RPC ${index + 1}`;
+    return item.enabled === false || Boolean(item.name && item.name !== defaultName);
+  });
+  if (hasMeta) return JSON.stringify(rpcUrls, null, 2);
+  return rpcUrls
+    .filter((item) => item?.url)
+    .map((item) => item.url)
+    .join('\n');
+}
+
+function parseRpcUrlsText(text?: string): string[] | RpcEndpoint[] {
+  const raw = String(text || '').trim();
+  if (!raw) return [];
+  if (raw.startsWith('[')) {
+    const parsed = JSON.parse(raw) as RpcEndpoint[];
+    if (!Array.isArray(parsed)) throw new Error('RPC URL 列表必须是数组');
+    return parsed;
+  }
+  return raw
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export default function SystemPage() {
   const [form] = Form.useForm<RuntimeSettingsFormValues>();
   const [loading, setLoading] = useState(false);
@@ -90,11 +140,12 @@ export default function SystemPage() {
   const [settingsPayload, setSettingsPayload] = useState<RuntimeSettingsPayload | null>(null);
 
   const applySettingsToForm = useCallback((values: RuntimeSettingsValues) => {
-    const { fallbackReleaseDate, walletTokens, ...rest } = values;
+    const { fallbackReleaseDate, walletTokens, rpcUrls, ...rest } = values;
     form.setFieldsValue({
       ...rest,
       fallbackReleaseDate: fallbackReleaseDate ? dayjs(Number(fallbackReleaseDate) * 1000) : null,
       walletTokensText: JSON.stringify(walletTokens || [], null, 2),
+      rpcUrlsText: stringifyRpcUrls(rpcUrls),
     });
   }, [form]);
 
@@ -130,15 +181,19 @@ export default function SystemPage() {
 
   const saveSettings = async (values: RuntimeSettingsFormValues) => {
     let walletTokens: WalletToken[];
+    let rpcUrls: string[] | RpcEndpoint[];
     try {
       walletTokens = parseWalletTokens(values.walletTokensText);
+      rpcUrls = parseRpcUrlsText(values.rpcUrlsText);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '默认钱包代币列表 JSON 格式错误');
+      message.error(error instanceof Error ? error.message : 'JSON 格式错误');
       return;
     }
 
     const body = {
       publicHost: values.publicHost,
+      rpcUrls,
+      redPacketContract: values.redPacketContract,
       maxExpiresInSeconds: values.maxExpiresInSeconds,
       appUploadPublicPath: values.appUploadPublicPath,
       appUploadDir: values.appUploadDir,
@@ -197,6 +252,27 @@ export default function SystemPage() {
       </Card>
 
       <Card
+        title="RPC 连接状态（服务端检测）"
+        loading={loading}
+        extra={<Button onClick={loadSystem}>重新检测</Button>}
+      >
+        <Table<RpcStatusRow>
+          rowKey={(row) => row.url}
+          dataSource={info?.rpcStatus || []}
+          pagination={false}
+          columns={[
+            { title: '名称', dataIndex: 'name', render: (value) => value || '-' },
+            { title: 'RPC URL', dataIndex: 'url', ellipsis: true },
+            { title: '状态', dataIndex: 'ok', render: (value: boolean) => <BoolTag value={value} /> },
+            { title: '链 ID', dataIndex: 'chainId', render: (value) => value ?? '-' },
+            { title: '区块', dataIndex: 'blockNumber', render: (value) => value ?? '-' },
+            { title: '延迟', dataIndex: 'latencyMs', render: (value) => value === null || value === undefined ? '-' : `${value} ms` },
+            { title: '错误', dataIndex: 'error', ellipsis: true, render: (value) => value || '-' },
+          ]}
+        />
+      </Card>
+
+      <Card
         title="运行参数配置"
         loading={settingsLoading}
         extra={(
@@ -213,16 +289,31 @@ export default function SystemPage() {
           onFinish={saveSettings}
           initialValues={{ maxApkUploadMB: 150, maxExpiresInSeconds: 2592000, proxyPort: 443 }}
         >
-          <Typography.Title level={5}>基础与红包参数</Typography.Title>
+          <Typography.Title level={5}>基础、链与红包参数</Typography.Title>
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="publicHost" label="服务公网地址" rules={[{ required: true, message: '请输入服务公网地址' }]}>
+              <Form.Item name="publicHost" label="服务公网地址" rules={[{ required: true, message: '请输入服务公网地址' }]}> 
                 <Input placeholder="https://api.example.com" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="maxExpiresInSeconds" label="红包最大有效期（秒）" rules={[{ required: true, message: '请输入红包最大有效期' }]}>
+              <Form.Item name="redPacketContract" label="红包合约地址" rules={[{ required: true, message: '请输入红包合约地址' }]}> 
+                <Input placeholder="0x..." />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="maxExpiresInSeconds" label="红包最大有效期（秒）" rules={[{ required: true, message: '请输入红包最大有效期' }]}> 
                 <InputNumber min={1} max={2592000} precision={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item
+                name="rpcUrlsText"
+                label="BSC RPC URL 列表（客户端节点页读取）"
+                tooltip="每行一个 RPC URL；也支持 JSON 数组 [{ name, url, enabled }]。服务端会检测所有地址，优先使用连接正常、区块最新、延迟最低的 RPC；客户端节点页面会读取这个列表，并在用户手机上再次本地测速后自动选择最佳节点。"
+                rules={[{ required: true, message: '请至少配置一个 RPC URL' }]}
+              >
+                <Input.TextArea rows={6} spellCheck={false} placeholder={'https://data-seed-prebsc-1-s1.bnbchain.org:8545\nhttps://data-seed-prebsc-2-s1.bnbchain.org:8545'} />
               </Form.Item>
             </Col>
           </Row>
@@ -230,12 +321,12 @@ export default function SystemPage() {
           <Typography.Title level={5}>客户端更新参数</Typography.Title>
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="appUploadPublicPath" label="APK 公开下载路径" rules={[{ required: true, message: '请输入 APK 公开下载路径' }]}>
+              <Form.Item name="appUploadPublicPath" label="APK 公开下载路径" rules={[{ required: true, message: '请输入 APK 公开下载路径' }]}> 
                 <Input placeholder="/uploads/apks" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="appUploadDir" label="APK 保存目录" rules={[{ required: true, message: '请输入 APK 保存目录' }]}>
+              <Form.Item name="appUploadDir" label="APK 保存目录" rules={[{ required: true, message: '请输入 APK 保存目录' }]}> 
                 <Input placeholder="./uploads/apks" />
               </Form.Item>
             </Col>
@@ -245,17 +336,17 @@ export default function SystemPage() {
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="maxApkUploadMB" label="APK 最大上传大小（MB）" rules={[{ required: true, message: '请输入 APK 最大上传大小' }]}>
+              <Form.Item name="maxApkUploadMB" label="APK 最大上传大小（MB）" rules={[{ required: true, message: '请输入 APK 最大上传大小' }]}> 
                 <InputNumber min={1} max={2048} precision={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="fallbackVersionCode" label="兜底版本号 versionCode" rules={[{ required: true, message: '请输入兜底版本号' }]}>
+              <Form.Item name="fallbackVersionCode" label="兜底版本号 versionCode" rules={[{ required: true, message: '请输入兜底版本号' }]}> 
                 <InputNumber min={1} precision={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="fallbackVersionName" label="兜底版本名称 versionName" rules={[{ required: true, message: '请输入兜底版本名称' }]}>
+              <Form.Item name="fallbackVersionName" label="兜底版本名称 versionName" rules={[{ required: true, message: '请输入兜底版本名称' }]}> 
                 <Input maxLength={64} />
               </Form.Item>
             </Col>
@@ -284,12 +375,12 @@ export default function SystemPage() {
           <Typography.Title level={5}>客户端代理参数</Typography.Title>
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="proxyAddress" label="代理地址" rules={[{ required: true, message: '请输入代理地址' }]}>
+              <Form.Item name="proxyAddress" label="代理地址" rules={[{ required: true, message: '请输入代理地址' }]}> 
                 <Input />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="proxyPort" label="代理端口" rules={[{ required: true, message: '请输入代理端口' }]}>
+              <Form.Item name="proxyPort" label="代理端口" rules={[{ required: true, message: '请输入代理端口' }]}> 
                 <InputNumber min={1} max={65535} precision={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -320,7 +411,7 @@ export default function SystemPage() {
           </Form.Item>
 
           <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            当前参数定义数：{settingsPayload?.definitions?.length || 0}。数据库连接、管理后台登录凭据、端口、链 ID、RPC 和合约地址仍然属于启动级或敏感参数，需要继续通过部署环境配置。
+            当前参数定义数：{settingsPayload?.definitions?.length || 0}。数据库连接、管理后台登录凭据、端口和链 ID 仍由部署环境管理；RPC URL 和红包合约地址已经改为后台运行参数管理。
           </Typography.Paragraph>
         </Form>
       </Card>

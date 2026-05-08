@@ -11,7 +11,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
-const { JsonRpcProvider, Interface, getAddress, isAddress } = require('ethers');
+const { JsonRpcProvider, Interface, Wallet, getAddress, getBytes, isAddress, solidityPackedKeccak256 } = require('ethers');
 
 const app = express();
 app.disable('x-powered-by');
@@ -24,11 +24,30 @@ app.use((req, _res, next) => {
 });
 
 const CHAIN_ID = Number(process.env.CHAIN_ID || 97);
-const CONTRACT_ADDRESS = (process.env.RED_PACKET_CONTRACT || '0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3').trim();
+const DEFAULT_RED_PACKET_CONTRACT = '0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3';
+const DEFAULT_RPC_URL = 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
 const MAX_PACKET_COUNT = 500;
 const CONTRACT_MAX_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-const RPC_URL = process.env.RPC_URL || 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
+const RED_PACKET_AUTH_SIGNER_PRIVATE_KEY = String(
+  process.env.RED_PACKET_AUTH_SIGNER_PRIVATE_KEY || process.env.RED_PACKET_CLAIM_SIGNER_PRIVATE_KEY || '',
+).trim();
+let claimSignerWallet = null;
+try {
+  if (RED_PACKET_AUTH_SIGNER_PRIVATE_KEY) {
+    claimSignerWallet = new Wallet(normalizePrivateKey(RED_PACKET_AUTH_SIGNER_PRIVATE_KEY));
+  }
+} catch (error) {
+  // eslint-disable-next-line no-console
+  console.error('[red-packet-auth-signer-config-error]', error.message);
+}
+
+const BOOTSTRAP_RED_PACKET_CONTRACT = normalizeAddress(process.env.RED_PACKET_CONTRACT || DEFAULT_RED_PACKET_CONTRACT)
+  || normalizeAddress(DEFAULT_RED_PACKET_CONTRACT);
+const BOOTSTRAP_RPC_URLS = normalizeRpcUrlsForBootstrap(process.env.RPC_URLS || process.env.RPC_URL || DEFAULT_RPC_URL);
+
+// Backward-compatible RPC name used only as startup/status fallback.
+const RPC_URL = BOOTSTRAP_RPC_URLS[0]?.url || DEFAULT_RPC_URL;
 
 // Bootstrap values are used to seed the database on first start.
 // After that, these runtime values are read from the admin-managed system_settings table.
@@ -72,6 +91,24 @@ const RUNTIME_SETTING_DEFINITIONS = [
     required: true,
     maxLength: 255,
     description: '用于生成红包 claimUrl，以及未配置 APK URL Base 时生成 APK 下载地址。',
+  },
+  {
+    key: 'rpcUrls',
+    group: 'chain',
+    label: 'BSC RPC URL 列表',
+    type: 'json',
+    defaultValue: BOOTSTRAP_RPC_URLS,
+    description: '客户端和服务端使用的 RPC 列表。支持多个 URL；服务端会探测可用性并优先使用连接最快且区块最新的节点。',
+  },
+  {
+    key: 'redPacketContract',
+    group: 'chain',
+    label: '红包合约地址',
+    type: 'string',
+    defaultValue: BOOTSTRAP_RED_PACKET_CONTRACT,
+    required: true,
+    maxLength: 64,
+    description: '当前用于创建新红包的合约地址；历史红包继续使用创建时保存的合约地址。',
   },
   {
     key: 'maxExpiresInSeconds',
@@ -263,9 +300,6 @@ const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET
     .update(`${ADMIN_USERNAME}:${ADMIN_PASSWORD}:${MYSQL_HOST}:${MYSQL_DATABASE}`)
     .digest('hex');
 
-const provider = new JsonRpcProvider(RPC_URL, CHAIN_ID);
-const contractAddressNorm = normalizeAddress(CONTRACT_ADDRESS);
-
 const contractInterface = new Interface([
   'event PacketCreated(bytes32 indexed packetId, address indexed creator, uint256 total, uint32 count, uint64 expiresAt)',
   'event PacketCreated(bytes32 indexed packetId, address indexed creator, address indexed token, uint256 total, uint32 count, uint64 expiresAt)',
@@ -304,6 +338,13 @@ function parsePositiveBigInt(value) {
   } catch (_) {
     return null;
   }
+}
+
+function normalizePrivateKey(value) {
+  const v = String(value || '').trim();
+  if (/^0x[0-9a-fA-F]{64}$/.test(v)) return v;
+  if (/^[0-9a-fA-F]{64}$/.test(v)) return `0x${v}`;
+  throw new Error('RED_PACKET_AUTH_SIGNER_PRIVATE_KEY invalid');
 }
 
 function packetIdToHex(packetId) {
@@ -567,6 +608,120 @@ function parseBooleanFlag(value, defaultValue = false) {
   return defaultValue;
 }
 
+function normalizeRpcUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+
+  let url;
+  try {
+    url = new URL(text);
+  } catch (_) {
+    throw new Error(`RPC URL 无效：${text}`);
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error(`RPC URL 只支持 http/https：${text}`);
+  }
+
+  // URL#hash 不应该出现在 JSON-RPC endpoint 中。
+  url.hash = '';
+  return url.toString().replace(/\/+$/, '');
+}
+
+function splitRpcUrlText(text) {
+  return String(text || '')
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeRpcUrlEntry(item, index = 0, strict = true) {
+  let name = '';
+  let urlValue = '';
+  let enabled = true;
+
+  if (typeof item === 'string') {
+    urlValue = item;
+  } else if (item && typeof item === 'object') {
+    urlValue = item.url || item.rpcUrl || item.endpoint || '';
+    name = String(item.name || item.label || '').trim().slice(0, 64);
+    enabled = parseBooleanFlag(item.enabled, true);
+  } else if (strict) {
+    throw new Error(`第 ${index + 1} 个 RPC 配置无效`);
+  }
+
+  let url = '';
+  try {
+    url = normalizeRpcUrl(urlValue);
+  } catch (error) {
+    if (strict) throw error;
+    return null;
+  }
+
+  if (!url) {
+    if (strict) throw new Error(`第 ${index + 1} 个 RPC URL 不能为空`);
+    return null;
+  }
+
+  return {
+    name: name || `RPC ${index + 1}`,
+    url,
+    enabled,
+  };
+}
+
+function parseRpcUrlInput(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return [value];
+
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+
+  if (raw.startsWith('[') || raw.startsWith('{')) {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  }
+
+  return splitRpcUrlText(raw);
+}
+
+function normalizeRpcUrlsForBootstrap(value) {
+  const fallback = [{ name: 'RPC 1', url: DEFAULT_RPC_URL, enabled: true }];
+  try {
+    const input = parseRpcUrlInput(value);
+    const result = [];
+    const seen = new Set();
+    input.forEach((item, index) => {
+      const entry = normalizeRpcUrlEntry(item, index, false);
+      if (!entry || seen.has(entry.url)) return;
+      seen.add(entry.url);
+      result.push({ ...entry, name: entry.name || `RPC ${result.length + 1}` });
+    });
+    return result.length ? result : fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function normalizeRpcUrlsSetting(value) {
+  const input = parseRpcUrlInput(value);
+  if (!input.length) throw new Error('至少需要配置一个 RPC URL');
+  if (input.length > 20) throw new Error('RPC URL 最多配置 20 个');
+
+  const result = [];
+  const seen = new Set();
+  input.forEach((item, index) => {
+    const entry = normalizeRpcUrlEntry(item, index, true);
+    if (seen.has(entry.url)) return;
+    seen.add(entry.url);
+    result.push({ ...entry, name: entry.name || `RPC ${result.length + 1}` });
+  });
+
+  if (!result.some((entry) => entry.enabled)) {
+    throw new Error('至少需要启用一个 RPC URL');
+  }
+  return result;
+}
 
 function serializeSettingValue(value, type) {
   if (type === 'json') return JSON.stringify(value ?? null);
@@ -588,6 +743,11 @@ function normalizeSettingString(value, definition) {
   if (definition.key === 'appUploadDir') {
     if (!text) text = definition.defaultValue;
     text = path.resolve(text);
+  }
+  if (definition.key === 'redPacketContract') {
+    const normalized = normalizeAddress(text);
+    if (!normalized) throw new Error('红包合约地址无效');
+    text = normalized;
   }
   if (definition.required && !text) throw new Error(`${definition.label}不能为空`);
   if (definition.maxLength && text.length > definition.maxLength) {
@@ -641,6 +801,7 @@ function normalizeSettingValueForStorage(key, value) {
   if (definition.type === 'number') return normalizeSettingNumber(value, definition);
   if (definition.type === 'json') {
     if (key === 'walletTokens') return normalizeWalletTokensSetting(value);
+    if (key === 'rpcUrls') return normalizeRpcUrlsSetting(value);
     return typeof value === 'string' ? JSON.parse(value) : value;
   }
   return normalizeSettingString(value, definition);
@@ -675,6 +836,12 @@ function buildRuntimeSettingsFromRows(rows = []) {
   settings.appUploadDir = path.resolve(settings.appUploadDir || BOOTSTRAP_APP_UPLOAD_DIR);
   settings.publicHost = String(settings.publicHost || BOOTSTRAP_PUBLIC_HOST).replace(/\/+$/, '');
   settings.appUploadUrlBase = String(settings.appUploadUrlBase || '').trim().replace(/\/+$/, '');
+  try {
+    settings.rpcUrls = normalizeRpcUrlsSetting(settings.rpcUrls);
+  } catch (_) {
+    settings.rpcUrls = BOOTSTRAP_RPC_URLS;
+  }
+  settings.redPacketContract = normalizeAddress(settings.redPacketContract) || BOOTSTRAP_RED_PACKET_CONTRACT;
   settings.walletTokens = Array.isArray(settings.walletTokens) ? settings.walletTokens : BUILTIN_DEFAULT_WALLET_TOKENS;
   return settings;
 }
@@ -910,6 +1077,78 @@ function getExpectedRefundAmountWei(packet) {
   } catch (_) {
     return '0';
   }
+}
+
+function assertPacketIdHex(packetIdHex) {
+  const normalized = String(packetIdHex || '').trim().toLowerCase();
+  if (!/^0x[0-9a-f]{64}$/.test(normalized)) {
+    throw new Error('packetIdHex invalid');
+  }
+  return normalized;
+}
+
+function getCreateAuthorizationDigest(packet, creatorAddress) {
+  const packetIdHex = assertPacketIdHex(packet?.packetIdHex);
+  const contractAddress = normalizeAddress(packet?.contractAddress);
+  const creator = normalizeAddress(creatorAddress || packet?.creatorWallet);
+  const token = getPacketTokenAddress(packet);
+  if (!contractAddress) throw new Error('contractAddress invalid');
+  if (!creator) throw new Error('creatorAddress invalid');
+
+  return solidityPackedKeccak256(
+    ['bytes32', 'uint256', 'address', 'bytes32', 'address', 'address', 'uint256', 'uint32', 'uint64'],
+    [
+      solidityPackedKeccak256(['string'], ['TelegramRedPacketV2:CREATE']),
+      CHAIN_ID,
+      getAddress(contractAddress),
+      packetIdHex,
+      getAddress(creator),
+      getAddress(token),
+      BigInt(String(packet?.totalAmountWei || '0')),
+      Number(packet?.count || 0),
+      Number(packet?.expiresAt || 0),
+    ],
+  );
+}
+
+function getClaimAuthorizationDigest(packet, claimerAddress) {
+  const packetIdHex = assertPacketIdHex(packet?.packetIdHex);
+  const contractAddress = normalizeAddress(packet?.contractAddress);
+  const claimer = normalizeAddress(claimerAddress);
+  if (!contractAddress) throw new Error('contractAddress invalid');
+  if (!claimer) throw new Error('claimerAddress invalid');
+
+  return solidityPackedKeccak256(
+    ['bytes32', 'uint256', 'address', 'bytes32', 'address'],
+    [
+      solidityPackedKeccak256(['string'], ['TelegramRedPacketV2:CLAIM']),
+      CHAIN_ID,
+      getAddress(contractAddress),
+      packetIdHex,
+      getAddress(claimer),
+    ],
+  );
+}
+
+async function signRedPacketDigest(digest) {
+  if (!claimSignerWallet) {
+    throw new Error('RED_PACKET_AUTH_SIGNER_PRIVATE_KEY is not configured');
+  }
+  return claimSignerWallet.signMessage(getBytes(digest));
+}
+
+async function signCreateAuthorization(packet, creatorAddress) {
+  return {
+    signatureHex: await signRedPacketDigest(getCreateAuthorizationDigest(packet, creatorAddress)),
+    claimSignerAddress: claimSignerWallet.address,
+  };
+}
+
+async function signClaimAuthorization(packet, claimerAddress) {
+  return {
+    signatureHex: await signRedPacketDigest(getClaimAuthorizationDigest(packet, claimerAddress)),
+    claimSignerAddress: claimSignerWallet.address,
+  };
 }
 
 class MySqlDB {
@@ -1999,6 +2238,159 @@ class MySqlDB {
 
 const db = new MySqlDB();
 
+const rpcProviderCache = new Map();
+const rpcHealthCache = {
+  key: '',
+  values: null,
+  expiresAt: 0,
+};
+
+function getEnabledRpcEndpoints(settings) {
+  const list = Array.isArray(settings?.rpcUrls) ? settings.rpcUrls : BOOTSTRAP_RPC_URLS;
+  const enabled = list
+    .map((item, index) => normalizeRpcUrlEntry(item, index, false))
+    .filter((item) => item && item.enabled && item.url);
+  return enabled.length ? enabled : BOOTSTRAP_RPC_URLS;
+}
+
+function getRpcEndpointKey(endpoints) {
+  return JSON.stringify((endpoints || []).map((endpoint) => ({ url: endpoint.url, enabled: endpoint.enabled !== false })));
+}
+
+function getProviderForRpcUrl(rpcUrl) {
+  const url = normalizeRpcUrl(rpcUrl);
+  let provider = rpcProviderCache.get(url);
+  if (!provider) {
+    provider = new JsonRpcProvider(url, CHAIN_ID);
+    rpcProviderCache.set(url, provider);
+  }
+  return provider;
+}
+
+function withTimeout(promise, timeoutMs, message = 'timeout') {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+function parseRpcQuantity(value) {
+  try {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'bigint') return Number(value);
+    const text = String(value || '').trim();
+    if (!text) return 0;
+    return Number(text.startsWith('0x') || text.startsWith('0X') ? BigInt(text) : BigInt(text));
+  } catch (_) {
+    return 0;
+  }
+}
+
+async function probeRpcEndpoint(endpoint, timeoutMs = 3500) {
+  const startedAt = Date.now();
+  const result = {
+    name: endpoint.name || '',
+    url: endpoint.url,
+    enabled: endpoint.enabled !== false,
+    ok: false,
+    latencyMs: null,
+    blockNumber: null,
+    chainId: null,
+    error: '',
+    checkedAt: nowSeconds(),
+  };
+
+  try {
+    const provider = getProviderForRpcUrl(endpoint.url);
+    const chainIdRaw = await withTimeout(provider.send('eth_chainId', []), timeoutMs, 'RPC chainId timeout');
+    const actualChainId = parseRpcQuantity(chainIdRaw);
+    result.chainId = actualChainId || null;
+    if (actualChainId && actualChainId !== CHAIN_ID) {
+      throw new Error(`chainId mismatch: ${actualChainId}`);
+    }
+
+    const blockRaw = await withTimeout(provider.send('eth_blockNumber', []), timeoutMs, 'RPC blockNumber timeout');
+    result.blockNumber = parseRpcQuantity(blockRaw) || null;
+    result.latencyMs = Date.now() - startedAt;
+    result.ok = Boolean(result.blockNumber);
+    if (!result.ok) result.error = 'empty blockNumber';
+  } catch (error) {
+    result.latencyMs = Date.now() - startedAt;
+    result.error = String(error?.message || error || 'rpc error').slice(0, 240);
+  }
+
+  return result;
+}
+
+function selectBestRpcHealth(healthRows = [], fallbackEndpoints = []) {
+  const okRows = healthRows
+    .filter((row) => row && row.ok && row.url)
+    .sort((a, b) => {
+      const blockDiff = Number(b.blockNumber || 0) - Number(a.blockNumber || 0);
+      if (blockDiff !== 0) return blockDiff;
+      return Number(a.latencyMs || Number.MAX_SAFE_INTEGER) - Number(b.latencyMs || Number.MAX_SAFE_INTEGER);
+    });
+  if (okRows.length) return okRows[0];
+  const fallback = (fallbackEndpoints || []).find((endpoint) => endpoint?.url) || BOOTSTRAP_RPC_URLS[0];
+  return fallback ? { ...fallback, ok: false, latencyMs: null, blockNumber: null, error: 'all rpc endpoints unavailable' } : null;
+}
+
+async function getRpcHealth(force = false) {
+  const settings = await getRuntimeSettings();
+  const endpoints = getEnabledRpcEndpoints(settings);
+  const key = getRpcEndpointKey(endpoints);
+  const now = Date.now();
+  if (!force && rpcHealthCache.values && rpcHealthCache.key === key && rpcHealthCache.expiresAt > now) {
+    return rpcHealthCache.values;
+  }
+
+  const values = await Promise.all(endpoints.map((endpoint) => probeRpcEndpoint(endpoint)));
+  rpcHealthCache.key = key;
+  rpcHealthCache.values = values;
+  rpcHealthCache.expiresAt = now + 30_000;
+  return values;
+}
+
+async function getOrderedRpcEndpointsByHealth(force = false) {
+  const settings = await getRuntimeSettings();
+  const endpoints = getEnabledRpcEndpoints(settings);
+  const health = await getRpcHealth(force);
+  const best = selectBestRpcHealth(health, endpoints);
+  const byUrl = new Map(health.map((row) => [row.url, row]));
+  const sortedOk = health
+    .filter((row) => row.ok && row.url && row.url !== best?.url)
+    .sort((a, b) => {
+      const blockDiff = Number(b.blockNumber || 0) - Number(a.blockNumber || 0);
+      if (blockDiff !== 0) return blockDiff;
+      return Number(a.latencyMs || Number.MAX_SAFE_INTEGER) - Number(b.latencyMs || Number.MAX_SAFE_INTEGER);
+    });
+  const rest = endpoints
+    .filter((endpoint) => endpoint.url !== best?.url && !sortedOk.some((row) => row.url === endpoint.url))
+    .map((endpoint) => byUrl.get(endpoint.url) || endpoint);
+
+  return [best, ...sortedOk, ...rest].filter((endpoint) => endpoint?.url);
+}
+
+async function getBestRpcHealth(force = false) {
+  const settings = await getRuntimeSettings();
+  const endpoints = getEnabledRpcEndpoints(settings);
+  const health = await getRpcHealth(force);
+  return selectBestRpcHealth(health, endpoints);
+}
+
+async function getBestProvider(force = false) {
+  const best = await getBestRpcHealth(force);
+  return getProviderForRpcUrl(best?.url || RPC_URL);
+}
+
 async function ensurePacket(packetId, res) {
   const packet = await db.getPacket(packetId);
   if (!packet) {
@@ -2009,18 +2401,26 @@ async function ensurePacket(packetId, res) {
 }
 
 async function getTransactionReceipt(txHash) {
-  try {
-    return await provider.getTransactionReceipt(txHash);
-  } catch (_) {
-    return null;
+  const endpoints = await getOrderedRpcEndpointsByHealth(false);
+  for (const endpoint of endpoints) {
+    try {
+      const provider = getProviderForRpcUrl(endpoint.url);
+      const receipt = await withTimeout(provider.getTransactionReceipt(txHash), 8_000, 'receipt timeout');
+      if (receipt) return receipt;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[receipt-rpc-error]', endpoint.url, error?.message || error);
+    }
   }
+  return null;
 }
 
-function parseExpectedLog(receipt, eventName) {
+function parseExpectedLog(receipt, eventName, expectedContractAddress) {
   if (!receipt || !Array.isArray(receipt.logs)) return null;
+  const expectedContractNorm = normalizeAddress(expectedContractAddress);
   for (const log of receipt.logs) {
     if (!log || !log.address) continue;
-    if (normalizeAddress(log.address) !== contractAddressNorm) continue;
+    if (expectedContractNorm && normalizeAddress(log.address) !== expectedContractNorm) continue;
     try {
       const parsed = contractInterface.parseLog(log);
       if (parsed?.name === eventName) {
@@ -2034,13 +2434,11 @@ function parseExpectedLog(receipt, eventName) {
 }
 
 app.get('/healthz', async (_, res) => {
-  let rpcOk = true;
+  const settings = await getRuntimeSettings();
+  const rpcHealth = await getRpcHealth(false);
+  const bestRpc = selectBestRpcHealth(rpcHealth, getEnabledRpcEndpoints(settings));
+  const rpcOk = Boolean(bestRpc?.ok);
   let dbOk = true;
-  try {
-    await provider.getBlockNumber();
-  } catch (_) {
-    rpcOk = false;
-  }
 
   try {
     await db.pool.query('SELECT 1');
@@ -2052,12 +2450,60 @@ app.get('/healthz', async (_, res) => {
     ok: true,
     service: 'web3-red-packet',
     chainId: CHAIN_ID,
-    contractAddress: CONTRACT_ADDRESS,
-    rpcUrl: RPC_URL,
+    contractAddress: settings.redPacketContract,
+    rpcUrl: bestRpc?.url || RPC_URL,
     rpcOk,
+    blockNumber: bestRpc?.blockNumber || null,
     dbOk,
     ts: nowSeconds(),
+    authSignerConfigured: Boolean(claimSignerWallet),
+    claimSignerConfigured: Boolean(claimSignerWallet),
+    claimSignerAddress: claimSignerWallet?.address || '',
   });
+});
+
+app.get('/api/v1/wallet/chain-config', async (_req, res, next) => {
+  try {
+    const settings = await getRuntimeSettings();
+    const endpoints = getEnabledRpcEndpoints(settings);
+    const rpcHealth = await getRpcHealth(false);
+    const bestRpc = selectBestRpcHealth(rpcHealth, endpoints);
+    const healthByUrl = new Map(rpcHealth.map((row) => [row.url, row]));
+    return res.json({
+      ok: true,
+      data: {
+        chainId: CHAIN_ID,
+        chainName: 'BNB Smart Chain',
+        rpcUrls: endpoints.map((endpoint) => endpoint.url),
+        rpcEndpoints: endpoints.map((endpoint, index) => {
+          const health = healthByUrl.get(endpoint.url) || null;
+          return {
+            name: endpoint.name || `BSC-Binance${index + 1}`,
+            url: endpoint.url,
+            enabled: endpoint.enabled !== false,
+            source: 'server',
+            priority: index + 1,
+            serverStatus: health ? {
+              ok: Boolean(health.ok),
+              latencyMs: health.latencyMs,
+              blockNumber: health.blockNumber,
+              chainId: health.chainId,
+              error: health.error || '',
+              checkedAt: health.checkedAt || null,
+            } : null,
+          };
+        }),
+        bestRpcUrl: bestRpc?.url || endpoints[0]?.url || RPC_URL,
+        redPacketContract: settings.redPacketContract,
+        contractAddress: settings.redPacketContract,
+        customRpcAllowed: true,
+        clientSelectionStrategy: 'client_probe_best_block_then_latency',
+        updatedAt: nowSeconds(),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 app.get('/api/v1/wallet/default-tokens', async (_req, res, next) => {
@@ -2367,13 +2813,11 @@ app.post(`${ADMIN_BASE_PATH}/settings`, adminRequireAuth, adminAsync(async (req,
 }));
 
 app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, res) => {
-  let rpcOk = true;
-  let blockNumber = null;
-  try {
-    blockNumber = await provider.getBlockNumber();
-  } catch (_) {
-    rpcOk = false;
-  }
+  const runtimeSettings = await getRuntimeSettings();
+  const rpcStatus = await getRpcHealth(true);
+  const bestRpc = selectBestRpcHealth(rpcStatus, getEnabledRpcEndpoints(runtimeSettings));
+  const rpcOk = Boolean(bestRpc?.ok);
+  const blockNumber = bestRpc?.blockNumber || null;
 
   let dbOk = true;
   let dbVersion = '';
@@ -2395,8 +2839,6 @@ app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, r
     dbOk = false;
   }
 
-  const runtimeSettings = await getRuntimeSettings();
-
   return res.json({
     ok: true,
     data: {
@@ -2404,10 +2846,16 @@ app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, r
       serverStartedAt: SERVER_STARTED_AT,
       health: { rpcOk, blockNumber, dbOk },
       database: { version: dbVersion, tables: tableRows },
+      rpcStatus: rpcStatus.map((row) => ({
+        ...row,
+        url: maskSensitiveUrl(row.url),
+      })),
       config: {
         chainId: CHAIN_ID,
-        contractAddress: CONTRACT_ADDRESS,
-        rpcUrl: maskSensitiveUrl(RPC_URL),
+        contractAddress: runtimeSettings.redPacketContract,
+        rpcUrl: maskSensitiveUrl(bestRpc?.url || RPC_URL),
+        rpcCount: getEnabledRpcEndpoints(runtimeSettings).length,
+        bestRpcLatencyMs: bestRpc?.latencyMs ?? '-',
         mysql: `${MYSQL_USER}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}`,
         appVersion: latestAppVersion
           ? `${latestAppVersion.version_name} (${latestAppVersion.version_code})`
@@ -2511,6 +2959,7 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
   const countNum = parsePositiveInt(count);
   const totalWei = parsePositiveBigInt(totalAmountWei);
   const expiresAtNum = parsePositiveInt(expiresAt);
+  // const expiresAtNum = 1778342388;
   const tokenSymbolClean = typeof tokenSymbol === 'string' ? tokenSymbol.trim() : '';
   const isNativeBnb = tokenSymbolClean.toUpperCase() === 'BNB';
   const tokenAddr = normalizeAddress(tokenAddress);
@@ -2527,6 +2976,8 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
   if (maxExpiresInSeconds > 0 && expiresAtNum > currentSeconds + maxExpiresInSeconds) {
     return badRequest(res, `expiresAt must be within ${maxExpiresInSeconds} seconds`);
   }
+  const redPacketContract = normalizeAddress(runtimeSettings.redPacketContract);
+  if (!redPacketContract) return badRequest(res, 'redPacketContract is not configured');
   if (totalWei % BigInt(countNum) !== 0n) return badRequest(res, 'totalAmountWei must be divisible by count');
   if (!isNativeBnb && !tokenAddr) return badRequest(res, 'tokenAddress invalid');
   if (!tokenSymbolClean) return badRequest(res, 'tokenSymbol invalid');
@@ -2555,12 +3006,21 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
     greeting: typeof greeting === 'string' ? greeting : '',
     packetType: typeof packetType === 'string' ? packetType : '',
     chainId: CHAIN_ID,
-    contractAddress: CONTRACT_ADDRESS,
+    contractAddress: redPacketContract,
     claimUrl: `${runtimeSettings.publicHost}/claim/${packetId}`,
     legacyClaimUrl: `${runtimeSettings.publicHost}/claim/${packetId}`,
     createdAt,
     updatedAt: createdAt,
   };
+
+  let createAuthorization;
+  try {
+    createAuthorization = await signCreateAuthorization(packet, creator);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[create-sign-error]', { packetId: packet.packetId, error: error.message });
+    return badRequest(res, 'red packet auth signer is not configured correctly');
+  }
 
   await db.upsertPacket(packet);
 
@@ -2577,6 +3037,8 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
       tokenSymbol: packet.tokenSymbol,
       tokenDecimals: packet.tokenDecimals,
       count: packet.count,
+      createSignatureHex: createAuthorization.signatureHex,
+      claimSignerAddress: createAuthorization.claimSignerAddress,
       greeting: packet.greeting,
       packetType: packet.packetType,
       claimUrl: packet.legacyClaimUrl,
@@ -2595,7 +3057,7 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
   const receipt = await getTransactionReceipt(txHash);
   if (!receipt || receipt.status !== 1) return badRequest(res, 'transaction not confirmed');
 
-  const event = parseExpectedLog(receipt, 'PacketCreated');
+  const event = parseExpectedLog(receipt, 'PacketCreated', packet.contractAddress);
   if (!event) return badRequest(res, 'PacketCreated event not found');
 
   const eventPacketIdHex = String(event.args.packetId).toLowerCase();
@@ -2734,6 +3196,15 @@ app.post('/api/v1/red-packets/:packetId/claim/prepare', async (req, res) => {
   if (!packet.onchainCreated) return badRequest(res, 'packet not confirmed on chain');
   if (packet.claimedWallets.includes(claimerAddress)) return badRequest(res, 'already claimed');
 
+  let claimAuthorization;
+  try {
+    claimAuthorization = await signClaimAuthorization(packet, claimerAddress);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[claim-sign-error]', { packetId: packet.packetId, claimerAddress, error: error.message });
+    return badRequest(res, 'red packet auth signer is not configured correctly');
+  }
+
   packet.updatedAt = nowSeconds();
   await db.upsertPacket(packet);
   // eslint-disable-next-line no-console
@@ -2751,6 +3222,8 @@ app.post('/api/v1/red-packets/:packetId/claim/prepare', async (req, res) => {
       chainId: packet.chainId,
       claimerAddress,
       amountPerClaimWei: packet.amountPerClaimWei,
+      signatureHex: claimAuthorization.signatureHex,
+      claimSignerAddress: claimAuthorization.claimSignerAddress,
     },
   });
 });
@@ -2773,7 +3246,7 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
   const receipt = await getTransactionReceipt(txHash);
   if (!receipt || receipt.status !== 1) return badRequest(res, 'transaction not confirmed');
 
-  const event = parseExpectedLog(receipt, 'Claimed');
+  const event = parseExpectedLog(receipt, 'Claimed', packet.contractAddress);
   if (!event) return badRequest(res, 'Claimed event not found');
 
   const eventPacketIdHex = String(event.args.packetId).toLowerCase();
@@ -2832,7 +3305,7 @@ app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
   const receipt = await getTransactionReceipt(txHash);
   if (!receipt || receipt.status !== 1) return badRequest(res, 'transaction not confirmed');
 
-  const event = parseExpectedLog(receipt, 'Refunded');
+  const event = parseExpectedLog(receipt, 'Refunded', packet.contractAddress);
   if (!event) return badRequest(res, 'Refunded event not found');
 
   const eventPacketIdHex = String(event.args.packetId).toLowerCase();

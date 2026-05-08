@@ -15,7 +15,7 @@ import android.widget.Toast;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.Utilities;
 import org.telegram.wallet.chain.RedPacketContractService;
-import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.config.WalletRuntimeConfig;
 import org.telegram.wallet.model.RedPacketClaimRecord;
 import org.telegram.wallet.model.RedPacketRefundRecord;
 import org.telegram.wallet.model.RedPacketSendRecordDetail;
@@ -125,7 +125,7 @@ public class RedPacketRecordDetailFragment extends Fragment {
             return;
         }
         final String packetId = TextUtils.isEmpty(refund.packetIdHex) ? (getArguments() == null ? "" : getArguments().getString(ARG_PACKET_ID, "")) : refund.packetIdHex;
-        final String contract = TextUtils.isEmpty(refund.contractAddress) ? WalletConfig.RED_PACKET_CONTRACT : refund.contractAddress;
+        final String contract = TextUtils.isEmpty(refund.contractAddress) ? WalletRuntimeConfig.getRedPacketContract() : refund.contractAddress;
         refundSubmitting = true;
         Toast.makeText(getActivity(), "正在提交回退交易…", Toast.LENGTH_SHORT).show();
         Utilities.globalQueue.postRunnable(() -> {

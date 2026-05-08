@@ -1,6 +1,7 @@
 package org.telegram.wallet.ui;
 
 import android.app.Activity;
+import android.app.Fragment;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.FrameLayout;
@@ -12,17 +13,40 @@ import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 
 public class WalletListPageActivity extends Activity implements WalletWorkflowCoordinator.Host {
+    public static final String EXTRA_PAGE = "page";
+    public static final String PAGE_WALLET_LIST = "wallet_list";
+    public static final String PAGE_RPC_NODES = "rpc_nodes";
+
     private int containerId;
     private WalletWorkflowCoordinator coordinator;
+    private String page;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Web3Ui.applySystemBars(this);
         coordinator = new WalletWorkflowCoordinator(this, this);
-        setContentView(buildRoot(LocaleController.getString(R.string.Web3WalletListSwitchTitle)));
-        if (savedInstanceState == null) getFragmentManager().beginTransaction().replace(containerId, WalletListPageFragment.newInstance(), "wallet_list_page").commitAllowingStateLoss();
+        page = getIntent() == null ? PAGE_WALLET_LIST : getIntent().getStringExtra(EXTRA_PAGE);
+        if (page == null) page = PAGE_WALLET_LIST;
+        setContentView(buildRoot(resolveTitle()));
+        if (savedInstanceState == null) {
+            getFragmentManager().beginTransaction().replace(containerId, createFragment(), page).commitAllowingStateLoss();
+        }
     }
     @Override protected void onResume() { super.onResume(); Web3Ui.applySystemBars(this); }
+
+    private String resolveTitle() {
+        if (PAGE_RPC_NODES.equals(page)) {
+            return "币安智能链";
+        }
+        return LocaleController.getString(R.string.Web3WalletListSwitchTitle);
+    }
+
+    private Fragment createFragment() {
+        if (PAGE_RPC_NODES.equals(page)) {
+            return WalletRpcNodeFragment.newInstance();
+        }
+        return WalletListPageFragment.newInstance();
+    }
 
     private LinearLayout buildRoot(String titleText) {
         Web3Ui.Palette p = Web3Ui.palette();
@@ -40,7 +64,15 @@ public class WalletListPageActivity extends Activity implements WalletWorkflowCo
         TextView title = Web3Ui.text(this, titleText, 18, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        bar.addView(new TextView(this), new LinearLayout.LayoutParams(dp(44), dp(56)));
+        TextView right = Web3Ui.text(this, PAGE_RPC_NODES.equals(page) ? "刷新" : "", 15, p.primaryText, false);
+        right.setGravity(Gravity.CENTER);
+        right.setOnClickListener(v -> {
+            Fragment fragment = getFragmentManager().findFragmentById(containerId);
+            if (fragment instanceof WalletRpcNodeFragment) {
+                ((WalletRpcNodeFragment) fragment).forceRefreshNodes();
+            }
+        });
+        bar.addView(right, new LinearLayout.LayoutParams(dp(44), dp(56)));
         root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();

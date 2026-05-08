@@ -39,6 +39,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
             R.drawable.icon_wallet_2_2
     };
     private WalletWorkflowCoordinator coordinator;
+    private View rpcStatusDot;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +55,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         super.onResume();
         Web3Ui.applySystemBars(this);
         refreshCurrentFragment();
+        updateRpcNodeIndicator();
     }
 
     private LinearLayout buildRootLayout() {
@@ -88,8 +90,15 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         title.setTypeface(Typeface.DEFAULT_BOLD);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        View spacer = new View(this);
-        bar.addView(spacer, new LinearLayout.LayoutParams(dp(44), dp(56)));
+        FrameLayout nodeButton = Web3Ui.iconButton(this, Web3IconView.LINK);
+        nodeButton.setOnClickListener(v -> startActivity(new Intent(this, WalletListPageActivity.class).putExtra(WalletListPageActivity.EXTRA_PAGE, WalletListPageActivity.PAGE_RPC_NODES)));
+        rpcStatusDot = new View(this);
+        rpcStatusDot.setBackground(Web3Ui.rounded(this, Web3Ui.palette().orange, 4));
+        FrameLayout.LayoutParams dotLp = new FrameLayout.LayoutParams(dp(8), dp(8), Gravity.RIGHT | Gravity.TOP);
+        dotLp.topMargin = dp(14);
+        dotLp.rightMargin = dp(7);
+        nodeButton.addView(rpcStatusDot, dotLp);
+        bar.addView(nodeButton, new LinearLayout.LayoutParams(dp(44), dp(56)));
         return bar;
     }
 
@@ -162,6 +171,31 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
 
     private void showDeveloperInfoDialog() {
         coordinator.checkConnectivity(status -> new android.app.AlertDialog.Builder(this).setTitle(LocaleController.getString(R.string.Web3WalletDeveloperInfo)).setMessage(status).setPositiveButton(LocaleController.getString(R.string.OK), null).show());
+    }
+
+    private void updateRpcNodeIndicator() {
+        final View dot = rpcStatusDot;
+        if (dot == null) {
+            return;
+        }
+        dot.setBackground(Web3Ui.rounded(this, Web3Ui.palette().orange, 4));
+        new Thread(() -> {
+            boolean ok = false;
+            try {
+                org.telegram.wallet.config.WalletRuntimeConfig.ChainConfig config = org.telegram.wallet.config.WalletRuntimeConfig.get(false);
+                java.util.ArrayList<org.telegram.wallet.config.WalletRuntimeConfig.RpcEndpoint> nodes = new java.util.ArrayList<>();
+                nodes.add(new org.telegram.wallet.config.WalletRuntimeConfig.RpcEndpoint("当前节点", config.bestRpcUrl, true, "current", false));
+                java.util.List<org.telegram.wallet.config.WalletRuntimeConfig.RpcProbeResult> probes = org.telegram.wallet.config.WalletRuntimeConfig.probeRpcEndpoints(nodes, config.chainId);
+                ok = !probes.isEmpty() && probes.get(0).ok;
+            } catch (Throwable ignore) {
+            }
+            final int color = ok ? 0xFF009B72 : 0xFFE15249;
+            runOnUiThread(() -> {
+                if (rpcStatusDot != null) {
+                    rpcStatusDot.setBackground(Web3Ui.rounded(this, color, 4));
+                }
+            });
+        }, "wallet-rpc-status-dot").start();
     }
 
     private void switchTo(String tag) {

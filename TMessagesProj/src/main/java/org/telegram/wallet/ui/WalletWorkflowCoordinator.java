@@ -11,6 +11,7 @@ import org.telegram.wallet.chain.Bep20Service;
 import org.telegram.wallet.chain.BnbNativeTransferService;
 import org.telegram.wallet.chain.BscRpcClient;
 import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.config.WalletRuntimeConfig;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.model.WalletAccount;
@@ -183,10 +184,12 @@ public class WalletWorkflowCoordinator {
         new Thread(() -> {
             String status;
             try {
+                WalletRuntimeConfig.ChainConfig config = WalletRuntimeConfig.get();
                 String chain = BscRpcClient.get().ethChainId().send().getChainId().toString();
                 status = "API: " + WalletConfig.getRedPacketApiBaseUrl() + "\n"
-                        + "RPC: chainId=" + chain + "\n"
-                        + "Contract: " + WalletConfig.RED_PACKET_CONTRACT;
+                        + "RPC: " + BscRpcClient.getCurrentRpcUrl() + "\n"
+                        + "RPC chainId=" + chain + " / config chainId=" + config.chainId + "\n"
+                        + "Contract: " + config.redPacketContract;
             } catch (Throwable t) {
                 status = "连接检查失败：" + t.getMessage();
             }

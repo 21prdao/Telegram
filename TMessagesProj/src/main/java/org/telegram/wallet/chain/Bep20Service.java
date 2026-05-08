@@ -2,7 +2,6 @@ package org.telegram.wallet.chain;
 
 import android.text.TextUtils;
 
-import org.telegram.wallet.config.WalletConfig;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
@@ -119,7 +118,7 @@ public class Bep20Service {
 
         byte[] signedMessage = TransactionEncoder.signMessage(
                 rawTransaction,
-                WalletConfig.BSC_CHAIN_ID,
+                BscRpcClient.getChainId(),
                 credentials
         );
         EthSendTransaction sent = BscRpcClient.get().ethSendRawTransaction(Numeric.toHexString(signedMessage)).send();

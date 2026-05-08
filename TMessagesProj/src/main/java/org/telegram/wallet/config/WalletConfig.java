@@ -5,6 +5,10 @@ import android.text.TextUtils;
 
 import org.telegram.messenger.BuildConfig;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public final class WalletConfig {
     public static final boolean ENABLED = BuildConfig.WEB3_WALLET_ENABLED;
     public static final String RED_PACKET_HOST = BuildConfig.WEB3_RED_PACKET_HOST;
@@ -14,6 +18,52 @@ public final class WalletConfig {
 
     private WalletConfig() {}
 
+    public static List<String> getBuildRpcUrls() {
+        ArrayList<String> urls = new ArrayList<>();
+        addRpcUrls(urls, BSC_RPC_URL);
+        if (urls.isEmpty()) {
+            urls.add("https://data-seed-prebsc-1-s1.bnbchain.org:8545");
+        }
+        return Collections.unmodifiableList(urls);
+    }
+
+    private static void addRpcUrls(ArrayList<String> urls, String rawValue) {
+        if (TextUtils.isEmpty(rawValue)) {
+            return;
+        }
+        String[] parts = rawValue.split("[\\n,]+");
+        for (String part : parts) {
+            String url = normalizeRpcUrl(part);
+            if (TextUtils.isEmpty(url)) {
+                continue;
+            }
+            boolean exists = false;
+            for (String existing : urls) {
+                if (existing.equalsIgnoreCase(url)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                urls.add(url);
+            }
+        }
+    }
+
+    private static String normalizeRpcUrl(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return "";
+        }
+        String result = value.trim();
+        if (!(result.startsWith("http://") || result.startsWith("https://"))) {
+            return "";
+        }
+        return trimTrailingSlash(result);
+    }
+
+    public static String getBuildRedPacketContract() {
+        return RED_PACKET_CONTRACT == null ? "" : RED_PACKET_CONTRACT.trim();
+    }
 
     public static String getRedPacketApiBaseUrl() {
         String host = RED_PACKET_HOST == null ? "" : RED_PACKET_HOST.trim();

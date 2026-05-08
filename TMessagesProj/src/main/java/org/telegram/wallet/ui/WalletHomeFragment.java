@@ -92,6 +92,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout.LayoutParams chainLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         chainLp.leftMargin = dp(8);
         chainRow.addView(chainNameView, chainLp);
+        chainRow.setOnClickListener(v -> startActivity(new Intent(getActivity(), WalletListPageActivity.class).putExtra(WalletListPageActivity.EXTRA_PAGE, WalletListPageActivity.PAGE_RPC_NODES)));
         assetCard.addView(chainRow, Web3Ui.topMargin(getActivity(), 10));
 
         LinearLayout tokenCard = Web3Ui.card(getActivity());

@@ -8,5 +8,6 @@ public class CreateRedPacketPrepareResponse {
     public long expiresAt;
     public String totalAmountWei;
     public int count;
+    public String createSignatureHex; // 服务端授权创建签名
     public String tokenSymbol;       // 默认 BNB
 }

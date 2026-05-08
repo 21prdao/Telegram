@@ -28,7 +28,7 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.wallet.chain.RedPacketContractService;
-import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.config.WalletRuntimeConfig;
 import org.telegram.wallet.model.ClaimPrepareResponse;
 import org.telegram.wallet.model.RedPacketInfo;
 import org.telegram.wallet.redpacket.RedPacketRepository;
@@ -431,7 +431,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                 String contractAddress = firstNonEmpty(
                         prepare.contractAddress,
                         currentInfo.contractAddress,
-                        WalletConfig.RED_PACKET_CONTRACT
+                        WalletRuntimeConfig.getRedPacketContract()
                 );
 
                 String finalPacketId = firstNonEmpty(prepare.packetIdHex, packetId);
@@ -511,7 +511,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
             try {
                 String contractAddress = firstNonEmpty(
                         currentInfo.contractAddress,
-                        WalletConfig.RED_PACKET_CONTRACT
+                        WalletRuntimeConfig.getRedPacketContract()
                 );
                 String finalPacketId = firstNonEmpty(currentInfo.packetIdHex, packetId);
                 String txHash = new RedPacketContractService().refund(

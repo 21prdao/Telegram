@@ -3,7 +3,6 @@ package org.telegram.wallet.chain;
 import android.text.TextUtils;
 
 import org.telegram.messenger.FileLog;
-import org.telegram.wallet.config.WalletConfig;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.DynamicBytes;
@@ -34,8 +33,8 @@ import java.util.Collections;
 
 /**
  * 当前版本按“原生 BNB 红包合约”写：
- * - createNativePacket(bytes32 packetId, uint32 count, uint64 expiresAt) payable
- * - createTokenPacket(bytes32 packetId, address token, uint256 totalAmount, uint32 count, uint64 expiresAt)
+ * - createNativePacket(bytes32 packetId, uint32 count, uint64 expiresAt, bytes signature) payable
+ * - createTokenPacket(bytes32 packetId, address token, uint256 totalAmount, uint32 count, uint64 expiresAt, bytes signature)
  * - claim(bytes32 packetId, bytes signature)
  * - refund(bytes32 packetId)
  *
@@ -62,7 +61,8 @@ public class RedPacketContractService {
             int count,
             BigInteger amountPerClaimWei,
             long expiresAtSeconds,
-            String tokenAddress
+            String tokenAddress,
+            String createSignatureHex
     ) throws Exception {
         validatePrivateKey(privateKeyHex);
         validateAddress(contractAddress);
@@ -76,6 +76,9 @@ public class RedPacketContractService {
         if (expiresAtSeconds <= 0) {
             throw new IllegalArgumentException("expiresAtSeconds must be > 0");
         }
+        if (TextUtils.isEmpty(createSignatureHex)) {
+            throw new IllegalArgumentException("create signature is required");
+        }
 
         BigInteger totalAmount = amountPerClaimWei.multiply(BigInteger.valueOf(count));
         boolean isNative = TextUtils.isEmpty(tokenAddress) || isZeroAddress(tokenAddress);
@@ -87,7 +90,8 @@ public class RedPacketContractService {
                     Arrays.asList(
                             toBytes32(packetIdHex),
                             new Uint32(BigInteger.valueOf(count)),
-                            new Uint64(BigInteger.valueOf(expiresAtSeconds))
+                            new Uint64(BigInteger.valueOf(expiresAtSeconds)),
+                            new DynamicBytes(hexToBytes(createSignatureHex))
                     ),
                     Collections.emptyList()
             );
@@ -101,7 +105,8 @@ public class RedPacketContractService {
                             new Address(tokenAddress),
                             new Uint256(totalAmount),
                             new Uint32(BigInteger.valueOf(count)),
-                            new Uint64(BigInteger.valueOf(expiresAtSeconds))
+                            new Uint64(BigInteger.valueOf(expiresAtSeconds)),
+                            new DynamicBytes(hexToBytes(createSignatureHex))
                     ),
                     Collections.emptyList()
             );
@@ -125,25 +130,18 @@ public class RedPacketContractService {
         validatePrivateKey(privateKeyHex);
         validateAddress(contractAddress);
 
-        Function function;
         if (TextUtils.isEmpty(signatureHex)) {
-            function = new Function(
-                    "claim",
-                    Arrays.asList(
-                            toBytes32(packetIdHex)
-                    ),
-                    Collections.emptyList()
-            );
-        } else {
-            function = new Function(
-                    "claim",
-                    Arrays.asList(
-                            toBytes32(packetIdHex),
-                            new DynamicBytes(hexToBytes(signatureHex))
-                    ),
-                    Collections.emptyList()
-            );
+            throw new IllegalArgumentException("claim signature is required");
         }
+
+        Function function = new Function(
+                "claim",
+                Arrays.asList(
+                        toBytes32(packetIdHex),
+                        new DynamicBytes(hexToBytes(signatureHex))
+                ),
+                Collections.emptyList()
+        );
 
         return sendFunctionTransaction(
                 privateKeyHex,
@@ -250,7 +248,7 @@ public class RedPacketContractService {
 
         byte[] signedMessage = TransactionEncoder.signMessage(
                 rawTransaction,
-                WalletConfig.BSC_CHAIN_ID,
+                BscRpcClient.getChainId(),
                 credentials
         );
 

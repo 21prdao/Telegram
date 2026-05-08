@@ -42,6 +42,7 @@ import org.telegram.wallet.chain.Bep20Service;
 import org.telegram.wallet.chain.BscRpcClient;
 import org.telegram.wallet.chain.RedPacketContractService;
 import org.telegram.wallet.config.WalletConfig;
+import org.telegram.wallet.config.WalletRuntimeConfig;
 import org.telegram.wallet.data.WalletStorage;
 import org.telegram.wallet.model.CreateRedPacketPrepareResponse;
 import org.telegram.wallet.model.RedPacketInfo;
@@ -649,7 +650,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 String packetIdHex = prepare.packetIdHex;
                 String contractAddress = firstNonEmpty(
                         prepare.contractAddress,
-                        WalletConfig.RED_PACKET_CONTRACT
+                        WalletRuntimeConfig.getRedPacketContract()
                 );
                 if (!selectedToken.isBnb()) {
                     Bep20Service bep20Service = new Bep20Service();
@@ -679,7 +680,8 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                         count,
                         amountPerClaimRaw,
                         expiresAtSeconds,
-                        selectedToken.isBnb() ? null : selectedToken.contractAddress
+                        selectedToken.isBnb() ? null : selectedToken.contractAddress,
+                        prepare.createSignatureHex
                 );
 
                 TLRPC.User me = UserConfig.getInstance(currentAccount).getCurrentUser();
