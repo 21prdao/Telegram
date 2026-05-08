@@ -24,7 +24,7 @@ public class ServerApiManager {
     private static volatile boolean refreshingProxy;
 
     public interface VersionCheckCallback {
-        void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String message);
+        void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String releaseDate, String message);
 
         default void onError(String error) {
         }
@@ -60,8 +60,9 @@ public class ServerApiManager {
                 boolean hasUpdate = data.optBoolean("hasUpdate", false);
                 String updateUrl = firstNonEmpty(data, "downloadUrl", "updateUrl", "url", "apkUrl", "apkDownloadUrl", "download");
                 String latestVersion = data.optString("versionName", "");
+                String releaseDate = firstNonEmpty(data, "releaseDate", "updateDate", "date", "releasedAt", "publishDate");
                 String message = data.optString("message", "");
-                AndroidUtilities.runOnUIThread(() -> callback.onResult(hasUpdate, updateUrl, latestVersion, message));
+                AndroidUtilities.runOnUIThread(() -> callback.onResult(hasUpdate, updateUrl, latestVersion, releaseDate, message));
             } catch (Throwable e) {
                 FileLog.e(e);
                 AndroidUtilities.runOnUIThread(() -> callback.onError(e.getMessage()));
