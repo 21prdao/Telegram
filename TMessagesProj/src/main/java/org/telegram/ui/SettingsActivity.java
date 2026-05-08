@@ -162,8 +162,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     private SizeNotifierFrameLayout contentView;
     private UniversalRecyclerView listView;
     private boolean hasClientUpdate;
-    private String latestClientVersion = "";
-    private String latestClientUpdateDate = "";
     private View actionBarBackground;
 
     private ActionBarMenuItem searchItem, otherItem;
@@ -235,8 +233,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             @Override
             public void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String releaseDate, String message) {
                 hasClientUpdate = hasUpdate;
-                latestClientVersion = latestVersion == null ? "" : latestVersion;
-                latestClientUpdateDate = releaseDate == null ? "" : releaseDate;
                 if (listView != null) {
                     listView.adapter.update(true);
                 }
@@ -901,15 +897,13 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                             return;
                         }
                         hasClientUpdate = hasUpdate;
-                        latestClientVersion = latestVersion == null ? "" : latestVersion;
-                        latestClientUpdateDate = releaseDate == null ? "" : releaseDate;
                         if (listView != null) {
                             listView.adapter.update(true);
                         }
                         if (hasUpdate) {
                             String updateInfo = LocaleController.getString(R.string.AppUpdate) + "\n"
-                                + LocaleController.getString(R.string.AppVersion) + ": " + (TextUtils.isEmpty(latestVersion) ? "-" : latestVersion) + "\n"
-                                + LocaleController.getString(R.string.Date) + ": " + (TextUtils.isEmpty(releaseDate) ? "-" : releaseDate);
+                                + "Version: " + (TextUtils.isEmpty(latestVersion) ? "-" : latestVersion) + "\n"
+                                + "Date: " + (TextUtils.isEmpty(releaseDate) ? "-" : releaseDate);
                             AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
                             builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
                             builder.setMessage(updateInfo);
@@ -941,8 +935,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                         } catch (Throwable ignore) {
                         }
                         String latestInfo = "当前客户端已经最新版本\n"
-                            + LocaleController.getString(R.string.AppVersion) + ": " + currentVersion + "\n"
-                            + LocaleController.getString(R.string.Date) + ": " + currentDate;
+                            + "Version: " + currentVersion + "\n"
+                            + "Date: " + currentDate;
                         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
                         builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
                         builder.setMessage(latestInfo);
