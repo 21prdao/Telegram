@@ -14120,7 +14120,7 @@
   <string name="messages_few">%1$d件のメッセージ</string>
   <string name="messages_many">%1$d件のメッセージ</string>
   <string name="telegram_passport">ETZone Passport</string>
-  <string name="Web3WalletProTitle">Web3 ウォレット Pro</string>
+  <string name="Web3WalletProTitle">Web3 ウォレット</string>
   <string name="Web3WalletTotalAssets">総資産</string>
   <string name="Web3WalletAddressLabel">ウォレットアドレス：%1$s</string>
   <string name="Web3WalletAddressNotCreated">未作成</string>

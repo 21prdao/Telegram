@@ -14120,7 +14120,7 @@
   <string name="messages_few">%1$d 条消息</string>
   <string name="messages_many">%1$d 条消息</string>
   <string name="telegram_passport">ETZone 通行证</string>
-  <string name="Web3WalletProTitle">Web3 钱包专业版</string>
+  <string name="Web3WalletProTitle">Web3 钱包</string>
   <string name="Web3WalletTotalAssets">总资产</string>
   <string name="Web3WalletAddressLabel">钱包地址：%1$s</string>
   <string name="Web3WalletAddressNotCreated">未创建</string>

@@ -14120,7 +14120,7 @@
   <string name="messages_few">%1$d messages</string>
   <string name="messages_many">%1$d messages</string>
   <string name="telegram_passport">Telegram passport</string>
-  <string name="Web3WalletProTitle">Web3 Wallet Pro</string>
+  <string name="Web3WalletProTitle">Web3 Wallet</string>
   <string name="Web3WalletTotalAssets">Total Assets</string>
   <string name="Web3WalletAddressLabel">Wallet address: %1$s</string>
   <string name="Web3WalletAddressNotCreated">Not created</string>
