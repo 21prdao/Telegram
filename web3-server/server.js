@@ -25,21 +25,34 @@ app.use((req, _res, next) => {
 
 const CHAIN_ID = Number(process.env.CHAIN_ID || 97);
 const CONTRACT_ADDRESS = (process.env.RED_PACKET_CONTRACT || '0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3').trim();
-const HOST = process.env.PUBLIC_HOST || 'http://127.0.0.1:8787';
 const MAX_PACKET_COUNT = 500;
+const CONTRACT_MAX_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const RPC_URL = process.env.RPC_URL || 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
-const DEFAULT_PROXY_ADDRESS = (process.env.DEFAULT_PROXY_ADDRESS || '139.180.223.206').trim();
-const DEFAULT_PROXY_PORT = Number(process.env.DEFAULT_PROXY_PORT || 443);
-const DEFAULT_PROXY_USERNAME = process.env.DEFAULT_PROXY_USERNAME || '';
-const DEFAULT_PROXY_PASSWORD = process.env.DEFAULT_PROXY_PASSWORD || '';
-const DEFAULT_PROXY_SECRET = process.env.DEFAULT_PROXY_SECRET || 'aff4456037ec453cde85935760a840f0';
-const APP_VERSION_CODE = Number(process.env.APP_VERSION_CODE || 1);
-const APP_VERSION_NAME = process.env.APP_VERSION_NAME || '1.0.0';
-const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || '';
-const APP_VERSION_MESSAGE = process.env.APP_VERSION_MESSAGE || '';
-const APP_RELEASE_DATE = Number(process.env.APP_RELEASE_DATE || 0);
-const APP_APK_SIZE_BYTES = Number(process.env.APP_APK_SIZE_BYTES || 0);
-const DEFAULT_WALLET_TOKENS = [
+
+// Bootstrap values are used to seed the database on first start.
+// After that, these runtime values are read from the admin-managed system_settings table.
+const BOOTSTRAP_PUBLIC_HOST = process.env.PUBLIC_HOST || 'http://127.0.0.1:8787';
+const BOOTSTRAP_MAX_EXPIRES_IN_SECONDS = Math.min(
+  Math.max(numberFromEnv(process.env.MAX_EXPIRES_IN_SECONDS, CONTRACT_MAX_EXPIRES_IN_SECONDS), 1),
+  CONTRACT_MAX_EXPIRES_IN_SECONDS,
+);
+const BOOTSTRAP_DEFAULT_PROXY_ADDRESS = (process.env.DEFAULT_PROXY_ADDRESS || '139.180.223.206').trim();
+const BOOTSTRAP_DEFAULT_PROXY_PORT = Number(process.env.DEFAULT_PROXY_PORT || 443);
+const BOOTSTRAP_DEFAULT_PROXY_USERNAME = process.env.DEFAULT_PROXY_USERNAME || '';
+const BOOTSTRAP_DEFAULT_PROXY_PASSWORD = process.env.DEFAULT_PROXY_PASSWORD || '';
+const BOOTSTRAP_DEFAULT_PROXY_SECRET = process.env.DEFAULT_PROXY_SECRET || 'aff4456037ec453cde85935760a840f0';
+const BOOTSTRAP_APP_VERSION_CODE = Number(process.env.APP_VERSION_CODE || 1);
+const BOOTSTRAP_APP_VERSION_NAME = process.env.APP_VERSION_NAME || '1.0.0';
+const BOOTSTRAP_APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || '';
+const BOOTSTRAP_APP_VERSION_MESSAGE = process.env.APP_VERSION_MESSAGE || '';
+const BOOTSTRAP_APP_RELEASE_DATE = Number(process.env.APP_RELEASE_DATE || 0);
+const BOOTSTRAP_APP_APK_SIZE_BYTES = Number(process.env.APP_APK_SIZE_BYTES || 0);
+const BOOTSTRAP_APP_UPLOAD_PUBLIC_PATH = normalizePublicPath(process.env.APP_UPLOAD_PUBLIC_PATH || '/uploads/apks');
+const BOOTSTRAP_APP_UPLOAD_DIR = path.resolve(process.env.APP_UPLOAD_DIR || path.join(__dirname, 'uploads', 'apks'));
+const BOOTSTRAP_APP_UPLOAD_URL_BASE = String(process.env.APP_UPLOAD_URL_BASE || '').trim().replace(/\/+$/, '');
+const BOOTSTRAP_MAX_APK_UPLOAD_BYTES = Math.max(numberFromEnv(process.env.MAX_APK_UPLOAD_BYTES, 150 * 1024 * 1024), 1024 * 1024);
+const BUILTIN_DEFAULT_WALLET_TOKENS = [
   { symbol: 'ETZ', contractAddress: '0xc78dabf21594c76ad98a0b3ed103fcfcd9499999', decimals: 18 },
   { symbol: 'Piao', contractAddress: '0x68973e906a64b283ac90eb88cd561ba6c6681103', decimals: 18 },
   { symbol: 'Tea', contractAddress: '0x3142Db225d0262973715606c85B2B50a66f9b00C', decimals: 18 },
@@ -47,6 +60,183 @@ const DEFAULT_WALLET_TOKENS = [
   { symbol: 'Mu', contractAddress: '0x7677421f49776addcfc18cb851df0c24d02d8888', decimals: 18 },
   { symbol: 'Goods', contractAddress: '0x80B75C9c6773D255c32ADA8E971c0C4ba03088d0', decimals: 18 },
 ];
+
+
+const RUNTIME_SETTING_DEFINITIONS = [
+  {
+    key: 'publicHost',
+    group: 'base',
+    label: '服务公网地址',
+    type: 'string',
+    defaultValue: BOOTSTRAP_PUBLIC_HOST,
+    required: true,
+    maxLength: 255,
+    description: '用于生成红包 claimUrl，以及未配置 APK URL Base 时生成 APK 下载地址。',
+  },
+  {
+    key: 'maxExpiresInSeconds',
+    group: 'redPacket',
+    label: '红包最大有效期（秒）',
+    type: 'number',
+    defaultValue: BOOTSTRAP_MAX_EXPIRES_IN_SECONDS,
+    min: 1,
+    max: CONTRACT_MAX_EXPIRES_IN_SECONDS,
+    description: '不能超过合约 MAX_EXPIRES_IN，即 30 天。',
+  },
+  {
+    key: 'appUploadPublicPath',
+    group: 'clientUpdate',
+    label: 'APK 公开下载路径',
+    type: 'string',
+    defaultValue: BOOTSTRAP_APP_UPLOAD_PUBLIC_PATH,
+    required: true,
+    maxLength: 128,
+    description: '服务端公开 APK 的 URL path，例如 /uploads/apks。',
+  },
+  {
+    key: 'appUploadDir',
+    group: 'clientUpdate',
+    label: 'APK 保存目录',
+    type: 'string',
+    defaultValue: BOOTSTRAP_APP_UPLOAD_DIR,
+    required: true,
+    maxLength: 512,
+    description: '服务端本地保存 APK 文件的目录，可以填相对路径或绝对路径。',
+  },
+  {
+    key: 'appUploadUrlBase',
+    group: 'clientUpdate',
+    label: 'APK 下载 URL Base',
+    type: 'string',
+    defaultValue: BOOTSTRAP_APP_UPLOAD_URL_BASE,
+    maxLength: 512,
+    description: '如果使用 CDN/Nginx 分发 APK，可填完整 URL 前缀；留空则使用服务公网地址 + APK 公开下载路径。',
+  },
+  {
+    key: 'maxApkUploadMB',
+    group: 'clientUpdate',
+    label: 'APK 最大上传大小（MB）',
+    type: 'number',
+    defaultValue: Math.max(Math.floor(BOOTSTRAP_MAX_APK_UPLOAD_BYTES / 1024 / 1024), 1),
+    min: 1,
+    max: 2048,
+    description: '管理后台上传 APK 的最大文件大小。',
+  },
+  {
+    key: 'fallbackVersionCode',
+    group: 'clientUpdate',
+    label: '兜底版本号 versionCode',
+    type: 'number',
+    defaultValue: Number.isFinite(BOOTSTRAP_APP_VERSION_CODE) ? BOOTSTRAP_APP_VERSION_CODE : 1,
+    min: 1,
+    max: 2147483647,
+    description: '当后台还没有发布客户端版本时，版本检查接口使用此兜底版本号。',
+  },
+  {
+    key: 'fallbackVersionName',
+    group: 'clientUpdate',
+    label: '兜底版本名称 versionName',
+    type: 'string',
+    defaultValue: BOOTSTRAP_APP_VERSION_NAME,
+    required: true,
+    maxLength: 64,
+    description: '当后台还没有发布客户端版本时，版本检查接口使用此兜底版本名称。',
+  },
+  {
+    key: 'fallbackDownloadUrl',
+    group: 'clientUpdate',
+    label: '兜底 APK 下载地址',
+    type: 'string',
+    defaultValue: BOOTSTRAP_APP_DOWNLOAD_URL,
+    maxLength: 1024,
+    description: '当后台还没有发布客户端版本时，版本检查接口使用此兜底下载地址。',
+  },
+  {
+    key: 'fallbackVersionMessage',
+    group: 'clientUpdate',
+    label: '兜底更新内容',
+    type: 'text',
+    defaultValue: BOOTSTRAP_APP_VERSION_MESSAGE,
+    maxLength: 5000,
+    description: '当后台还没有发布客户端版本时，版本检查接口使用此兜底更新内容。',
+  },
+  {
+    key: 'fallbackReleaseDate',
+    group: 'clientUpdate',
+    label: '兜底发布日期',
+    type: 'number',
+    defaultValue: Number.isFinite(BOOTSTRAP_APP_RELEASE_DATE) ? BOOTSTRAP_APP_RELEASE_DATE : 0,
+    min: 0,
+    max: 4102444800,
+    description: 'Unix 秒时间戳；0 表示接口返回当前检查时间。',
+  },
+  {
+    key: 'fallbackApkSizeBytes',
+    group: 'clientUpdate',
+    label: '兜底 APK 大小（字节）',
+    type: 'number',
+    defaultValue: Number.isFinite(BOOTSTRAP_APP_APK_SIZE_BYTES) ? BOOTSTRAP_APP_APK_SIZE_BYTES : 0,
+    min: 0,
+    max: 10 * 1024 * 1024 * 1024,
+    description: '当后台还没有发布客户端版本时，版本检查接口返回的 APK 大小。',
+  },
+  {
+    key: 'proxyAddress',
+    group: 'proxy',
+    label: '客户端代理地址',
+    type: 'string',
+    defaultValue: BOOTSTRAP_DEFAULT_PROXY_ADDRESS,
+    required: true,
+    maxLength: 255,
+    description: '客户端 /api/v1/client/proxy 返回的代理 address。',
+  },
+  {
+    key: 'proxyPort',
+    group: 'proxy',
+    label: '客户端代理端口',
+    type: 'number',
+    defaultValue: Number.isFinite(BOOTSTRAP_DEFAULT_PROXY_PORT) ? BOOTSTRAP_DEFAULT_PROXY_PORT : 443,
+    min: 1,
+    max: 65535,
+    description: '客户端 /api/v1/client/proxy 返回的代理 port。',
+  },
+  {
+    key: 'proxyUsername',
+    group: 'proxy',
+    label: '客户端代理用户名',
+    type: 'string',
+    defaultValue: BOOTSTRAP_DEFAULT_PROXY_USERNAME,
+    maxLength: 255,
+    description: '客户端 /api/v1/client/proxy 返回的 username。',
+  },
+  {
+    key: 'proxyPassword',
+    group: 'proxy',
+    label: '客户端代理密码',
+    type: 'string',
+    defaultValue: BOOTSTRAP_DEFAULT_PROXY_PASSWORD,
+    maxLength: 255,
+    description: '客户端 /api/v1/client/proxy 返回的 password。',
+  },
+  {
+    key: 'proxySecret',
+    group: 'proxy',
+    label: '客户端代理 Secret',
+    type: 'string',
+    defaultValue: BOOTSTRAP_DEFAULT_PROXY_SECRET,
+    maxLength: 255,
+    description: '客户端 /api/v1/client/proxy 返回的 secret。',
+  },
+  {
+    key: 'walletTokens',
+    group: 'wallet',
+    label: '默认钱包代币列表',
+    type: 'json',
+    defaultValue: BUILTIN_DEFAULT_WALLET_TOKENS,
+    description: '客户端 /api/v1/wallet/default-tokens 返回的默认代币数组。',
+  },
+];
+const RUNTIME_SETTING_DEFINITION_MAP = new Map(RUNTIME_SETTING_DEFINITIONS.map((definition) => [definition.key, definition]));
 
 const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
@@ -87,6 +277,11 @@ const contractInterface = new Interface([
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
+}
+
+function numberFromEnv(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function normalizeAddress(value) {
@@ -147,7 +342,7 @@ function buildPacketResponse(packet, wallet) {
       && walletNorm === packet.creatorWallet
       && packet.onchainCreated
       && packet.remainingCount > 0
-      && ['empty', 'expired'].includes(status),
+      && status === 'expired',
     token: {
       tokenAddress: packet.tokenAddress,
       tokenSymbol: packet.tokenSymbol,
@@ -195,6 +390,13 @@ function normalizeAdminBasePath(value) {
   const withSlash = raw.startsWith('/') ? raw : `/${raw}`;
   const normalized = withSlash.replace(/\/+$/, '');
   return normalized || '/admin-console';
+}
+
+function normalizePublicPath(value) {
+  const raw = String(value || '/uploads/apks').trim();
+  const withSlash = raw.startsWith('/') ? raw : `/${raw}`;
+  const normalized = withSlash.replace(/\/+$/, '');
+  return normalized || '/uploads/apks';
 }
 
 function isAdminAuthConfigured() {
@@ -356,6 +558,360 @@ function maskSensitiveUrl(value) {
   }
 }
 
+function parseBooleanFlag(value, defaultValue = false) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  const raw = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(raw)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(raw)) return false;
+  return defaultValue;
+}
+
+
+function serializeSettingValue(value, type) {
+  if (type === 'json') return JSON.stringify(value ?? null);
+  if (type === 'number') return String(Number(value) || 0);
+  return String(value ?? '');
+}
+
+function normalizeSettingString(value, definition) {
+  let text = String(value ?? '').trim();
+  if (definition.key === 'publicHost' || definition.key === 'appUploadUrlBase') {
+    text = text.replace(/\/+$/, '');
+  }
+  if (definition.key === 'appUploadPublicPath') {
+    text = normalizePublicPath(text || definition.defaultValue);
+    if (!text.startsWith('/uploads')) {
+      throw new Error('APK 公开下载路径必须以 /uploads 开头，避免覆盖管理后台或业务接口');
+    }
+  }
+  if (definition.key === 'appUploadDir') {
+    if (!text) text = definition.defaultValue;
+    text = path.resolve(text);
+  }
+  if (definition.required && !text) throw new Error(`${definition.label}不能为空`);
+  if (definition.maxLength && text.length > definition.maxLength) {
+    throw new Error(`${definition.label}不能超过 ${definition.maxLength} 个字符`);
+  }
+  return text;
+}
+
+function normalizeSettingNumber(value, definition) {
+  const raw = value === '' || value === null || value === undefined ? definition.defaultValue : value;
+  const number = Number(raw);
+  if (!Number.isFinite(number)) throw new Error(`${definition.label}必须是数字`);
+  const integer = Math.trunc(number);
+  if (definition.min !== undefined && integer < definition.min) {
+    throw new Error(`${definition.label}不能小于 ${definition.min}`);
+  }
+  if (definition.max !== undefined && integer > definition.max) {
+    throw new Error(`${definition.label}不能大于 ${definition.max}`);
+  }
+  return integer;
+}
+
+function normalizeWalletTokensSetting(value) {
+  let tokens = value;
+  if (typeof tokens === 'string') {
+    const raw = tokens.trim();
+    tokens = raw ? JSON.parse(raw) : [];
+  }
+  if (!Array.isArray(tokens)) throw new Error('默认钱包代币列表必须是数组');
+  if (tokens.length > 50) throw new Error('默认钱包代币最多配置 50 个');
+
+  return tokens.map((item, index) => {
+    if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 个代币配置无效`);
+    const symbol = String(item.symbol || '').trim().slice(0, 32);
+    const contractAddressRaw = String(item.contractAddress || item.tokenAddress || '').trim();
+    const contractAddress = normalizeAddress(contractAddressRaw);
+    const decimals = Number(item.decimals);
+    if (!symbol) throw new Error(`第 ${index + 1} 个代币 symbol 不能为空`);
+    if (!contractAddress) throw new Error(`第 ${index + 1} 个代币 contractAddress 无效`);
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) {
+      throw new Error(`第 ${index + 1} 个代币 decimals 必须是 0-36 的整数`);
+    }
+    return { symbol, contractAddress, decimals };
+  });
+}
+
+function normalizeSettingValueForStorage(key, value) {
+  const definition = RUNTIME_SETTING_DEFINITION_MAP.get(key);
+  if (!definition) throw new Error(`未知参数：${key}`);
+
+  if (definition.type === 'number') return normalizeSettingNumber(value, definition);
+  if (definition.type === 'json') {
+    if (key === 'walletTokens') return normalizeWalletTokensSetting(value);
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  }
+  return normalizeSettingString(value, definition);
+}
+
+function parseSettingStoredValue(value, definition) {
+  try {
+    if (definition.type === 'number') return normalizeSettingNumber(value, definition);
+    if (definition.type === 'json') return normalizeSettingValueForStorage(definition.key, value);
+    return normalizeSettingString(value, definition);
+  } catch (_) {
+    return definition.defaultValue;
+  }
+}
+
+function buildRuntimeSettingsFromRows(rows = []) {
+  const rowMap = new Map(rows.map((row) => [row.setting_key, row.setting_value]));
+  const settings = {};
+
+  for (const definition of RUNTIME_SETTING_DEFINITIONS) {
+    const rawValue = rowMap.has(definition.key) ? rowMap.get(definition.key) : definition.defaultValue;
+    settings[definition.key] = parseSettingStoredValue(rawValue, definition);
+  }
+
+  settings.maxExpiresInSeconds = Math.min(
+    Math.max(Number(settings.maxExpiresInSeconds || BOOTSTRAP_MAX_EXPIRES_IN_SECONDS), 1),
+    CONTRACT_MAX_EXPIRES_IN_SECONDS,
+  );
+  settings.maxApkUploadMB = Math.min(Math.max(Number(settings.maxApkUploadMB || 1), 1), 2048);
+  settings.maxApkUploadBytes = settings.maxApkUploadMB * 1024 * 1024;
+  settings.appUploadPublicPath = normalizePublicPath(settings.appUploadPublicPath || BOOTSTRAP_APP_UPLOAD_PUBLIC_PATH);
+  settings.appUploadDir = path.resolve(settings.appUploadDir || BOOTSTRAP_APP_UPLOAD_DIR);
+  settings.publicHost = String(settings.publicHost || BOOTSTRAP_PUBLIC_HOST).replace(/\/+$/, '');
+  settings.appUploadUrlBase = String(settings.appUploadUrlBase || '').trim().replace(/\/+$/, '');
+  settings.walletTokens = Array.isArray(settings.walletTokens) ? settings.walletTokens : BUILTIN_DEFAULT_WALLET_TOKENS;
+  return settings;
+}
+
+function publicRuntimeSettingsForAdmin(settings) {
+  const result = {};
+  for (const definition of RUNTIME_SETTING_DEFINITIONS) {
+    result[definition.key] = settings[definition.key];
+  }
+  return result;
+}
+
+function runtimeSettingDefinitionsForAdmin() {
+  return RUNTIME_SETTING_DEFINITIONS.map((definition) => ({
+    key: definition.key,
+    group: definition.group,
+    label: definition.label,
+    type: definition.type,
+    required: Boolean(definition.required),
+    min: definition.min,
+    max: definition.max,
+    maxLength: definition.maxLength,
+    description: definition.description,
+  }));
+}
+
+const runtimeSettingsCache = {
+  values: null,
+  expiresAt: 0,
+};
+
+function clearRuntimeSettingsCache() {
+  runtimeSettingsCache.values = null;
+  runtimeSettingsCache.expiresAt = 0;
+}
+
+async function getRuntimeSettings(force = false) {
+  const now = Date.now();
+  if (!force && runtimeSettingsCache.values && runtimeSettingsCache.expiresAt > now) {
+    return runtimeSettingsCache.values;
+  }
+
+  let rows = [];
+  try {
+    rows = await db.getRuntimeSettingsRows();
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[runtime-settings-db-error]', error);
+  }
+
+  const values = buildRuntimeSettingsFromRows(rows);
+  runtimeSettingsCache.values = values;
+  runtimeSettingsCache.expiresAt = now + 15_000;
+  return values;
+}
+
+function sanitizeOriginalFilename(value) {
+  const basename = path.basename(String(value || 'app.apk')).trim();
+  const safe = basename.replace(/[^a-zA-Z0-9._()\-\u4e00-\u9fa5 ]/g, '_').slice(0, 180);
+  return safe || 'app.apk';
+}
+
+function buildApkDownloadUrl(filename, settings) {
+  const encodedName = encodeURIComponent(filename);
+  const uploadUrlBase = String(settings?.appUploadUrlBase || '').trim().replace(/\/+$/, '');
+  if (uploadUrlBase) return `${uploadUrlBase}/${encodedName}`;
+  const publicHost = String(settings?.publicHost || BOOTSTRAP_PUBLIC_HOST).trim().replace(/\/+$/, '');
+  const publicPath = normalizePublicPath(settings?.appUploadPublicPath || BOOTSTRAP_APP_UPLOAD_PUBLIC_PATH);
+  return `${publicHost}${publicPath}/${encodedName}`;
+}
+
+function createClientUploadError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+function readRequestBody(req, maxBytes, maxFileBytes = maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    let settled = false;
+
+    req.on('data', (chunk) => {
+      if (settled) return;
+      total += chunk.length;
+      if (total > maxBytes) {
+        settled = true;
+        reject(createClientUploadError(`APK 文件不能超过 ${Math.floor(maxFileBytes / 1024 / 1024)}MB`, 413));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    req.on('error', (error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    });
+
+    req.on('end', () => {
+      if (!settled) {
+        settled = true;
+        resolve(Buffer.concat(chunks));
+      }
+    });
+  });
+}
+
+function parseMultipartHeaders(headerText) {
+  return String(headerText || '')
+    .split(/\r?\n/)
+    .reduce((acc, line) => {
+      const index = line.indexOf(':');
+      if (index <= 0) return acc;
+      acc[line.slice(0, index).trim().toLowerCase()] = line.slice(index + 1).trim();
+      return acc;
+    }, {});
+}
+
+function parseContentDisposition(value) {
+  const result = {};
+  const text = String(value || '');
+  const regex = /([a-zA-Z0-9_-]+)=(?:"((?:\\"|[^"])*)"|([^;]*))/g;
+  let match;
+  while ((match = regex.exec(text))) {
+    result[match[1]] = String(match[2] ?? match[3] ?? '').replace(/\\"/g, '"');
+  }
+  return result;
+}
+
+async function parseMultipartForm(req, maxBytes, maxFileBytes = maxBytes) {
+  const contentType = String(req.get('content-type') || '');
+  const boundaryMatch = contentType.match(/multipart\/form-data\s*;\s*boundary=(?:"([^"]+)"|([^;]+))/i);
+  const boundaryText = (boundaryMatch?.[1] || boundaryMatch?.[2] || '').trim();
+  if (!boundaryText) throw createClientUploadError('请使用 multipart/form-data 上传 APK');
+
+  const body = await readRequestBody(req, maxBytes, maxFileBytes);
+  const boundary = Buffer.from(`--${boundaryText}`);
+  const headerSeparator = Buffer.from('\r\n\r\n');
+  const fields = {};
+  const files = [];
+  let cursor = body.indexOf(boundary);
+
+  while (cursor >= 0) {
+    cursor += boundary.length;
+    if (body[cursor] === 45 && body[cursor + 1] === 45) break;
+    if (body[cursor] === 13 && body[cursor + 1] === 10) cursor += 2;
+
+    const headerEnd = body.indexOf(headerSeparator, cursor);
+    if (headerEnd < 0) break;
+    const contentStart = headerEnd + headerSeparator.length;
+    const nextBoundary = body.indexOf(boundary, contentStart);
+    if (nextBoundary < 0) break;
+
+    let contentEnd = nextBoundary;
+    if (contentEnd >= 2 && body[contentEnd - 2] === 13 && body[contentEnd - 1] === 10) {
+      contentEnd -= 2;
+    }
+
+    const headers = parseMultipartHeaders(body.slice(cursor, headerEnd).toString('utf8'));
+    const disposition = parseContentDisposition(headers['content-disposition']);
+    const fieldname = disposition.name;
+    const content = body.slice(contentStart, contentEnd);
+
+    if (fieldname) {
+      if (Object.prototype.hasOwnProperty.call(disposition, 'filename')) {
+        files.push({
+          fieldname,
+          originalName: sanitizeOriginalFilename(disposition.filename),
+          mimeType: headers['content-type'] || 'application/octet-stream',
+          size: content.length,
+          buffer: content,
+        });
+      } else {
+        fields[fieldname] = content.toString('utf8');
+      }
+    }
+
+    cursor = nextBoundary;
+  }
+
+  return { fields, files };
+}
+
+async function saveUploadedApk(file, versionCode, settings) {
+  if (!file || !file.buffer || !file.size) return null;
+  const originalName = sanitizeOriginalFilename(file.originalName);
+  if (!originalName.toLowerCase().endsWith('.apk')) {
+    throw createClientUploadError('只支持上传 .apk 文件');
+  }
+  const maxApkUploadBytes = Number(settings?.maxApkUploadBytes || BOOTSTRAP_MAX_APK_UPLOAD_BYTES);
+  if (file.size > maxApkUploadBytes) {
+    throw createClientUploadError(`APK 文件不能超过 ${Math.floor(maxApkUploadBytes / 1024 / 1024)}MB`, 413);
+  }
+
+  const uploadDir = path.resolve(settings?.appUploadDir || BOOTSTRAP_APP_UPLOAD_DIR);
+  await fs.promises.mkdir(uploadDir, { recursive: true });
+  const sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+  const filename = `app-v${versionCode}-${Date.now()}-${sha256.slice(0, 12)}.apk`;
+  const filePath = path.join(uploadDir, filename);
+  await fs.promises.writeFile(filePath, file.buffer);
+
+  return {
+    downloadUrl: buildApkDownloadUrl(filename, settings),
+    apkFilename: filename,
+    apkOriginalName: originalName,
+    apkSizeBytes: file.size,
+    apkSha256: sha256,
+  };
+}
+
+function getEventTokenAddress(event) {
+  const token = event?.args?.token;
+  if (token === undefined || token === null) return '';
+  return normalizeAddress(String(token));
+}
+
+function getPacketTokenAddress(packet) {
+  return normalizeAddress(packet?.tokenAddress) || ZERO_ADDRESS;
+}
+
+function eventTokenMatchesPacket(event, packet) {
+  const eventToken = getEventTokenAddress(event);
+  return !eventToken || eventToken === getPacketTokenAddress(packet);
+}
+
+function getExpectedRefundAmountWei(packet) {
+  try {
+    return (BigInt(String(packet.amountPerClaimWei || '0')) * BigInt(Math.max(Number(packet.remainingCount || 0), 0))).toString();
+  } catch (_) {
+    return '0';
+  }
+}
+
 class MySqlDB {
   constructor() {
     this.pool = mysql.createPool({
@@ -444,6 +1000,107 @@ class MySqlDB {
         UNIQUE KEY uniq_packet_tx (packet_id, tx_hash)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS client_app_versions (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        version_code INT UNSIGNED NOT NULL,
+        version_name VARCHAR(64) NOT NULL,
+        release_notes TEXT NOT NULL,
+        download_url VARCHAR(1024) NOT NULL,
+        apk_filename VARCHAR(255) NOT NULL DEFAULT '',
+        apk_original_name VARCHAR(255) NOT NULL DEFAULT '',
+        apk_size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+        apk_sha256 VARCHAR(64) NOT NULL DEFAULT '',
+        force_update TINYINT(1) NOT NULL DEFAULT 0,
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        release_date BIGINT NOT NULL,
+        created_by VARCHAR(128) NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY uniq_version_code (version_code),
+        KEY idx_enabled_code (enabled, version_code),
+        KEY idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        setting_key VARCHAR(128) NOT NULL,
+        setting_value TEXT NOT NULL,
+        value_type VARCHAR(32) NOT NULL DEFAULT 'string',
+        label VARCHAR(128) NOT NULL DEFAULT '',
+        description VARCHAR(512) NOT NULL DEFAULT '',
+        updated_by VARCHAR(128) NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        PRIMARY KEY (setting_key),
+        KEY idx_updated_at (updated_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  }
+
+  async ensureSettingDefaults() {
+    const current = nowSeconds();
+    for (const definition of RUNTIME_SETTING_DEFINITIONS) {
+      await this.pool.query(
+        `INSERT IGNORE INTO system_settings (
+          setting_key, setting_value, value_type, label, description, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          definition.key,
+          serializeSettingValue(definition.defaultValue, definition.type),
+          definition.type,
+          definition.label,
+          definition.description || '',
+          'env-bootstrap',
+          current,
+          current,
+        ],
+      );
+    }
+  }
+
+  async getRuntimeSettingsRows() {
+    const [rows] = await this.pool.query(
+      `SELECT setting_key, setting_value, value_type, label, description, updated_by, created_at, updated_at
+       FROM system_settings`,
+    );
+    return rows;
+  }
+
+  async saveRuntimeSettings(values, updatedBy = '') {
+    const current = nowSeconds();
+    const entries = Object.entries(values || {}).filter(([key]) => RUNTIME_SETTING_DEFINITION_MAP.has(key));
+    for (const [key, rawValue] of entries) {
+      const definition = RUNTIME_SETTING_DEFINITION_MAP.get(key);
+      const normalizedValue = normalizeSettingValueForStorage(key, rawValue);
+      await this.pool.query(
+        `INSERT INTO system_settings (
+          setting_key, setting_value, value_type, label, description, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          setting_value = VALUES(setting_value),
+          value_type = VALUES(value_type),
+          label = VALUES(label),
+          description = VALUES(description),
+          updated_by = VALUES(updated_by),
+          updated_at = VALUES(updated_at)`,
+        [
+          key,
+          serializeSettingValue(normalizedValue, definition.type),
+          definition.type,
+          definition.label,
+          definition.description || '',
+          updatedBy,
+          current,
+          current,
+        ],
+      );
+    }
+    clearRuntimeSettingsCache();
+    return getRuntimeSettings(true);
   }
 
   async getPacket(packetId) {
@@ -764,13 +1421,13 @@ class MySqlDB {
     } else if (status === 'empty') {
       where.push("p.status <> 'refunded' AND p.remaining_count <= 0");
     } else if (status === 'expired') {
-      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at <= ?");
+      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at < ?");
       params.push(current);
     } else if (status === 'pending_create_confirm') {
-      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at > ? AND p.onchain_created = 0");
+      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at >= ? AND p.onchain_created = 0");
       params.push(current);
     } else if (status === 'active') {
-      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at > ? AND p.onchain_created = 1");
+      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at >= ? AND p.onchain_created = 1");
       params.push(current);
     }
 
@@ -787,9 +1444,9 @@ class MySqlDB {
         COUNT(*) AS totalPackets,
         SUM(CASE WHEN status = 'refunded' THEN 1 ELSE 0 END) AS refundedPackets,
         SUM(CASE WHEN status <> 'refunded' AND remaining_count <= 0 THEN 1 ELSE 0 END) AS emptyPackets,
-        SUM(CASE WHEN status <> 'refunded' AND remaining_count > 0 AND expires_at <= ? THEN 1 ELSE 0 END) AS expiredPackets,
-        SUM(CASE WHEN status <> 'refunded' AND remaining_count > 0 AND expires_at > ? AND onchain_created = 0 THEN 1 ELSE 0 END) AS pendingPackets,
-        SUM(CASE WHEN status <> 'refunded' AND remaining_count > 0 AND expires_at > ? AND onchain_created = 1 THEN 1 ELSE 0 END) AS activePackets,
+        SUM(CASE WHEN status <> 'refunded' AND remaining_count > 0 AND expires_at < ? THEN 1 ELSE 0 END) AS expiredPackets,
+        SUM(CASE WHEN status <> 'refunded' AND remaining_count > 0 AND expires_at >= ? AND onchain_created = 0 THEN 1 ELSE 0 END) AS pendingPackets,
+        SUM(CASE WHEN status <> 'refunded' AND remaining_count > 0 AND expires_at >= ? AND onchain_created = 1 THEN 1 ELSE 0 END) AS activePackets,
         COALESCE(SUM(count_total), 0) AS totalSlots,
         COALESCE(SUM(count_total - remaining_count), 0) AS claimedSlots,
         COALESCE(SUM(CAST(total_amount_wei AS DECIMAL(65, 0))), 0) AS totalAmountWei
@@ -887,7 +1544,7 @@ class MySqlDB {
         CASE
           WHEN p.status = 'refunded' THEN 'refunded'
           WHEN p.remaining_count <= 0 THEN 'empty'
-          WHEN p.expires_at <= ? THEN 'expired'
+          WHEN p.expires_at < ? THEN 'expired'
           WHEN p.onchain_created = 0 THEN 'pending_create_confirm'
           ELSE 'active'
         END AS runtime_status,
@@ -929,7 +1586,7 @@ class MySqlDB {
         CASE
           WHEN p.status = 'refunded' THEN 'refunded'
           WHEN p.remaining_count <= 0 THEN 'empty'
-          WHEN p.expires_at <= ? THEN 'expired'
+          WHEN p.expires_at < ? THEN 'expired'
           WHEN p.onchain_created = 0 THEN 'pending_create_confirm'
           ELSE 'active'
         END AS runtime_status,
@@ -1177,6 +1834,139 @@ class MySqlDB {
     };
   }
 
+  async getClientVersionPage(options = {}) {
+    const page = Math.max(Number(options.page) || 1, 1);
+    const safeLimit = Math.min(Math.max(Number(options.pageSize) || 20, 1), 200);
+    const safeOffset = Math.max(Number(options.offset) || ((page - 1) * safeLimit), 0);
+    const where = [];
+    const params = [];
+
+    const search = String(options.search || '').trim();
+    if (search) {
+      const term = `%${search}%`;
+      where.push(`(CAST(version_code AS CHAR) LIKE ? OR version_name LIKE ? OR release_notes LIKE ? OR apk_original_name LIKE ? OR apk_sha256 LIKE ?)`);
+      params.push(term, term, term, term, term);
+    }
+
+    if (options.enabled === '0' || options.enabled === '1') {
+      where.push('enabled = ?');
+      params.push(Number(options.enabled));
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const [countRows] = await this.pool.query(
+      `SELECT COUNT(*) AS total FROM client_app_versions ${whereSql}`,
+      params,
+    );
+    const [rows] = await this.pool.query(
+      `SELECT id, version_code, version_name, release_notes, download_url, apk_filename,
+              apk_original_name, apk_size_bytes, apk_sha256, force_update, enabled,
+              release_date, created_by, created_at, updated_at
+       FROM client_app_versions
+       ${whereSql}
+       ORDER BY version_code DESC, created_at DESC, id DESC
+       LIMIT ? OFFSET ?`,
+      [...params, safeLimit, safeOffset],
+    );
+
+    return {
+      rows,
+      page,
+      pageSize: safeLimit,
+      total: Number(countRows[0]?.total || 0),
+    };
+  }
+
+  async getClientVersionByCode(versionCode) {
+    const [rows] = await this.pool.query(
+      `SELECT id, version_code, version_name, release_notes, download_url, apk_filename,
+              apk_original_name, apk_size_bytes, apk_sha256, force_update, enabled,
+              release_date, created_by, created_at, updated_at
+       FROM client_app_versions
+       WHERE version_code = ?
+       LIMIT 1`,
+      [versionCode],
+    );
+    return rows[0] || null;
+  }
+
+  async getClientVersionById(id) {
+    const [rows] = await this.pool.query(
+      `SELECT id, version_code, version_name, release_notes, download_url, apk_filename,
+              apk_original_name, apk_size_bytes, apk_sha256, force_update, enabled,
+              release_date, created_by, created_at, updated_at
+       FROM client_app_versions
+       WHERE id = ?
+       LIMIT 1`,
+      [id],
+    );
+    return rows[0] || null;
+  }
+
+  async getLatestClientVersion() {
+    const [rows] = await this.pool.query(
+      `SELECT id, version_code, version_name, release_notes, download_url, apk_filename,
+              apk_original_name, apk_size_bytes, apk_sha256, force_update, enabled,
+              release_date, created_by, created_at, updated_at
+       FROM client_app_versions
+       WHERE enabled = 1
+       ORDER BY version_code DESC, id DESC
+       LIMIT 1`,
+    );
+    return rows[0] || null;
+  }
+
+  async saveClientVersion(version) {
+    const current = nowSeconds();
+    await this.pool.query(
+      `INSERT INTO client_app_versions (
+        version_code, version_name, release_notes, download_url, apk_filename,
+        apk_original_name, apk_size_bytes, apk_sha256, force_update, enabled,
+        release_date, created_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        version_name = VALUES(version_name),
+        release_notes = VALUES(release_notes),
+        download_url = VALUES(download_url),
+        apk_filename = VALUES(apk_filename),
+        apk_original_name = VALUES(apk_original_name),
+        apk_size_bytes = VALUES(apk_size_bytes),
+        apk_sha256 = VALUES(apk_sha256),
+        force_update = VALUES(force_update),
+        enabled = VALUES(enabled),
+        release_date = VALUES(release_date),
+        created_by = VALUES(created_by),
+        updated_at = VALUES(updated_at)`,
+      [
+        version.versionCode,
+        version.versionName,
+        version.releaseNotes,
+        version.downloadUrl,
+        version.apkFilename,
+        version.apkOriginalName,
+        version.apkSizeBytes,
+        version.apkSha256,
+        version.forceUpdate ? 1 : 0,
+        version.enabled ? 1 : 0,
+        version.releaseDate || current,
+        version.createdBy || '',
+        current,
+        current,
+      ],
+    );
+    return this.getClientVersionByCode(version.versionCode);
+  }
+
+  async setClientVersionEnabled(id, enabled) {
+    await this.pool.query(
+      `UPDATE client_app_versions
+       SET enabled = ?, updated_at = ?
+       WHERE id = ?`,
+      [enabled ? 1 : 0, nowSeconds(), id],
+    );
+    return this.getClientVersionById(id);
+  }
+
   mapPacket(row, claims = []) {
     return {
       packetId: row.packet_id,
@@ -1270,8 +2060,45 @@ app.get('/healthz', async (_, res) => {
   });
 });
 
-app.get('/api/v1/wallet/default-tokens', (_req, res) => {
-  return res.json({ ok: true, data: { tokens: DEFAULT_WALLET_TOKENS } });
+app.get('/api/v1/wallet/default-tokens', async (_req, res, next) => {
+  try {
+    const settings = await getRuntimeSettings();
+    return res.json({ ok: true, data: { tokens: settings.walletTokens } });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.use((req, res, next) => {
+  Promise.resolve().then(async () => {
+    if (!['GET', 'HEAD'].includes(req.method)) return next();
+
+    let settings;
+    try {
+      settings = await getRuntimeSettings();
+    } catch (_) {
+      settings = buildRuntimeSettingsFromRows([]);
+    }
+
+    const publicPath = normalizePublicPath(settings.appUploadPublicPath || BOOTSTRAP_APP_UPLOAD_PUBLIC_PATH);
+    if (req.path !== publicPath && !req.path.startsWith(`${publicPath}/`)) return next();
+
+    const relativePath = decodeURIComponent(req.path.slice(publicPath.length).replace(/^\/+/, ''));
+    const filename = path.basename(relativePath);
+    if (!filename || filename !== relativePath || !filename.toLowerCase().endsWith('.apk')) {
+      return res.status(404).json({ ok: false, message: 'not found' });
+    }
+
+    const filePath = path.join(path.resolve(settings.appUploadDir || BOOTSTRAP_APP_UPLOAD_DIR), filename);
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Cache-Control', 'public, max-age=2592000');
+    }
+    return res.sendFile(filePath, (error) => {
+      if (error) return next();
+      return undefined;
+    });
+  }).catch(next);
 });
 
 function adminAsync(handler) {
@@ -1313,6 +2140,16 @@ function buildAdminWalletOptions(req, maxPageSize = 200) {
   return {
     ...paging,
     search: String(req.query.search || '').trim(),
+  };
+}
+
+function buildAdminClientVersionOptions(req, maxPageSize = 100) {
+  const paging = parseAdminPageParams(req.query, maxPageSize);
+  const enabled = String(req.query.enabled ?? '').trim();
+  return {
+    ...paging,
+    search: String(req.query.search || '').trim(),
+    enabled: enabled === '0' || enabled === '1' ? enabled : '',
   };
 }
 
@@ -1431,6 +2268,104 @@ app.get(`${ADMIN_BASE_PATH}/wallets`, adminRequireAuth, adminAsync(async (req, r
   return res.json({ ok: true, data: result });
 }));
 
+app.get(`${ADMIN_BASE_PATH}/client-versions`, adminRequireAuth, adminAsync(async (req, res) => {
+  const result = await db.getClientVersionPage(buildAdminClientVersionOptions(req, 100));
+  return res.json({ ok: true, data: result });
+}));
+
+app.post(`${ADMIN_BASE_PATH}/client-versions`, adminRequireAuth, adminAsync(async (req, res) => {
+  const runtimeSettings = await getRuntimeSettings();
+  let form;
+  try {
+    form = await parseMultipartForm(req, runtimeSettings.maxApkUploadBytes + (256 * 1024), runtimeSettings.maxApkUploadBytes);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ ok: false, message: error.message || 'APK 上传失败' });
+  }
+
+  const fields = form.fields || {};
+  const versionCode = parsePositiveInt(fields.versionCode || fields.updateVersionCode || fields.code);
+  const versionName = String(fields.versionName || fields.updateVersionName || fields.name || '').trim().slice(0, 64);
+  const releaseNotes = String(fields.releaseNotes || fields.updateContent || fields.message || '').trim().slice(0, 5000);
+  const releaseDate = parseAdminDateSeconds(fields.releaseDate, false) || nowSeconds();
+  const enabled = parseBooleanFlag(fields.enabled, true);
+  const forceUpdate = parseBooleanFlag(fields.forceUpdate || fields.force, false);
+
+  if (!versionCode) return badRequest(res, 'versionCode invalid');
+  if (!versionName) return badRequest(res, 'versionName required');
+  if (!releaseNotes) return badRequest(res, 'releaseNotes required');
+
+  const uploadFile = (form.files || []).find((file) => ['apkFile', 'apk', 'file', 'upload'].includes(file.fieldname));
+  let apkInfo = null;
+  if (uploadFile) {
+    try {
+      apkInfo = await saveUploadedApk(uploadFile, versionCode, runtimeSettings);
+    } catch (error) {
+      return res.status(error.statusCode || 400).json({ ok: false, message: error.message || 'APK 保存失败' });
+    }
+  }
+
+  const existing = await db.getClientVersionByCode(versionCode);
+  const externalDownloadUrl = String(fields.downloadUrl || '').trim();
+  const downloadUrl = apkInfo?.downloadUrl || externalDownloadUrl || existing?.download_url || '';
+  if (!downloadUrl) return badRequest(res, 'apkFile or downloadUrl required');
+
+  const version = await db.saveClientVersion({
+    versionCode,
+    versionName,
+    releaseNotes,
+    downloadUrl,
+    apkFilename: apkInfo?.apkFilename || existing?.apk_filename || '',
+    apkOriginalName: apkInfo?.apkOriginalName || existing?.apk_original_name || '',
+    apkSizeBytes: apkInfo?.apkSizeBytes || Number(existing?.apk_size_bytes || 0),
+    apkSha256: apkInfo?.apkSha256 || existing?.apk_sha256 || '',
+    forceUpdate,
+    enabled,
+    releaseDate,
+    createdBy: req.adminUser || ADMIN_USERNAME,
+  });
+
+  return res.json({ ok: true, data: version });
+}));
+
+app.post(`${ADMIN_BASE_PATH}/client-versions/:id/enabled`, adminRequireAuth, adminAsync(async (req, res) => {
+  const id = parsePositiveInt(req.params.id);
+  if (!id) return badRequest(res, 'id invalid');
+  if (req.body?.enabled === undefined) return badRequest(res, 'enabled required');
+  const version = await db.setClientVersionEnabled(id, parseBooleanFlag(req.body.enabled, true));
+  if (!version) return res.status(404).json({ ok: false, message: 'not found' });
+  return res.json({ ok: true, data: version });
+}));
+
+app.get(`${ADMIN_BASE_PATH}/settings`, adminRequireAuth, adminAsync(async (_req, res) => {
+  const settings = await getRuntimeSettings(true);
+  return res.json({
+    ok: true,
+    data: {
+      values: publicRuntimeSettingsForAdmin(settings),
+      definitions: runtimeSettingDefinitionsForAdmin(),
+      updatedAt: nowSeconds(),
+    },
+  });
+}));
+
+app.post(`${ADMIN_BASE_PATH}/settings`, adminRequireAuth, adminAsync(async (req, res) => {
+  let settings;
+  try {
+    settings = await db.saveRuntimeSettings(req.body || {}, req.adminUser || ADMIN_USERNAME);
+  } catch (error) {
+    return badRequest(res, error.message || '参数保存失败');
+  }
+
+  return res.json({
+    ok: true,
+    data: {
+      values: publicRuntimeSettingsForAdmin(settings),
+      definitions: runtimeSettingDefinitionsForAdmin(),
+      updatedAt: nowSeconds(),
+    },
+  });
+}));
+
 app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, res) => {
   let rpcOk = true;
   let blockNumber = null;
@@ -1443,20 +2378,24 @@ app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, r
   let dbOk = true;
   let dbVersion = '';
   let tableRows = [];
+  let latestAppVersion = null;
   try {
     const [versionRows] = await db.pool.query('SELECT VERSION() AS version');
     dbVersion = versionRows[0]?.version || '';
     const [tables] = await db.pool.query(
       `SELECT TABLE_NAME AS tableName, TABLE_ROWS AS estimatedRows
        FROM information_schema.TABLES
-       WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('red_packets', 'red_packet_claims', 'red_packet_refunds')
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('red_packets', 'red_packet_claims', 'red_packet_refunds', 'client_app_versions', 'system_settings')
        ORDER BY TABLE_NAME ASC`,
       [MYSQL_DATABASE],
     );
     tableRows = tables;
+    latestAppVersion = await db.getLatestClientVersion();
   } catch (_) {
     dbOk = false;
   }
+
+  const runtimeSettings = await getRuntimeSettings();
 
   return res.json({
     ok: true,
@@ -1470,8 +2409,17 @@ app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, r
         contractAddress: CONTRACT_ADDRESS,
         rpcUrl: maskSensitiveUrl(RPC_URL),
         mysql: `${MYSQL_USER}@${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE}`,
-        appVersion: `${APP_VERSION_NAME} (${APP_VERSION_CODE})`,
-        proxy: `${DEFAULT_PROXY_ADDRESS}:${DEFAULT_PROXY_PORT}${DEFAULT_PROXY_USERNAME ? ` user=${DEFAULT_PROXY_USERNAME}` : ''}`,
+        appVersion: latestAppVersion
+          ? `${latestAppVersion.version_name} (${latestAppVersion.version_code})`
+          : `${runtimeSettings.fallbackVersionName} (${runtimeSettings.fallbackVersionCode})`,
+        publicHost: runtimeSettings.publicHost,
+        appUploadPath: runtimeSettings.appUploadPublicPath,
+        appUploadDir: runtimeSettings.appUploadDir,
+        appUploadUrlBase: runtimeSettings.appUploadUrlBase || '-',
+        maxApkUploadMB: runtimeSettings.maxApkUploadMB,
+        maxExpiresInSeconds: runtimeSettings.maxExpiresInSeconds,
+        proxy: `${runtimeSettings.proxyAddress}:${runtimeSettings.proxyPort}${runtimeSettings.proxyUsername ? ` user=${runtimeSettings.proxyUsername}` : ''}`,
+        walletTokens: Array.isArray(runtimeSettings.walletTokens) ? runtimeSettings.walletTokens.length : 0,
         adminApiBasePath: ADMIN_BASE_PATH,
         adminWebBasePath: ADMIN_WEB_BASE_PATH,
       },
@@ -1558,6 +2506,7 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
     packetType,
   } = req.body || {};
 
+  const runtimeSettings = await getRuntimeSettings();
   const creator = normalizeAddress(creatorWallet);
   const countNum = parsePositiveInt(count);
   const totalWei = parsePositiveBigInt(totalAmountWei);
@@ -1572,7 +2521,12 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
   if (!creator) return badRequest(res, 'creatorWallet invalid');
   if (!countNum || countNum > MAX_PACKET_COUNT) return badRequest(res, `count must be 1-${MAX_PACKET_COUNT}`);
   if (!totalWei) return badRequest(res, 'totalAmountWei invalid');
-  if (!expiresAtNum || expiresAtNum <= nowSeconds()) return badRequest(res, 'expiresAt must be in the future');
+  const currentSeconds = nowSeconds();
+  if (!expiresAtNum || expiresAtNum <= currentSeconds) return badRequest(res, 'expiresAt must be in the future');
+  const maxExpiresInSeconds = Number(runtimeSettings.maxExpiresInSeconds || BOOTSTRAP_MAX_EXPIRES_IN_SECONDS);
+  if (maxExpiresInSeconds > 0 && expiresAtNum > currentSeconds + maxExpiresInSeconds) {
+    return badRequest(res, `expiresAt must be within ${maxExpiresInSeconds} seconds`);
+  }
   if (totalWei % BigInt(countNum) !== 0n) return badRequest(res, 'totalAmountWei must be divisible by count');
   if (!isNativeBnb && !tokenAddr) return badRequest(res, 'tokenAddress invalid');
   if (!tokenSymbolClean) return badRequest(res, 'tokenSymbol invalid');
@@ -1580,7 +2534,7 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
 
   const packetId = `tg-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
   const amountPerClaimWei = totalWei / BigInt(countNum);
-  const createdAt = nowSeconds();
+  const createdAt = currentSeconds;
 
   const packet = {
     packetId,
@@ -1595,15 +2549,15 @@ app.post('/api/v1/red-packets/prepare-create', async (req, res) => {
     expiresAt: expiresAtNum,
     status: 'pending_create_confirm',
     onchainCreated: false,
-    tokenAddress: tokenAddr || '0x0000000000000000000000000000000000000000',
+    tokenAddress: tokenAddr || ZERO_ADDRESS,
     tokenSymbol: tokenSymbolClean,
     tokenDecimals: tokenDecimalsNum,
     greeting: typeof greeting === 'string' ? greeting : '',
     packetType: typeof packetType === 'string' ? packetType : '',
     chainId: CHAIN_ID,
     contractAddress: CONTRACT_ADDRESS,
-    claimUrl: `${HOST}/claim/${packetId}`,
-    legacyClaimUrl: `${HOST}/claim/${packetId}`,
+    claimUrl: `${runtimeSettings.publicHost}/claim/${packetId}`,
+    legacyClaimUrl: `${runtimeSettings.publicHost}/claim/${packetId}`,
     createdAt,
     updatedAt: createdAt,
   };
@@ -1655,6 +2609,7 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
 
   if (eventPacketIdHex !== packet.packetIdHex.toLowerCase()) return badRequest(res, 'PacketCreated packetId mismatch');
   if (eventCreator !== packet.creatorWallet) return badRequest(res, 'PacketCreated creator mismatch');
+  if (!eventTokenMatchesPacket(event, packet)) return badRequest(res, 'PacketCreated token mismatch');
   if (eventTotal !== packet.totalAmountWei) return badRequest(res, 'PacketCreated total mismatch');
   if (eventCount !== packet.count) return badRequest(res, 'PacketCreated count mismatch');
   if (eventExpiresAt !== Number(packet.expiresAt)) return badRequest(res, 'PacketCreated expiresAt mismatch');
@@ -1704,14 +2659,15 @@ app.get('/api/v1/red-packets/:packetId', async (req, res) => {
 });
 
 app.get('/api/v1/client/proxy', async (_req, res) => {
+  const runtimeSettings = await getRuntimeSettings();
   return res.json({
     ok: true,
     data: {
-      address: DEFAULT_PROXY_ADDRESS,
-      port: DEFAULT_PROXY_PORT,
-      username: DEFAULT_PROXY_USERNAME,
-      password: DEFAULT_PROXY_PASSWORD,
-      secret: DEFAULT_PROXY_SECRET,
+      address: runtimeSettings.proxyAddress,
+      port: runtimeSettings.proxyPort,
+      username: runtimeSettings.proxyUsername,
+      password: runtimeSettings.proxyPassword,
+      secret: runtimeSettings.proxySecret,
       updatedAt: nowSeconds(),
     },
   });
@@ -1720,11 +2676,31 @@ app.get('/api/v1/client/proxy', async (_req, res) => {
 app.get('/api/v1/client/version/check', async (req, res) => {
   const clientVersionCode = Number(req.query.versionCode || 0);
   const clientVersionName = String(req.query.versionName || '').trim();
-  const hasUpdate = clientVersionCode > 0
-    ? clientVersionCode < APP_VERSION_CODE
-    : true;
   const checkedAt = nowSeconds();
-  const releaseDate = APP_RELEASE_DATE > 0 ? APP_RELEASE_DATE : checkedAt;
+  const runtimeSettings = await getRuntimeSettings();
+  let latestVersion = null;
+
+  try {
+    latestVersion = await db.getLatestClientVersion();
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[client-version-check-db-error]', error);
+  }
+
+  const serverVersionCode = latestVersion ? Number(latestVersion.version_code || 0) : Number(runtimeSettings.fallbackVersionCode || 1);
+  const serverVersionName = latestVersion ? String(latestVersion.version_name || '') : String(runtimeSettings.fallbackVersionName || '1.0.0');
+  const releaseDate = latestVersion
+    ? Number(latestVersion.release_date || latestVersion.created_at || checkedAt)
+    : (Number(runtimeSettings.fallbackReleaseDate || 0) > 0 ? Number(runtimeSettings.fallbackReleaseDate) : checkedAt);
+  const apkSizeBytes = latestVersion
+    ? Number(latestVersion.apk_size_bytes || 0)
+    : Number(runtimeSettings.fallbackApkSizeBytes || 0);
+  const downloadUrl = latestVersion ? String(latestVersion.download_url || '') : String(runtimeSettings.fallbackDownloadUrl || '');
+  const messageText = latestVersion ? String(latestVersion.release_notes || '') : String(runtimeSettings.fallbackVersionMessage || '');
+  const forceUpdate = latestVersion ? Boolean(latestVersion.force_update) : false;
+  const hasUpdate = clientVersionCode > 0
+    ? clientVersionCode < serverVersionCode
+    : true;
 
   return res.json({
     ok: true,
@@ -1732,12 +2708,14 @@ app.get('/api/v1/client/version/check', async (req, res) => {
       hasUpdate,
       currentVersionCode: clientVersionCode,
       currentVersionName: clientVersionName,
-      versionCode: APP_VERSION_CODE,
-      versionName: APP_VERSION_NAME,
+      versionCode: serverVersionCode,
+      versionName: serverVersionName,
       releaseDate,
-      apkSizeBytes: APP_APK_SIZE_BYTES > 0 ? APP_APK_SIZE_BYTES : null,
-      downloadUrl: hasUpdate ? APP_DOWNLOAD_URL : '',
-      message: APP_VERSION_MESSAGE,
+      apkSizeBytes: apkSizeBytes > 0 ? apkSizeBytes : null,
+      downloadUrl: hasUpdate ? downloadUrl : '',
+      message: messageText,
+      releaseNotes: messageText,
+      forceUpdate: hasUpdate ? forceUpdate : false,
       checkedAt,
     },
   });
@@ -1805,6 +2783,7 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
 
   if (eventPacketIdHex !== packet.packetIdHex.toLowerCase()) return badRequest(res, 'Claimed packetId mismatch');
   if (eventClaimer !== claimerAddress) return badRequest(res, 'Claimed claimer mismatch');
+  if (!eventTokenMatchesPacket(event, packet)) return badRequest(res, 'Claimed token mismatch');
   if (eventAmount !== packet.amountPerClaimWei) return badRequest(res, 'Claimed amount mismatch');
 
   let updated;
@@ -1847,6 +2826,8 @@ app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return badRequest(res, 'txHash invalid');
   if (creatorAddress !== packet.creatorWallet) return badRequest(res, 'creator mismatch');
   if (!packet.onchainCreated) return badRequest(res, 'packet not confirmed on chain');
+  if (packet.remainingCount <= 0) return badRequest(res, 'nothing to refund');
+  if (nowSeconds() <= Number(packet.expiresAt)) return badRequest(res, 'packet not expired');
 
   const receipt = await getTransactionReceipt(txHash);
   if (!receipt || receipt.status !== 1) return badRequest(res, 'transaction not confirmed');
@@ -1861,6 +2842,8 @@ app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
 
   if (eventPacketIdHex !== packet.packetIdHex.toLowerCase()) return badRequest(res, 'Refunded packetId mismatch');
   if (eventCreator !== creatorAddress) return badRequest(res, 'Refunded creator mismatch');
+  if (!eventTokenMatchesPacket(event, packet)) return badRequest(res, 'Refunded token mismatch');
+  if (eventAmount !== getExpectedRefundAmountWei(packet)) return badRequest(res, 'Refunded amount mismatch');
 
   let updated;
   try {
@@ -1895,6 +2878,7 @@ const port = Number(process.env.PORT || 8787);
 
 (async () => {
   await db.ensureSchema();
+  await db.ensureSettingDefaults();
   app.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`red-packet service listening on http://127.0.0.1:${port}`);

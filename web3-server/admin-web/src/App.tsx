@@ -4,6 +4,7 @@ import {
   GiftOutlined,
   HistoryOutlined,
   LogoutOutlined,
+  MobileOutlined,
   ReloadOutlined,
   RollbackOutlined,
   SettingOutlined,
@@ -20,6 +21,7 @@ import PacketDetailPage from './pages/PacketDetail';
 import ClaimsPage from './pages/Claims';
 import RefundsPage from './pages/Refunds';
 import WalletsPage from './pages/Wallets';
+import ClientVersionsPage from './pages/ClientVersions';
 import SystemPage from './pages/System';
 
 type AdminUser = {
@@ -56,6 +58,7 @@ function AdminShell({ user, onLogout }: { user: AdminUser; onLogout: () => void 
       { path: '/claims', name: '领取记录', icon: <HistoryOutlined /> },
       { path: '/refunds', name: '退款记录', icon: <RollbackOutlined /> },
       { path: '/wallets', name: '钱包统计', icon: <WalletOutlined /> },
+      { path: '/client-versions', name: '客户端版本', icon: <MobileOutlined /> },
       { path: '/system', name: '系统状态', icon: <SettingOutlined /> },
     ],
   };
@@ -148,6 +151,7 @@ export default function App() {
         <Route path="claims" element={<ClaimsPage />} />
         <Route path="refunds" element={<RefundsPage />} />
         <Route path="wallets" element={<WalletsPage />} />
+        <Route path="client-versions" element={<ClientVersionsPage />} />
         <Route path="system" element={<SystemPage />} />
       </Route>
       <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />

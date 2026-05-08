@@ -162,6 +162,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     private SizeNotifierFrameLayout contentView;
     private UniversalRecyclerView listView;
     private boolean hasClientUpdate;
+    private ClientUpdateInfo clientUpdateInfo = new ClientUpdateInfo();
     private View actionBarBackground;
 
     private ActionBarMenuItem searchItem, otherItem;
@@ -229,15 +230,224 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     private void requestClientUpdateState() {
+        requestClientUpdateState(false);
+    }
+
+    private void requestClientUpdateState(boolean showDialogWhenDone) {
         ServerApiManager.checkVersion(new ServerApiManager.VersionCheckCallback() {
             @Override
             public void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String releaseDate, String message) {
-                hasClientUpdate = hasUpdate;
-                if (listView != null) {
-                    listView.adapter.update(true);
+                ClientUpdateInfo info = buildClientUpdateInfo(hasUpdate, updateUrl, latestVersion, releaseDate, message);
+                AndroidUtilities.runOnUIThread(() -> {
+                    clientUpdateInfo = info;
+                    hasClientUpdate = info.hasUpdate;
+                    if (listView != null) {
+                        listView.adapter.update(true);
+                    }
+                    if (showDialogWhenDone && getParentActivity() != null) {
+                        showClientUpdateDialog(info);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String error) {
+                if (!showDialogWhenDone) {
+                    return;
                 }
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (getParentActivity() == null) {
+                        return;
+                    }
+                    BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(
+                            R.raw.chats_infotip,
+                            TextUtils.isEmpty(error) ? LocaleController.getString(R.string.UnknownError) : error
+                    ).show();
+                });
             }
         });
+    }
+
+    private ClientUpdateInfo buildClientUpdateInfo(boolean hasUpdate, String updateUrl, String latestVersion, String releaseDate, String message) {
+        ClientUpdateInfo info = new ClientUpdateInfo();
+        info.hasUpdate = hasUpdate;
+        info.updateUrl = updateUrl;
+        info.versionName = latestVersion;
+        info.versionCode = extractClientUpdateVersionCode(updateUrl, latestVersion, message);
+        info.releaseDate = formatClientUpdateDate(releaseDate);
+        info.releaseNotes = message;
+        return info;
+    }
+
+    private String extractClientUpdateVersionCode(String updateUrl, String latestVersion, String message) {
+        String value = findFirstMatch(updateUrl, "(?:^|[/_-])app-v(\\d+)(?:[-_.]|$)");
+        if (!TextUtils.isEmpty(value)) {
+            return value;
+        }
+        value = findFirstMatch(message, "(?:versionCode|version_code|版本号)\\s*[:：=]\\s*(\\d+)");
+        if (!TextUtils.isEmpty(value)) {
+            return value;
+        }
+        value = findFirstMatch(latestVersion, "\\((\\d+)\\)");
+        if (!TextUtils.isEmpty(value)) {
+            return value;
+        }
+        value = findFirstMatch(latestVersion, "^\\s*(\\d+)\\s*$");
+        return value;
+    }
+
+    private String findFirstMatch(String text, String pattern) {
+        if (TextUtils.isEmpty(text)) {
+            return "";
+        }
+        try {
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(pattern, java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return "";
+    }
+
+    private String formatClientUpdateDate(String releaseDate) {
+        if (TextUtils.isEmpty(releaseDate)) {
+            return "";
+        }
+        String trimmed = releaseDate.trim();
+        try {
+            long value = Long.parseLong(trimmed);
+            if (value > 0) {
+                if (value < 100000000000L) {
+                    value *= 1000L;
+                }
+                return formatClientUpdateDate(value);
+            }
+        } catch (Throwable ignore) {
+        }
+        return trimmed;
+    }
+
+    private String formatClientUpdateDate(long timeMillis) {
+        try {
+            return new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new java.util.Date(timeMillis));
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return "";
+        }
+    }
+
+    private void showClientUpdateDialog(ClientUpdateInfo info) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        if (info == null || !info.hasUpdate) {
+            showCurrentClientVersionDialog();
+            return;
+        }
+
+        StringBuilder updateInfo = new StringBuilder();
+        updateInfo.append("更新版本：").append(displayText(info.versionName)).append('\n');
+        updateInfo.append("更新日期：").append(displayText(info.releaseDate)).append('\n');
+        updateInfo.append("更新内容：\n").append(displayText(info.releaseNotes));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
+        builder.setMessage(updateInfo.toString());
+        builder.setPositiveButton("确认更新", (dialog, which) -> startClientUpdateDownload(info));
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(builder.create());
+    }
+
+    private void showCurrentClientVersionDialog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        StringBuilder currentInfo = new StringBuilder();
+        currentInfo.append("当前已经是最新版本\n");
+        currentInfo.append("现在版本：").append(displayText(getCurrentClientVersionName())).append('\n');
+        currentInfo.append("更新日期：").append(displayText(getCurrentClientUpdateDate()));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
+        builder.setMessage(currentInfo.toString());
+        builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
+        showDialog(builder.create());
+    }
+
+    private void startClientUpdateDownload(ClientUpdateInfo info) {
+        if (info == null || getParentActivity() == null) {
+            return;
+        }
+        String updateUrl = info.updateUrl;
+        if (!TextUtils.isEmpty(updateUrl)) {
+            if (enqueueAppUpdateDownload(updateUrl, info.versionName)) {
+                return;
+            }
+            Browser.openUrl(getParentActivity(), updateUrl);
+            return;
+        }
+        java.util.regex.Matcher matcher = Patterns.WEB_URL.matcher(info.releaseNotes == null ? "" : info.releaseNotes);
+        if (matcher.find()) {
+            Browser.openUrl(getParentActivity(), matcher.group());
+            return;
+        }
+        BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.AppUpdate)).show();
+    }
+
+    private String displayText(String value) {
+        return TextUtils.isEmpty(value) ? "-" : value;
+    }
+
+    private String getCurrentClientVersionName() {
+        try {
+            PackageInfo packageInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+            if (!TextUtils.isEmpty(packageInfo.versionName)) {
+                return packageInfo.versionName;
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return BuildVars.BUILD_VERSION_STRING;
+    }
+
+    private String getCurrentClientVersionCode() {
+        try {
+            PackageInfo packageInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+            long rawVersionCode;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                rawVersionCode = packageInfo.getLongVersionCode();
+            } else {
+                rawVersionCode = packageInfo.versionCode;
+            }
+            long versionCode = rawVersionCode > 10 ? rawVersionCode / 10 : rawVersionCode;
+            return String.valueOf(versionCode);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return "";
+    }
+
+    private String getCurrentClientUpdateDate() {
+        try {
+            PackageInfo packageInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+            if (packageInfo.lastUpdateTime > 0) {
+                return formatClientUpdateDate(packageInfo.lastUpdateTime);
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        return "";
+    }
+
+    private static class ClientUpdateInfo {
+        boolean hasUpdate;
+        String updateUrl;
+        String versionName;
+        String versionCode;
+        String releaseDate;
+        String releaseNotes;
     }
 
     private boolean ignoreClearViews;
@@ -887,71 +1097,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             }
             case 24: {
-                if (getParentActivity() instanceof LaunchActivity) {
-                    ((LaunchActivity) getParentActivity()).checkAppUpdate(true, null);
-                }
-                ServerApiManager.checkVersion(new ServerApiManager.VersionCheckCallback() {
-                    @Override
-                    public void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String releaseDate, String message) {
-                        if (getParentActivity() == null) {
-                            return;
-                        }
-                        hasClientUpdate = hasUpdate;
-                        if (listView != null) {
-                            listView.adapter.update(true);
-                        }
-                        if (hasUpdate) {
-                            String updateInfo = LocaleController.getString(R.string.AppUpdate) + "\n"
-                                + "Version: " + (TextUtils.isEmpty(latestVersion) ? "-" : latestVersion) + "\n"
-                                + "Date: " + (TextUtils.isEmpty(releaseDate) ? "-" : releaseDate);
-                            AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                            builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
-                            builder.setMessage(updateInfo);
-                            builder.setPositiveButton(LocaleController.getString(R.string.AppUpdateNow), (dialog, which) -> {
-                            if (!TextUtils.isEmpty(updateUrl)) {
-                                if (enqueueAppUpdateDownload(updateUrl, latestVersion)) {
-                                    return;
-                                }
-                                Browser.openUrl(getParentActivity(), updateUrl);
-                                return;
-                            }
-                            java.util.regex.Matcher matcher = Patterns.WEB_URL.matcher(message == null ? "" : message);
-                            if (matcher.find()) {
-                                Browser.openUrl(getParentActivity(), matcher.group());
-                                return;
-                            }
-                            String updateMessage = !TextUtils.isEmpty(message) ? message : LocaleController.getString(R.string.AppUpdate);
-                            BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, updateMessage).show();
-                            });
-                            builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
-                            showDialog(builder.create());
-                            return;
-                        }
-                        String currentVersion = BuildVars.BUILD_VERSION_STRING;
-                        String currentDate = "";
-                        try {
-                            PackageInfo packageInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
-                            currentDate = LocaleController.getInstance().getFormatterYear().format(packageInfo.lastUpdateTime);
-                        } catch (Throwable ignore) {
-                        }
-                        String latestInfo = "当前客户端已经最新版本\n"
-                            + "Version: " + currentVersion + "\n"
-                            + "Date: " + currentDate;
-                        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                        builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
-                        builder.setMessage(latestInfo);
-                        builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
-                        showDialog(builder.create());
-                    }
-
-                    @Override
-                    public void onError(String error) {
-                        if (getParentActivity() == null) {
-                            return;
-                        }
-                        BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, TextUtils.isEmpty(error) ? LocaleController.getString(R.string.UnknownError) : error).show();
-                    }
-                });
+                requestClientUpdateState(true);
                 break;
             }
         }
