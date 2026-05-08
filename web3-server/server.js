@@ -634,19 +634,20 @@ class MySqlDB {
     };
   }
 
-  async getSendRecordsByCreator(creatorWallet, limit = 100) {
+  async getSendRecordsByCreator(creatorWallet, limit = 100, offset = 0) {
     const normalized = normalizeAddress(creatorWallet);
     if (!normalized) {
       return [];
     }
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 200);
+    const safeOffset = Math.max(Number(offset) || 0, 0);
     const [rows] = await this.pool.query(
       `SELECT packet_id, token_symbol, total_amount_wei, count_total, status, created_at, create_tx_hash, greeting
        FROM red_packets
        WHERE creator_wallet = ? AND status <> 'pending_create_confirm'
        ORDER BY created_at DESC
-       LIMIT ?`,
-      [normalized, safeLimit],
+       LIMIT ? OFFSET ?`,
+      [normalized, safeLimit, safeOffset],
     );
     return rows.map((row) => ({
       packetId: row.packet_id,
@@ -1680,11 +1681,12 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
 app.get('/api/v1/red-packets/send-records', async (req, res) => {
   const creatorWallet = String(req.query.creatorWallet || '').trim();
   const limit = Number(req.query.limit || 50);
+  const offset = Number(req.query.offset || 0);
   if (!normalizeAddress(creatorWallet)) {
     return badRequest(res, 'creatorWallet invalid');
   }
-  const records = await db.getSendRecordsByCreator(creatorWallet, limit);
-  return res.json({ ok: true, data: records });
+  const records = await db.getSendRecordsByCreator(creatorWallet, limit, offset);
+  return res.json({ ok: true, data: { records, limit, offset, hasMore: records.length >= Math.min(Math.max(Number(limit) || 20, 1), 200) } });
 });
 
 app.get('/api/v1/red-packets/send-records/:packetId', async (req, res) => {

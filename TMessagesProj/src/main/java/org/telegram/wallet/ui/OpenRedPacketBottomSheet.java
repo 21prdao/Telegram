@@ -18,6 +18,8 @@ import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.UserConfig;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.Utilities;
@@ -445,7 +447,10 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                     throw new IllegalStateException("交易失败：链上执行未成功");
                 }
 
-                RedPacketRepository.getInstance().confirmClaim(packetId, walletAddress, txHash);
+                TLRPC.User me = UserConfig.getInstance(currentAccount).getCurrentUser();
+                String tgName = me == null ? "" : ((me.first_name == null ? "" : me.first_name) + (me.last_name == null ? "" : (" " + me.last_name))).trim();
+                String tgId = me == null ? "" : String.valueOf(me.id);
+                RedPacketRepository.getInstance().confirmClaim(packetId, walletAddress, txHash, tgName, tgId);
                 final String claimedDisplay = firstNonEmpty(
                         currentInfo.amountPerClaimDisplay,
                         currentInfo.totalAmountDisplay,
