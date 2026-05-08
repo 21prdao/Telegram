@@ -161,6 +161,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
     private SizeNotifierFrameLayout contentView;
     private UniversalRecyclerView listView;
+    private boolean hasClientUpdate;
     private View actionBarBackground;
 
     private ActionBarMenuItem searchItem, otherItem;
@@ -223,7 +224,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
 
         additionNavigationBarHeight = hasMainTabs ? dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) : 0;
+        requestClientUpdateState();
         return super.onFragmentCreate();
+    }
+
+    private void requestClientUpdateState() {
+        ServerApiManager.checkVersion(new ServerApiManager.VersionCheckCallback() {
+            @Override
+            public void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String releaseDate, String message) {
+                hasClientUpdate = hasUpdate;
+                if (listView != null) {
+                    listView.adapter.update(true);
+                }
+            }
+        });
     }
 
     private boolean ignoreClearViews;
@@ -745,7 +759,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(18, IconBackgroundColors.BLUE_LIGHT.top, IconBackgroundColors.BLUE_LIGHT.bottom, R.drawable.settings_faq, getString(R.string.TelegramFAQ)));
         items.add(SettingCell.Factory.of(23, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_features, getString(R.string.TelegramFeatures)));
         items.add(SettingCell.Factory.of(19, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_policy, getString(R.string.PrivacyPolicy)));
-        items.add(SettingCell.Factory.of(24, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_power, getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate)));
+        items.add(SettingCell.Factory.of(24, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.settings_power, getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate), null, hasClientUpdate ? "●" : null));
 
         if (BuildVars.LOGS_ENABLED || BuildVars.DEBUG_PRIVATE_VERSION) {
             items.add(UItem.asShadow(null));
@@ -878,11 +892,22 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 }
                 ServerApiManager.checkVersion(new ServerApiManager.VersionCheckCallback() {
                     @Override
-                    public void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String message) {
+                    public void onResult(boolean hasUpdate, String updateUrl, String latestVersion, String releaseDate, String message) {
                         if (getParentActivity() == null) {
                             return;
                         }
+                        hasClientUpdate = hasUpdate;
+                        if (listView != null) {
+                            listView.adapter.update(true);
+                        }
                         if (hasUpdate) {
+                            String updateInfo = LocaleController.getString(R.string.AppUpdate) + "\n"
+                                + "Version: " + (TextUtils.isEmpty(latestVersion) ? "-" : latestVersion) + "\n"
+                                + "Date: " + (TextUtils.isEmpty(releaseDate) ? "-" : releaseDate);
+                            AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                            builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
+                            builder.setMessage(updateInfo);
+                            builder.setPositiveButton(LocaleController.getString(R.string.AppUpdateNow), (dialog, which) -> {
                             if (!TextUtils.isEmpty(updateUrl)) {
                                 if (enqueueAppUpdateDownload(updateUrl, latestVersion)) {
                                     return;
@@ -897,9 +922,26 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                             }
                             String updateMessage = !TextUtils.isEmpty(message) ? message : LocaleController.getString(R.string.AppUpdate);
                             BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, updateMessage).show();
+                            });
+                            builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+                            showDialog(builder.create());
                             return;
                         }
-                        BulletinFactory.of(SettingsActivity.this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.YourVersionIsLatest)).show();
+                        String currentVersion = BuildVars.BUILD_VERSION_STRING;
+                        String currentDate = "";
+                        try {
+                            PackageInfo packageInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
+                            currentDate = LocaleController.getFormatterYear().format(packageInfo.lastUpdateTime);
+                        } catch (Throwable ignore) {
+                        }
+                        String latestInfo = "当前客户端已经最新版本\n"
+                            + "Version: " + currentVersion + "\n"
+                            + "Date: " + currentDate;
+                        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                        builder.setTitle(getString("DebugMenuCheckAppUpdate", R.string.DebugMenuCheckAppUpdate));
+                        builder.setMessage(latestInfo);
+                        builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
+                        showDialog(builder.create());
                     }
 
                     @Override
@@ -1370,6 +1412,13 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             subtitleView.setText(subtitle);
             valueView.setVisibility(!TextUtils.isEmpty(value) ? View.VISIBLE : View.GONE);
             valueView.setText(value);
+            if ("●".contentEquals(value == null ? "" : value)) {
+                valueView.setTextColor(0xFFFF4D4F);
+                valueView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            } else {
+                valueView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourcesProvider));
+                valueView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            }
         }
 
         @Override
