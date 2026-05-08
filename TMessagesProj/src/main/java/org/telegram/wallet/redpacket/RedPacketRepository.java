@@ -325,7 +325,7 @@ public class RedPacketRepository {
         return response;
     }
 
-    public void confirmCreate( String packetId, String creatorWallet, String txHash ) throws Exception {
+    public void confirmCreate( String packetId, String creatorWallet, String txHash, String claimerName, String telegramId ) throws Exception {
         if (TextUtils.isEmpty(packetId)) {
             throw new IllegalArgumentException("packetId is empty");
         }
