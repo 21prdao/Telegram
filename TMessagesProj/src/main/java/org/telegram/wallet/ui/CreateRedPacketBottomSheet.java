@@ -23,7 +23,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
+
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
@@ -157,7 +157,7 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
                 getThemedColor(Theme.key_windowBackgroundWhiteBlackText)
         );
         tokenSelectorView.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        tokenSelectorView.setOnClickListener(v -> showTokenSelectorDialog());
+        tokenSelectorView.setOnClickListener(v -> showTokenSelectorSheet());
         contentLayout.addView(tokenSelectorView, LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, 48));
 
@@ -971,24 +971,20 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
         tokenSelectorView.setText(token.symbol + "  ·  " + (token.isBnb() ? "原生币" : shortAddress(token.contractAddress)));
     }
 
-    private void showTokenSelectorDialog() {
+    private void showTokenSelectorSheet() {
         Context context = getContext();
         if (context == null || tokenOptions.isEmpty()) {
             return;
         }
 
-        String[] labels = new String[tokenOptions.size()];
+        BottomSheet.Builder builder = new BottomSheet.Builder(parentFragment.getParentActivity(), false, parentFragment.getResourceProvider());
+        CharSequence[] labels = new CharSequence[tokenOptions.size()];
         for (int i = 0; i < tokenOptions.size(); i++) {
             TokenOption token = tokenOptions.get(i);
-            labels[i] = token.symbol + (token.isBnb() ? " (BNB)" : " (" + shortAddress(token.contractAddress) + ")");
+            labels[i] = token.symbol + (token.isBnb() ? " · 原生币" : " · " + shortAddress(token.contractAddress));
         }
-
-        new AlertDialog.Builder(context)
-                .setTitle("选择 Token")
-                .setSingleChoiceItems(labels, selectedTokenIndex, (dialog, which) -> selectedTokenIndex = which)
-                .setPositiveButton("确定", (dialog, which) -> updateTokenSelectorText())
-                .setNegativeButton(getString(R.string.Cancel), null)
-                .show();
+        builder.setItems(labels, (dialog, which) -> { selectedTokenIndex = which; updateTokenSelectorText(); });
+        builder.create().show();
     }
 
     private String shortAddress(String address) {

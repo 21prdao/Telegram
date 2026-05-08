@@ -339,6 +339,8 @@ public class RedPacketRepository {
         JSONObject body = new JSONObject();
         body.put("creatorWallet", creatorWallet);
         body.put("txHash", txHash);
+        body.put("claimerName", claimerName == null ? "" : claimerName);
+        body.put("telegramId", telegramId == null ? "" : telegramId);
 
         try {
             requestJson(
@@ -351,7 +353,7 @@ public class RedPacketRepository {
         }
     }
 
-    public void confirmClaim(String packetId, String claimerAddress, String txHash) throws Exception {
+    public void confirmClaim(String packetId, String claimerAddress, String txHash, String claimerName, String telegramId) throws Exception {
         if (TextUtils.isEmpty(packetId)) {
             throw new IllegalArgumentException("packetId is empty");
         }
@@ -365,6 +367,8 @@ public class RedPacketRepository {
         JSONObject body = new JSONObject();
         body.put("claimerAddress", claimerAddress);
         body.put("txHash", txHash);
+        body.put("claimerName", claimerName == null ? "" : claimerName);
+        body.put("telegramId", telegramId == null ? "" : telegramId);
 
         try {
             requestJson(
@@ -465,6 +469,7 @@ public class RedPacketRepository {
                 RedPacketClaimRecord claim = new RedPacketClaimRecord();
                 claim.claimerName = firstNonEmpty(optString(item, "claimerName", "claimer_name"), "");
                 claim.claimerAddress = firstNonEmpty(optString(item, "claimerAddress", "claimer_address"), "");
+                claim.telegramId = firstNonEmpty(optString(item, "telegramId", "telegram_id"), "");
                 claim.claimedAt = optLong(item, "claimedAt", "created_at");
                 if (claim.claimedAt > 0 && claim.claimedAt < 10_000_000_000L) {
                     claim.claimedAt *= 1000L;
