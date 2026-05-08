@@ -931,7 +931,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                         String currentDate = "";
                         try {
                             PackageInfo packageInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
-                            currentDate = LocaleController.getFormatterYear().format(packageInfo.lastUpdateTime);
+                            currentDate = LocaleController.getInstance().getFormatterYear().format(packageInfo.lastUpdateTime);
                         } catch (Throwable ignore) {
                         }
                         String latestInfo = "当前客户端已经最新版本\n"
