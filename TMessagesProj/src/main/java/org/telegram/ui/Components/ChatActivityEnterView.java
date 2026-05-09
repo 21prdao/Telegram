@@ -3674,8 +3674,8 @@ public class ChatActivityEnterView extends FrameLayout implements
             }
         };
         redPacketButton.setScaleType(ImageView.ScaleType.CENTER);
-        redPacketButton.clearColorFilter();
         redPacketButton.setImageResource(R.drawable.msg_input_redpacket);
+        redPacketButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_glass_defaultIcon), PorterDuff.Mode.MULTIPLY));
         redPacketButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));
         redPacketButton.setContentDescription(getString(R.string.CreateRedPacket));
 
@@ -3701,9 +3701,6 @@ public class ChatActivityEnterView extends FrameLayout implements
             WalletNavigator.openCreateRedPacket(parentFragment, currentAccount, dialog_id);
         });
 
-        // 临时调试：强刷布局
-        attachLayout.requestLayout();
-        attachLayout.invalidate();
     }
 
     public void createSuggestionButton() {
@@ -10185,6 +10182,10 @@ public class ChatActivityEnterView extends FrameLayout implements
         audioVideoSendButton.setColorFilter(new PorterDuffColorFilter(audioVideoButtonContainerForbidden ? getThemedColor(Theme.key_glass_defaultIcon) : Color.WHITE, PorterDuff.Mode.SRC_IN));
         emojiButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_glass_defaultIcon), PorterDuff.Mode.SRC_IN));
         emojiButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));
+        if (redPacketButton != null) {
+            redPacketButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_glass_defaultIcon), PorterDuff.Mode.MULTIPLY));
+            redPacketButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));
+        }
     }
 
     private void updateRecordedDeleteIconColors() {
