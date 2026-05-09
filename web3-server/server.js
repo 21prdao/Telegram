@@ -1537,13 +1537,21 @@ class MySqlDB {
     }
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 200);
     const safeOffset = Math.max(Number(offset) || 0, 0);
+    const current = nowSeconds();
     const [rows] = await this.pool.query(
-      `SELECT packet_id, token_symbol, total_amount_wei, count_total, status, created_at, create_tx_hash, greeting
-       FROM red_packets
-       WHERE creator_wallet = ? AND status <> 'pending_create_confirm'
-       ORDER BY created_at DESC
+      `SELECT p.packet_id, p.token_symbol, p.total_amount_wei, p.count_total, p.expires_at, p.created_at, p.create_tx_hash, p.greeting,
+        CASE
+          WHEN p.status = 'refunded' THEN 'refunded'
+          WHEN p.remaining_count <= 0 THEN 'empty'
+          WHEN p.expires_at < ? THEN 'expired'
+          WHEN p.onchain_created = 0 THEN 'pending_create_confirm'
+          ELSE 'active'
+        END AS status
+       FROM red_packets p
+       WHERE p.creator_wallet = ? AND p.status <> 'pending_create_confirm'
+       ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`,
-      [normalized, safeLimit, safeOffset],
+      [current, normalized, safeLimit, safeOffset],
     );
     return rows.map((row) => ({
       packetId: row.packet_id,

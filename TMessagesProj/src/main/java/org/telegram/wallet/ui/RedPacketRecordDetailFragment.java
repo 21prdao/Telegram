@@ -97,7 +97,7 @@ public class RedPacketRecordDetailFragment extends Fragment {
             LinearLayout card = Web3Ui.card(getActivity());
             card.setOrientation(LinearLayout.VERTICAL);
             card.addView(line("回退ID", TextUtils.isEmpty(refund.refundId) ? "-" : refund.refundId));
-            card.addView(line("剩余金额", TextUtils.isEmpty(refund.amountDisplay) ? refund.amountWei : refund.amountDisplay));
+            card.addView(line("剩余金额", (TextUtils.isEmpty(refund.amountDisplay) ? Web3Ui.formatTokenAmount(refund.amountWei) : refund.amountDisplay) + " " + detail.tokenSymbol));
             card.addView(line("状态", refund.refunded ? "已回退" : (refund.canRefund ? "可回退" : "不可回退")));
             LinearLayout action = Web3Ui.actionButton(getActivity(), refund.refunded ? "已回退" : "回退剩余金额", 0, true);
             action.setOnClickListener(v -> onClickRefund(refund));
