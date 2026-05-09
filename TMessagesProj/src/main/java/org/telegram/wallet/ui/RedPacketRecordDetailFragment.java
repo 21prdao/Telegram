@@ -21,6 +21,7 @@ import org.telegram.wallet.model.RedPacketRefundRecord;
 import org.telegram.wallet.model.RedPacketSendRecordDetail;
 import org.telegram.wallet.redpacket.RedPacketRepository;
 import org.telegram.wallet.security.WalletKeyStore;
+import org.web3j.crypto.Credentials;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -130,12 +131,14 @@ public class RedPacketRecordDetailFragment extends Fragment {
         Toast.makeText(getActivity(), "正在提交回退交易…", Toast.LENGTH_SHORT).show();
         Utilities.globalQueue.postRunnable(() -> {
             try {
-                new RedPacketContractService().refund(privateKeyHex, contract, packetId);
+                String txHash = new RedPacketContractService().refund(privateKeyHex, contract, packetId);
+                String creatorAddress = Credentials.create(privateKeyHex).getAddress();
+                RedPacketRepository.getInstance().confirmRefund(packetId, creatorAddress, txHash);
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(() -> {
                     refundSubmitting = false;
                     Toast.makeText(getActivity(), "回退成功", Toast.LENGTH_SHORT).show();
-                    load();
+                    getActivity().finish();
                 });
             } catch (Throwable t) {
                 FileLog.e(t);
