@@ -9,6 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.content.Intent;
 import android.net.Uri;
@@ -44,7 +45,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private int currentRecordOffset = 0;
     private boolean hasMoreRecords = true;
     private SwipeRefreshLayout swipeRefreshLayout;
-    private String currentStatusFilter = "active";
+    private String currentStatusFilter = "all";
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -135,33 +136,42 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         card.addView(copy, copyLp);
 
         copy.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.WalletRedPacketRecords), 17, p.primaryText, true), Web3Ui.matchWrap());
-        summaryCountView = Web3Ui.text(getActivity(), "共 0 条记录", 13, p.secondaryText, false);
-        copy.addView(summaryCountView, Web3Ui.topMargin(getActivity(), 2));
-        LinearLayout filters = new LinearLayout(getActivity());
-        filters.setOrientation(LinearLayout.HORIZONTAL);
-        filters.addView(filterButton("进行中", "active"));
-        filters.addView(filterButton("已领完", "empty"), Web3Ui.leftMargin(getActivity(), 6));
-        filters.addView(filterButton("可过期", "expired"), Web3Ui.leftMargin(getActivity(), 6));
-        filters.addView(filterButton("已退款", "refunded"), Web3Ui.leftMargin(getActivity(), 6));
-        copy.addView(filters, Web3Ui.topMargin(getActivity(), 8));
+        LinearLayout summaryRow = new LinearLayout(getActivity());
+        summaryRow.setOrientation(LinearLayout.HORIZONTAL);
+        summaryRow.setGravity(Gravity.CENTER_VERTICAL);
+        summaryCountView = Web3Ui.text(getActivity(), "总共 0 条记录", 13, p.secondaryText, false);
+        summaryRow.addView(summaryCountView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        summaryRow.addView(filterButton("全部", "all"));
+        copy.addView(summaryRow, Web3Ui.topMargin(getActivity(), 2));
         return card;
     }
 
     private TextView filterButton(String text, String status) {
         Web3Ui.Palette p = Web3Ui.palette();
-        boolean active = TextUtils.equals(currentStatusFilter, status);
-        TextView tv = Web3Ui.text(getActivity(), text, 11, active ? p.primaryText : p.secondaryText, true);
+        TextView tv = Web3Ui.text(getActivity(), text, 11, p.primaryText, true);
         tv.setPadding(dp(8), dp(4), dp(8), dp(4));
-        tv.setBackground(Web3Ui.roundedStroke(getActivity(), active ? p.grayBadgeBg : 0x00000000, p.grayBadgeBg, 10, 1));
+        tv.setBackground(Web3Ui.roundedStroke(getActivity(), p.grayBadgeBg, p.grayBadgeBg, 10, 1));
         tv.setOnClickListener(v -> {
-            currentStatusFilter = status;
-            currentRecordOffset = 0;
-            hasMoreRecords = true;
-            syncRedPacketRecordsFromServer(false);
-            if (showRedPacketRecords && listContainer != null) {
-                listContainer.removeAllViews();
-                renderRedPacketRecords();
+            final String[] labels = new String[]{"全部", "进行中", "已领完", "可过期", "已退款"};
+            final String[] values = new String[]{"all", "active", "empty", "expired", "refunded"};
+            PopupMenu menu = new PopupMenu(getActivity(), tv);
+            for (int i = 0; i < labels.length; i++) {
+                menu.getMenu().add(0, i, i, labels[i]);
             }
+            menu.setOnMenuItemClickListener(item -> {
+                int which = item.getItemId();
+                if (which < 0 || which >= values.length) {
+                    return false;
+                }
+                currentStatusFilter = values[which];
+                tv.setText(labels[which]);
+                if (showRedPacketRecords && listContainer != null) {
+                    listContainer.removeAllViews();
+                    renderRedPacketRecords();
+                }
+                return true;
+            });
+            menu.show();
         });
         return tv;
     }
@@ -240,15 +250,19 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     }
 
     private void renderRedPacketRecords() {
+        List<RedPacketSendRecord> allRecords = new ArrayList<>();
         List<RedPacketSendRecord> records = new ArrayList<>();
         for (RedPacketSendRecord item : remoteRedPacketRecords) {
             if (item == null || "PENDING_CREATE_CONFIRM".equalsIgnoreCase(item.status) || "pending_create_confirm".equalsIgnoreCase(item.status)) {
                 continue;
             }
-            records.add(item);
+            allRecords.add(item);
+            if ("all".equalsIgnoreCase(currentStatusFilter) || currentStatusFilter.equalsIgnoreCase(safe(item.status, ""))) {
+                records.add(item);
+            }
         }
         if (summaryCountView != null) {
-            summaryCountView.setText("共 " + records.size() + " 条记录");
+            summaryCountView.setText("总共 " + allRecords.size() + " 条记录");
         }
         if (records.isEmpty()) {
             LinearLayout emptyCard = Web3Ui.card(getActivity());
@@ -441,7 +455,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             boolean success = false;
             try {
                 int offset = append ? currentRecordOffset : 0;
-                remote = RedPacketRepository.getInstance().getSendRecords(address, currentStatusFilter, RECORD_PAGE_SIZE, offset);
+                remote = RedPacketRepository.getInstance().getSendRecords(address, "", RECORD_PAGE_SIZE, offset);
                 success = true;
             } catch (Throwable ignore) {
             }
