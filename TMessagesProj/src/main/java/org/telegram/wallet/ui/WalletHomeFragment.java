@@ -118,10 +118,11 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     }
 
     @Override public void refresh() {
-        if (getActivity() == null) return;
-        WalletStorage.HomeSnapshot snapshot = WalletStorage.getHomeSnapshot(getActivity());
+        final android.app.Activity activity = getActivity();
+        if (activity == null || !isAdded()) return;
+        WalletStorage.HomeSnapshot snapshot = WalletStorage.getHomeSnapshot(activity);
         if (snapshot != null) {
-            currentAddress = TextUtils.isEmpty(snapshot.selectedAddress) ? WalletStorage.getSelectedAddress(getActivity()) : snapshot.selectedAddress;
+            currentAddress = TextUtils.isEmpty(snapshot.selectedAddress) ? WalletStorage.getSelectedAddress(activity) : snapshot.selectedAddress;
             currentChainName = TextUtils.isEmpty(snapshot.chainName) ? "BNB Smart Chain" : snapshot.chainName;
             walletAddressView.setText(LocaleController.formatString(R.string.Web3WalletAddressLabel, TextUtils.isEmpty(currentAddress) ? LocaleController.getString(R.string.Web3WalletAddressNotCreated) : WalletWorkflowCoordinator.shortAddress(currentAddress)));
             applyTotalAsset(snapshot.totalAsset);
@@ -129,13 +130,18 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
             renderTokenLines(snapshot.tokenLines);
         }
         coordinator().loadBalances((selectedAddress, totalAsset, chainName, tokenLines) -> {
+            if (!isAdded()) return;
+            android.app.Activity callbackActivity = getActivity();
+            if (callbackActivity == null || walletAddressView == null || totalAssetView == null || chainNameView == null || tokenListContainer == null) {
+                return;
+            }
             currentAddress = selectedAddress;
             currentChainName = TextUtils.isEmpty(chainName) ? "BNB Smart Chain" : chainName;
             walletAddressView.setText(LocaleController.formatString(R.string.Web3WalletAddressLabel, TextUtils.isEmpty(selectedAddress) ? LocaleController.getString(R.string.Web3WalletAddressNotCreated) : WalletWorkflowCoordinator.shortAddress(selectedAddress)));
             applyTotalAsset(totalAsset);
             chainNameView.setText(LocaleController.formatString(R.string.Web3WalletChainLabel, currentChainName));
             renderTokenLines(tokenLines);
-            WalletStorage.saveHomeSnapshot(getActivity(), selectedAddress, totalAsset, currentChainName, tokenLines);
+            WalletStorage.saveHomeSnapshot(callbackActivity, selectedAddress, totalAsset, currentChainName, tokenLines);
         });
     }
 
