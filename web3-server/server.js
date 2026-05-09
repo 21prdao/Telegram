@@ -3315,6 +3315,7 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
 
 app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
   const packet = await ensurePacket(req.params.packetId, res);
+  console.log(req.params.packetId);
   if (!packet) return;
 
   const creatorAddress = normalizeAddress(req.body?.creatorAddress);
@@ -3325,7 +3326,6 @@ app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
   if (!packet.onchainCreated) return badRequest(res, 'packet not confirmed on chain');
   if (packet.remainingCount <= 0) return badRequest(res, 'nothing to refund');
   if (nowSeconds() <= Number(packet.expiresAt)) return badRequest(res, 'packet not expired');
-
   const receipt = await getTransactionReceipt(txHash);
   if (!receipt || receipt.status !== 1) return badRequest(res, 'transaction not confirmed');
 
