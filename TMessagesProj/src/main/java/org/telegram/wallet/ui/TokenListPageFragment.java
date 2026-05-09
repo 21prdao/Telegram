@@ -249,6 +249,48 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         return card;
     }
 
+
+    private String normalizeStatus(String status) {
+        String safeStatus = safe(status, "").trim().toLowerCase(Locale.US);
+        if (safeStatus.isEmpty()) {
+            return "unknown";
+        }
+        if (safeStatus.contains("pending")) {
+            return "pending";
+        }
+        if ("active".equals(safeStatus) || "claimable".equals(safeStatus) || "created".equals(safeStatus)) {
+            return "active";
+        }
+        if ("empty".equals(safeStatus) || "claimed".equals(safeStatus) || "finished".equals(safeStatus) || "completed".equals(safeStatus)) {
+            return "empty";
+        }
+        if ("expired".equals(safeStatus) || "expire".equals(safeStatus)) {
+            return "expired";
+        }
+        if ("refunded".equals(safeStatus) || "refund".equals(safeStatus)) {
+            return "refunded";
+        }
+        return safeStatus;
+    }
+
+    private String statusLabel(String status) {
+        String normalized = normalizeStatus(status);
+        switch (normalized) {
+            case "active":
+                return "进行中";
+            case "empty":
+                return "已领完";
+            case "expired":
+                return "可过期";
+            case "refunded":
+                return "已退款";
+            case "pending":
+                return "处理中";
+            default:
+                return TextUtils.isEmpty(status) ? "-" : status;
+        }
+    }
+
     private void renderRedPacketRecords() {
         List<RedPacketSendRecord> allRecords = new ArrayList<>();
         List<RedPacketSendRecord> records = new ArrayList<>();
@@ -257,7 +299,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
                 continue;
             }
             allRecords.add(item);
-            if ("all".equalsIgnoreCase(currentStatusFilter) || currentStatusFilter.equalsIgnoreCase(safe(item.status, ""))) {
+            if ("all".equalsIgnoreCase(currentStatusFilter) || currentStatusFilter.equalsIgnoreCase(normalizeStatus(item.status))) {
                 records.add(item);
             }
         }
@@ -328,7 +370,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         countLp.leftMargin = dp(10);
         titleBlock.addView(countView, countLp);
 
-        TextView statusView = compactStatusBadge(record.status);
+        TextView statusView = compactStatusBadge(statusLabel(record.status), normalizeStatus(record.status));
         topRow.addView(statusView);
 
         content.addView(metaRowCompact(Web3IconView.CLOCK, "时间", format.format(new Date(record.createdAt)), null), Web3Ui.topMargin(getActivity(), 6));
@@ -344,11 +386,11 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         return card;
     }
 
-    private TextView compactStatusBadge(String status) {
+    private TextView compactStatusBadge(String statusText, String normalizedStatus) {
         Web3Ui.Palette p = Web3Ui.palette();
-        String safeStatus = TextUtils.isEmpty(status) ? "-" : status;
-        boolean active = "ACTIVE".equalsIgnoreCase(safeStatus);
-        boolean pending = safeStatus.toUpperCase().contains("PENDING");
+        String safeStatusText = TextUtils.isEmpty(statusText) ? "-" : statusText;
+        boolean active = "active".equalsIgnoreCase(normalizedStatus);
+        boolean pending = "pending".equalsIgnoreCase(normalizedStatus);
 
         int textColor;
         int bgColor;
@@ -367,7 +409,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             strokeColor = p.dark ? 0xFF4A5666 : 0xFFD7DEE8;
         }
 
-        TextView tv = Web3Ui.text(getActivity(), safeStatus, 10.5f, textColor, false);
+        TextView tv = Web3Ui.text(getActivity(), safeStatusText, 10.5f, textColor, false);
         tv.setGravity(Gravity.CENTER);
         tv.setSingleLine(true);
         tv.setEllipsize(TextUtils.TruncateAt.END);
