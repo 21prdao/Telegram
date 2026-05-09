@@ -21,6 +21,12 @@ import org.web3j.utils.Convert;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.math.RoundingMode;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import org.json.JSONObject;
 
 public class WalletWorkflowCoordinator {
 
@@ -168,16 +174,60 @@ public class WalletWorkflowCoordinator {
                     mergedTokens = WalletStorage.mergeTokens(RedPacketRepository.getInstance().getDefaultTokens(), tokens);
                 } catch (Throwable ignore) {
                 }
-                tokenLines.add("BNB: " + bnb.toPlainString());
+                BigDecimal bnbPriceUsd = getUsdPrice("BNB");
+                tokenLines.add("BNB: " + bnb.toPlainString() + "|" + formatUsdValue(bnb.multiply(bnbPriceUsd)));
                 for (TokenAsset token : mergedTokens) {
                     String bal = bep20Service.getBalance(selected, token.contractAddress, token.decimals);
-                    tokenLines.add(token.symbol + ": " + bal + "  (" + shortAddress(token.contractAddress) + ")");
+                    BigDecimal amount = safeDecimal(bal);
+                    BigDecimal usdPrice = getUsdPrice(token.symbol);
+                    String usd = formatUsdValue(amount.multiply(usdPrice));
+                    tokenLines.add(token.symbol + ": " + bal + "|" + usd + "  (" + shortAddress(token.contractAddress) + ")");
                 }
                 activity.runOnUiThread(() -> callback.onResult(selected, bnb.toPlainString() + " BNB", "BNB Smart Chain", tokenLines));
             } catch (Throwable t) {
                 activity.runOnUiThread(() -> callback.onResult(selected, "资产查询失败", "BNB Smart Chain", new java.util.ArrayList<>()));
             }
         }).start();
+    }
+
+    private BigDecimal safeDecimal(String value) {
+        try {
+            return new BigDecimal(value);
+        } catch (Throwable ignore) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    private String formatUsdValue(BigDecimal value) {
+        if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) return "0.00";
+        return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private BigDecimal getUsdPrice(String symbol) {
+        if (TextUtils.isEmpty(symbol)) return BigDecimal.ZERO;
+        String upper = symbol.toUpperCase();
+        if ("USDT".equals(upper) || "USDC".equals(upper) || "BUSD".equals(upper) || "USD".equals(upper)) return BigDecimal.ONE;
+        if (!"BNB".equals(upper)) return BigDecimal.ZERO;
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL("https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
+            conn.setRequestMethod("GET");
+            if (conn.getResponseCode() != 200) return BigDecimal.ZERO;
+            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            reader.close();
+            JSONObject obj = new JSONObject(sb.toString());
+            return new BigDecimal(obj.optString("price", "0"));
+        } catch (Throwable ignore) {
+            return BigDecimal.ZERO;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     public void checkConnectivity(StatusCallback callback) {

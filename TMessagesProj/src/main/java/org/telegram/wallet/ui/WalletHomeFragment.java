@@ -26,6 +26,8 @@ import org.telegram.messenger.R;
 import org.telegram.wallet.data.WalletStorage;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     private TextView totalAssetView;
@@ -164,11 +166,20 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
                 symbol = parts[0].trim();
                 String rest = parts[1].trim();
                 int contractStart = rest.indexOf('('), contractEnd = rest.indexOf(')');
+                String usdValue = "--";
+                String amountPart = rest;
+                int usdSplit = rest.indexOf("|");
+                if (usdSplit >= 0) {
+                    amountPart = rest.substring(0, usdSplit).trim();
+                    rest = rest.substring(usdSplit + 1).trim();
+                    int space = rest.indexOf("  ");
+                    usdValue = (space > 0 ? rest.substring(0, space) : rest).trim();
+                }
                 if (contractStart >= 0 && contractEnd > contractStart) {
-                    amount = rest.substring(0, contractStart).trim();
+                    amount = amountPart;
                     sub = rest.substring(contractStart + 1, contractEnd).trim();
                 } else {
-                    amount = rest;
+                    amount = amountPart;
                     sub = "BNB".equalsIgnoreCase(symbol) ? currentChainName : "";
                 }
             } else symbol = line;
@@ -189,19 +200,50 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout right = new LinearLayout(getActivity());
         right.setOrientation(LinearLayout.VERTICAL);
         right.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        TextView amountView = Web3Ui.text(getActivity(), amount, 15, p.primaryText, true);
+        String prettyAmount = formatTokenAmount(amount);
+        TextView amountView = Web3Ui.text(getActivity(), prettyAmount + " " + symbol, 15, p.primaryText, true);
         amountView.setGravity(Gravity.RIGHT);
         right.addView(amountView);
-        TextView usd = Web3Ui.text(getActivity(), "≈ $--", 11, p.mutedText, false);
+        TextView usd = Web3Ui.text(getActivity(), "≈ $" + formatUsdLabel(line), 11, p.mutedText, false);
         usd.setGravity(Gravity.RIGHT);
         right.addView(usd);
         row.addView(right);
         return row;
     }
 
+    private String formatTokenAmount(String amount) {
+        try {
+            BigDecimal d = new BigDecimal(amount);
+            if (d.compareTo(BigDecimal.ZERO) == 0) return "0";
+            if (d.abs().compareTo(new BigDecimal("1")) >= 0) return d.setScale(4, RoundingMode.DOWN).stripTrailingZeros().toPlainString();
+            return d.setScale(6, RoundingMode.DOWN).stripTrailingZeros().toPlainString();
+        } catch (Throwable ignore) {
+            return amount;
+        }
+    }
+
+    private String formatAssetAmount(String totalAsset) {
+        String[] parts = totalAsset.split(" ");
+        if (parts.length < 1) return totalAsset;
+        String number = formatTokenAmount(parts[0]);
+        return parts.length > 1 ? number + " " + parts[1] : number;
+    }
+
+    private String formatUsdLabel(String line) {
+        if (TextUtils.isEmpty(line)) return "--";
+        int colon = line.indexOf(':');
+        if (colon < 0) return "--";
+        String rest = line.substring(colon + 1).trim();
+        int pipe = rest.indexOf('|');
+        if (pipe < 0) return "--";
+        String tail = rest.substring(pipe + 1).trim();
+        int contract = tail.indexOf("  (");
+        return (contract > 0 ? tail.substring(0, contract) : tail).trim();
+    }
+
     private void applyTotalAsset(String totalAsset) {
         Web3Ui.Palette p = Web3Ui.palette();
-        String value = TextUtils.isEmpty(totalAsset) ? "--" : totalAsset;
+        String value = TextUtils.isEmpty(totalAsset) ? "--" : formatAssetAmount(totalAsset);
         SpannableString span = new SpannableString(value);
         int bnbIndex = value.indexOf("BNB");
         if (bnbIndex >= 0) {
