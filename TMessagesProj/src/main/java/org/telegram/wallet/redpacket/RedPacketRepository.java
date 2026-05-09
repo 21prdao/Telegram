@@ -385,13 +385,16 @@ public class RedPacketRepository {
         }
     }
 
-    public List<RedPacketSendRecord> getSendRecords(String creatorWallet, int limit, int offset) throws Exception {
+    public List<RedPacketSendRecord> getSendRecords(String creatorWallet, String status, int limit, int offset) throws Exception {
         if (TextUtils.isEmpty(creatorWallet)) {
             throw new IllegalArgumentException("creatorWallet is empty");
         }
         int safeLimit = Math.max(1, Math.min(limit, 200));
         int safeOffset = Math.max(0, offset);
         String path = "/red-packets/send-records?creatorWallet=" + Uri.encode(creatorWallet) + "&limit=" + safeLimit + "&offset=" + safeOffset;
+        if (!TextUtils.isEmpty(status)) {
+            path += "&status=" + Uri.encode(status);
+        }
         JSONObject root = requestJson("GET", path, null);
         JSONArray recordsArr = root.optJSONArray("data");
         if (recordsArr == null) {
@@ -422,11 +425,25 @@ public class RedPacketRepository {
             if (record.createdAt > 0 && record.createdAt < 10_000_000_000L) {
                 record.createdAt *= 1000L;
             }
+            record.expiresAt = optLong(item, "expiresAt", "expires_at", "expireAt", "expire_at");
+            if (record.expiresAt > 0 && record.expiresAt < 10_000_000_000L) {
+                record.expiresAt *= 1000L;
+            }
             record.txHash = firstNonEmpty(optString(item, "txHash", "createTxHash", "create_tx_hash"), "");
             record.greeting = firstNonEmpty(optString(item, "greeting"), "");
             records.add(record);
         }
         return records;
+    }
+
+    public void confirmRefund(String packetId, String creatorAddress, String txHash) throws Exception {
+        if (TextUtils.isEmpty(packetId) || TextUtils.isEmpty(creatorAddress) || TextUtils.isEmpty(txHash)) {
+            throw new IllegalArgumentException("refund confirm params invalid");
+        }
+        JSONObject body = new JSONObject();
+        body.put("creatorAddress", creatorAddress);
+        body.put("txHash", txHash);
+        requestJson("POST", "/red-packets/" + Uri.encode(packetId) + "/refund-confirm", body);
     }
 
     public RedPacketSendRecordDetail getSendRecordDetail(String packetId) throws Exception {

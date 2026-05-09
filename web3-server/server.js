@@ -1530,7 +1530,7 @@ class MySqlDB {
     };
   }
 
-  async getSendRecordsByCreator(creatorWallet, limit = 100, offset = 0) {
+  async getSendRecordsByCreator(creatorWallet, status = '', limit = 100, offset = 0) {
     const normalized = normalizeAddress(creatorWallet);
     if (!normalized) {
       return [];
@@ -1538,6 +1538,20 @@ class MySqlDB {
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 200);
     const safeOffset = Math.max(Number(offset) || 0, 0);
     const current = nowSeconds();
+    const where = ["p.creator_wallet = ?", "p.status <> 'pending_create_confirm'"];
+    const params = [normalized];
+    const safeStatus = normalizeAdminStatus(status);
+    if (safeStatus === 'refunded') {
+      where.push("p.status = 'refunded'");
+    } else if (safeStatus === 'empty') {
+      where.push("p.status <> 'refunded' AND p.remaining_count <= 0");
+    } else if (safeStatus === 'expired') {
+      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at < ?");
+      params.push(current);
+    } else if (safeStatus === 'active') {
+      where.push("p.status <> 'refunded' AND p.remaining_count > 0 AND p.expires_at >= ? AND p.onchain_created = 1");
+      params.push(current);
+    }
     const [rows] = await this.pool.query(
       `SELECT p.packet_id, p.token_symbol, p.total_amount_wei, p.count_total, p.expires_at, p.created_at, p.create_tx_hash, p.greeting,
         CASE
@@ -1548,10 +1562,10 @@ class MySqlDB {
           ELSE 'active'
         END AS status
        FROM red_packets p
-       WHERE p.creator_wallet = ? AND p.status <> 'pending_create_confirm'
+       WHERE ${where.join(' AND ')}
        ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`,
-      [current, normalized, safeLimit, safeOffset],
+      [current, ...params, safeLimit, safeOffset],
     );
     return rows.map((row) => ({
       packetId: row.packet_id,
@@ -1560,6 +1574,7 @@ class MySqlDB {
       count: Number(row.count_total || 0),
       status: String(row.status || '').toUpperCase(),
       createdAt: Number(row.created_at || 0) * 1000,
+      expiresAt: Number(row.expires_at || 0) * 1000,
       txHash: row.create_tx_hash || '',
       greeting: row.greeting || '',
     }));
@@ -3105,12 +3120,13 @@ app.post('/api/v1/red-packets/:packetId/create-confirm', async (req, res) => {
 
 app.get('/api/v1/red-packets/send-records', async (req, res) => {
   const creatorWallet = String(req.query.creatorWallet || '').trim();
+  const status = String(req.query.status || '').trim();
   const limit = Number(req.query.limit || 50);
   const offset = Number(req.query.offset || 0);
   if (!normalizeAddress(creatorWallet)) {
     return badRequest(res, 'creatorWallet invalid');
   }
-  const records = await db.getSendRecordsByCreator(creatorWallet, limit, offset);
+  const records = await db.getSendRecordsByCreator(creatorWallet, status, limit, offset);
   return res.json({ ok: true, data: { records, limit, offset, hasMore: records.length >= Math.min(Math.max(Number(limit) || 20, 1), 200) } });
 });
 

@@ -44,6 +44,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private int currentRecordOffset = 0;
     private boolean hasMoreRecords = true;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private String currentStatusFilter = "active";
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -136,7 +137,33 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         copy.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.WalletRedPacketRecords), 17, p.primaryText, true), Web3Ui.matchWrap());
         summaryCountView = Web3Ui.text(getActivity(), "共 0 条记录", 13, p.secondaryText, false);
         copy.addView(summaryCountView, Web3Ui.topMargin(getActivity(), 2));
+        LinearLayout filters = new LinearLayout(getActivity());
+        filters.setOrientation(LinearLayout.HORIZONTAL);
+        filters.addView(filterButton("进行中", "active"));
+        filters.addView(filterButton("已领完", "empty"), Web3Ui.leftMargin(getActivity(), 6));
+        filters.addView(filterButton("可过期", "expired"), Web3Ui.leftMargin(getActivity(), 6));
+        filters.addView(filterButton("已退款", "refunded"), Web3Ui.leftMargin(getActivity(), 6));
+        copy.addView(filters, Web3Ui.topMargin(getActivity(), 8));
         return card;
+    }
+
+    private TextView filterButton(String text, String status) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        boolean active = TextUtils.equals(currentStatusFilter, status);
+        TextView tv = Web3Ui.text(getActivity(), text, 11, active ? p.primaryText : p.secondaryText, true);
+        tv.setPadding(dp(8), dp(4), dp(8), dp(4));
+        tv.setBackground(Web3Ui.roundedStroke(getActivity(), active ? p.grayBadgeBg : 0x00000000, p.grayBadgeBg, 10, 1));
+        tv.setOnClickListener(v -> {
+            currentStatusFilter = status;
+            currentRecordOffset = 0;
+            hasMoreRecords = true;
+            syncRedPacketRecordsFromServer(false);
+            if (showRedPacketRecords && listContainer != null) {
+                listContainer.removeAllViews();
+                renderRedPacketRecords();
+            }
+        });
+        return tv;
     }
 
     private void renderTokens() {
@@ -291,6 +318,9 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         topRow.addView(statusView);
 
         content.addView(metaRowCompact(Web3IconView.CLOCK, "时间", format.format(new Date(record.createdAt)), null), Web3Ui.topMargin(getActivity(), 6));
+        if (record.expiresAt > 0) {
+            content.addView(metaRowCompact(Web3IconView.CLOCK, "到期", format.format(new Date(record.expiresAt)), null), Web3Ui.topMargin(getActivity(), 2));
+        }
         content.addView(metaRowCompact(Web3IconView.LINK, "Tx", TextUtils.isEmpty(record.txHash) ? "-" : Web3Ui.shortHash(record.txHash), record.txHash), Web3Ui.topMargin(getActivity(), 2));
 
         LinearLayout.LayoutParams chevronLp = new LinearLayout.LayoutParams(dp(16), dp(16));
@@ -411,7 +441,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             boolean success = false;
             try {
                 int offset = append ? currentRecordOffset : 0;
-                remote = RedPacketRepository.getInstance().getSendRecords(address, RECORD_PAGE_SIZE, offset);
+                remote = RedPacketRepository.getInstance().getSendRecords(address, currentStatusFilter, RECORD_PAGE_SIZE, offset);
                 success = true;
             } catch (Throwable ignore) {
             }

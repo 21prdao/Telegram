@@ -7,6 +7,7 @@ public class RedPacketSendRecord {
     public int count;
     public String status;
     public long createdAt;
+    public long expiresAt;
     public String txHash;
     public String greeting;
 }
