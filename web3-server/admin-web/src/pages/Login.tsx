@@ -27,7 +27,7 @@ export default function LoginPage({ onLogin }: { onLogin: (user: AdminUser) => v
       <Card className="login-card" bordered={false}>
         <LoginForm
           className="login-form"
-          title="Telegram 红包管理平台"
+          title="ETZone 红包管理平台"
           subTitle="独立 Ant Design Pro 后台前端"
           initialValues={{ username: config.username }}
           submitter={{ searchConfig: { submitText: '登录' } }}

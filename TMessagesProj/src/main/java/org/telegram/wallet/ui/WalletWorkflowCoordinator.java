@@ -20,7 +20,9 @@ import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.utils.Convert;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.math.RoundingMode;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -169,19 +171,33 @@ public class WalletWorkflowCoordinator {
                 );
                 java.util.ArrayList<String> tokenLines = new java.util.ArrayList<>();
                 Bep20Service bep20Service = new Bep20Service();
-                List<TokenAsset> mergedTokens = tokens;
+                List<TokenAsset> defaultTokens = new java.util.ArrayList<>();
                 try {
-                    mergedTokens = WalletStorage.mergeTokens(RedPacketRepository.getInstance().getDefaultTokens(), tokens);
+                    defaultTokens = RedPacketRepository.getInstance().getDefaultTokens();
                 } catch (Throwable ignore) {
                 }
-                BigDecimal bnbPriceUsd = getUsdPrice("BNB");
-                tokenLines.add("BNB: " + bnb.toPlainString() + "|" + formatUsdValue(bnb.multiply(bnbPriceUsd)));
+                List<TokenAsset> mergedTokens = WalletStorage.mergeTokens(defaultTokens, tokens);
+                Map<String, BigDecimal> priceMap = buildConfiguredPriceMap(mergedTokens);
+                try {
+                    priceMap.putAll(RedPacketRepository.getInstance().getTokenPrices());
+                } catch (Throwable ignore) {
+                }
+
+                BigDecimal bnbPriceUsd = resolveUsdPrice("BNB", "", priceMap, "");
+                tokenLines.add(buildTokenLine(
+                        "BNB",
+                        bnb.toPlainString(),
+                        bnbPriceUsd,
+                        calculateUsdValue(bnb, bnbPriceUsd),
+                        "BNB Smart Chain"
+                ));
+
                 for (TokenAsset token : mergedTokens) {
                     String bal = bep20Service.getBalance(selected, token.contractAddress, token.decimals);
                     BigDecimal amount = safeDecimal(bal);
-                    BigDecimal usdPrice = getUsdPrice(token.symbol);
-                    String usd = formatUsdValue(amount.multiply(usdPrice));
-                    tokenLines.add(token.symbol + ": " + bal + "|" + usd + "  (" + shortAddress(token.contractAddress) + ")");
+                    BigDecimal usdPrice = resolveUsdPrice(token.symbol, token.contractAddress, priceMap, token.priceUsd);
+                    String usd = calculateUsdValue(amount, usdPrice);
+                    tokenLines.add(buildTokenLine(token.symbol, bal, usdPrice, usd, shortAddress(token.contractAddress)));
                 }
                 activity.runOnUiThread(() -> callback.onResult(selected, bnb.toPlainString() + " BNB", "BNB Smart Chain", tokenLines));
             } catch (Throwable t) {
@@ -190,9 +206,75 @@ public class WalletWorkflowCoordinator {
         }).start();
     }
 
+    private Map<String, BigDecimal> buildConfiguredPriceMap(List<TokenAsset> tokens) {
+        Map<String, BigDecimal> result = new HashMap<>();
+        if (tokens == null) return result;
+        for (TokenAsset token : tokens) {
+            if (token == null) continue;
+            BigDecimal price = RedPacketRepository.parsePositiveDecimal(token.priceUsd);
+            if (price.compareTo(BigDecimal.ZERO) <= 0) continue;
+            if (!TextUtils.isEmpty(token.symbol)) {
+                result.put(RedPacketRepository.priceKeyForSymbol(token.symbol), price);
+            }
+            if (!TextUtils.isEmpty(token.contractAddress)) {
+                result.put(RedPacketRepository.priceKeyForContract(token.contractAddress), price);
+            }
+        }
+        return result;
+    }
+
+    private BigDecimal resolveUsdPrice(String symbol, String contractAddress, Map<String, BigDecimal> priceMap, String configuredPrice) {
+        if (priceMap != null) {
+            if (!TextUtils.isEmpty(contractAddress)) {
+                BigDecimal byContract = priceMap.get(RedPacketRepository.priceKeyForContract(contractAddress));
+                if (byContract != null && byContract.compareTo(BigDecimal.ZERO) > 0) return byContract;
+            }
+            if (!TextUtils.isEmpty(symbol)) {
+                BigDecimal bySymbol = priceMap.get(RedPacketRepository.priceKeyForSymbol(symbol));
+                if (bySymbol != null && bySymbol.compareTo(BigDecimal.ZERO) > 0) return bySymbol;
+            }
+        }
+        BigDecimal configured = RedPacketRepository.parsePositiveDecimal(configuredPrice);
+        if (configured.compareTo(BigDecimal.ZERO) > 0) return configured;
+        if (TextUtils.isEmpty(symbol)) return BigDecimal.ZERO;
+        String upper = symbol.trim().toUpperCase();
+        if ("USDT".equals(upper) || "USDC".equals(upper) || "BUSD".equals(upper) || "USD".equals(upper)) {
+            return BigDecimal.ONE;
+        }
+        if ("BNB".equals(upper)) {
+            return getUsdPrice("BNB");
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private String buildTokenLine(String symbol, String amount, BigDecimal priceUsd, String usdValue, String subtitle) {
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("symbol", TextUtils.isEmpty(symbol) ? "TOKEN" : symbol.trim());
+            obj.put("amount", TextUtils.isEmpty(amount) ? "0" : amount.trim());
+            obj.put("priceUsd", priceUsd != null && priceUsd.compareTo(BigDecimal.ZERO) > 0 ? priceUsd.stripTrailingZeros().toPlainString() : "");
+            obj.put("usdValue", TextUtils.isEmpty(usdValue) ? "--" : usdValue);
+            obj.put("subtitle", TextUtils.isEmpty(subtitle) ? "" : subtitle);
+            return obj.toString();
+        } catch (Throwable ignore) {
+            String safeSymbol = TextUtils.isEmpty(symbol) ? "TOKEN" : symbol.trim();
+            String safeAmount = TextUtils.isEmpty(amount) ? "0" : amount.trim();
+            String safeUsd = TextUtils.isEmpty(usdValue) ? "--" : usdValue;
+            String safeSubtitle = TextUtils.isEmpty(subtitle) ? "" : "  (" + subtitle + ")";
+            return safeSymbol + ": " + safeAmount + "|" + safeUsd + safeSubtitle;
+        }
+    }
+
+    private String calculateUsdValue(BigDecimal amount, BigDecimal priceUsd) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return "0.00";
+        if (priceUsd == null || priceUsd.compareTo(BigDecimal.ZERO) <= 0) return "--";
+        return formatUsdValue(amount.multiply(priceUsd));
+    }
+
     private BigDecimal safeDecimal(String value) {
         try {
-            return new BigDecimal(value);
+            if (TextUtils.isEmpty(value)) return BigDecimal.ZERO;
+            return new BigDecimal(value.trim().replace(",", ""));
         } catch (Throwable ignore) {
             return BigDecimal.ZERO;
         }
@@ -200,6 +282,7 @@ public class WalletWorkflowCoordinator {
 
     private String formatUsdValue(BigDecimal value) {
         if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) return "0.00";
+        if (value.compareTo(new BigDecimal("0.01")) < 0) return "<0.01";
         return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 
@@ -222,7 +305,7 @@ public class WalletWorkflowCoordinator {
             while ((line = reader.readLine()) != null) sb.append(line);
             reader.close();
             JSONObject obj = new JSONObject(sb.toString());
-            return new BigDecimal(obj.optString("price", "0"));
+            return RedPacketRepository.parsePositiveDecimal(obj.optString("price", "0"));
         } catch (Throwable ignore) {
             return BigDecimal.ZERO;
         } finally {

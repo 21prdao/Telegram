@@ -140,6 +140,7 @@ public final class WalletStorage {
                 token.contractAddress = o.optString("contractAddress", "");
                 token.decimals = o.optInt("decimals", 18);
                 token.favorite = o.optBoolean("favorite", false);
+                token.priceUsd = o.optString("priceUsd", "");
                 result.add(token);
             }
             return result;
@@ -244,6 +245,7 @@ public final class WalletStorage {
         token.contractAddress = source.contractAddress;
         token.decimals = source.decimals > 0 ? source.decimals : 18;
         token.favorite = source.favorite;
+        token.priceUsd = source.priceUsd == null ? "" : source.priceUsd;
         result.add(token);
     }
     public static void addOrUpdateCustomToken(Context context, String symbol, String contractAddress, int decimals, boolean favorite) {
@@ -451,6 +453,9 @@ public final class WalletStorage {
                 o.put("contractAddress", token.contractAddress);
                 o.put("decimals", token.decimals);
                 o.put("favorite", token.favorite);
+                if (!TextUtils.isEmpty(token.priceUsd)) {
+                    o.put("priceUsd", token.priceUsd);
+                }
                 arr.put(o);
             } catch (Throwable ignore) {
             }

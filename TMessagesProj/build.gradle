@@ -140,7 +140,7 @@ android {
             buildConfigField "int", "VERSION_NUM", "0"
 
             buildConfigField "boolean", "WEB3_WALLET_ENABLED", "true"
-            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
+            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"https://www.etzone.io/etzredpacket\""
             buildConfigField "String", "BSC_RPC_URL", "\"https://bsc-dataseed.bnbchain.org\""
             buildConfigField "long", "BSC_CHAIN_ID", "56L"
             buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xEa6491743e41B1864235A0B2c8d3eF566D802095\""
@@ -210,7 +210,7 @@ android {
             buildConfigField "int", "VERSION_NUM", "6"
 
             buildConfigField "boolean", "WEB3_WALLET_ENABLED", "true"
-            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
+            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"https://www.etzone.io/etzredpacket\""
             buildConfigField "String", "BSC_RPC_URL", "\"https://bsc-dataseed.bnbchain.org\""
             buildConfigField "long", "BSC_CHAIN_ID", "56L"
             buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xEa6491743e41B1864235A0B2c8d3eF566D802095\""
@@ -233,7 +233,7 @@ android {
             buildConfigField "int", "VERSION_NUM", "7"
 
             buildConfigField "boolean", "WEB3_WALLET_ENABLED", "true"
-            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"127.0.0.1:8787\""
+            buildConfigField "String", "WEB3_RED_PACKET_HOST", "\"https://www.etzone.io/etzredpacket\""
             buildConfigField "String", "BSC_RPC_URL", "\"https://bsc-dataseed.bnbchain.org\""
             buildConfigField "long", "BSC_CHAIN_ID", "56L"
             buildConfigField "String", "RED_PACKET_CONTRACT", "\"0xEa6491743e41B1864235A0B2c8d3eF566D802095\""

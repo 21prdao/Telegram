@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const mysql = require('mysql2/promise');
 const { JsonRpcProvider, Interface, Wallet, getAddress, getBytes, isAddress, solidityPackedKeccak256 } = require('ethers');
 
@@ -72,12 +73,12 @@ const BOOTSTRAP_APP_UPLOAD_DIR = path.resolve(process.env.APP_UPLOAD_DIR || path
 const BOOTSTRAP_APP_UPLOAD_URL_BASE = String(process.env.APP_UPLOAD_URL_BASE || '').trim().replace(/\/+$/, '');
 const BOOTSTRAP_MAX_APK_UPLOAD_BYTES = Math.max(numberFromEnv(process.env.MAX_APK_UPLOAD_BYTES, 150 * 1024 * 1024), 1024 * 1024);
 const BUILTIN_DEFAULT_WALLET_TOKENS = [
-  { symbol: 'ETZ', contractAddress: '0xc78dabf21594c76ad98a0b3ed103fcfcd9499999', decimals: 18 },
-  { symbol: 'Piao', contractAddress: '0x68973e906a64b283ac90eb88cd561ba6c6681103', decimals: 18 },
-  { symbol: 'Tea', contractAddress: '0x3142Db225d0262973715606c85B2B50a66f9b00C', decimals: 18 },
-  { symbol: 'Dimei', contractAddress: '0xb299d5bdf3c17d14aafb305f97b16c5aa0999921', decimals: 18 },
-  { symbol: 'Mu', contractAddress: '0x7677421f49776addcfc18cb851df0c24d02d8888', decimals: 18 },
-  { symbol: 'Goods', contractAddress: '0x80B75C9c6773D255c32ADA8E971c0C4ba03088d0', decimals: 18 },
+  { symbol: 'ETZ', contractAddress: '0xc78dabf21594c76ad98a0b3ed103fcfcd9499999', decimals: 18, priceUsd: '0' },
+  { symbol: 'Piao', contractAddress: '0x68973e906a64b283ac90eb88cd561ba6c6681103', decimals: 18, priceUsd: '0' },
+  { symbol: 'Tea', contractAddress: '0x3142Db225d0262973715606c85B2B50a66f9b00C', decimals: 18, priceUsd: '0' },
+  { symbol: 'Dimei', contractAddress: '0xb299d5bdf3c17d14aafb305f97b16c5aa0999921', decimals: 18, priceUsd: '0' },
+  { symbol: 'Mu', contractAddress: '0x7677421f49776addcfc18cb851df0c24d02d8888', decimals: 18, priceUsd: '0' },
+  { symbol: 'Goods', contractAddress: '0x80B75C9c6773D255c32ADA8E971c0C4ba03088d0', decimals: 18, priceUsd: '0' },
 ];
 
 
@@ -270,7 +271,7 @@ const RUNTIME_SETTING_DEFINITIONS = [
     label: '默认钱包代币列表',
     type: 'json',
     defaultValue: BUILTIN_DEFAULT_WALLET_TOKENS,
-    description: '客户端 /api/v1/wallet/default-tokens 返回的默认代币数组。',
+    description: '客户端 /api/v1/wallet/default-tokens 返回的默认代币数组；每个代币可配置 priceUsd，用于客户端计算美元估值。',
   },
 ];
 const RUNTIME_SETTING_DEFINITION_MAP = new Map(RUNTIME_SETTING_DEFINITIONS.map((definition) => [definition.key, definition]));
@@ -770,6 +771,24 @@ function normalizeSettingNumber(value, definition) {
   return integer;
 }
 
+function normalizeTokenPriceUsd(value, fallback = '0') {
+  if (value === undefined || value === null || value === '') return String(fallback);
+  const text = String(value).trim().replace(/,/g, '');
+  if (!text) return String(fallback);
+  if (!/^(?:\d+|\d*\.\d+)$/.test(text)) return String(fallback);
+  const number = Number(text);
+  if (!Number.isFinite(number) || number < 0) return String(fallback);
+  // 保留字符串，避免 JSON / MySQL 往返时把小数精度压成科学计数法。
+  let normalized = text.replace(/^0+(?=\d)/, '') || '0';
+  if (normalized.startsWith('.')) normalized = `0${normalized}`;
+  return normalized;
+}
+
+function tokenPriceUsdFromItem(item) {
+  if (!item || typeof item !== 'object') return '0';
+  return normalizeTokenPriceUsd(item.priceUsd ?? item.usdPrice ?? item.price ?? item.price_usd, '0');
+}
+
 function normalizeWalletTokensSetting(value) {
   let tokens = value;
   if (typeof tokens === 'string') {
@@ -790,7 +809,8 @@ function normalizeWalletTokensSetting(value) {
     if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) {
       throw new Error(`第 ${index + 1} 个代币 decimals 必须是 0-36 的整数`);
     }
-    return { symbol, contractAddress, decimals };
+    const priceUsd = tokenPriceUsdFromItem(item);
+    return { symbol, contractAddress, decimals, priceUsd };
   });
 }
 
@@ -1219,10 +1239,10 @@ class MySqlDB {
         KEY idx_claim_tx_hash (tx_hash)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
-    await this.pool.query(`
-      ALTER TABLE red_packet_claims
-      ADD COLUMN IF NOT EXISTS claimer_name VARCHAR(255) NOT NULL DEFAULT '' AFTER claimer_address
-    `);
+    // await this.pool.query(`
+    //   ALTER TABLE red_packet_claims
+    //   ADD COLUMN IF NOT EXISTS claimer_name VARCHAR(255) NOT NULL DEFAULT '' AFTER claimer_address
+    // `);
 
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS red_packet_refunds (
@@ -2478,6 +2498,86 @@ function parseExpectedLog(receipt, eventName, expectedContractAddress) {
   return null;
 }
 
+const tokenPriceCache = {
+  bnbPriceUsd: '0',
+  bnbCheckedAt: 0,
+  bnbExpiresAtMs: 0,
+};
+
+function fetchJsonHttps(url, timeoutMs = 4000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { timeout: timeoutMs }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > 1024 * 1024) {
+          req.destroy(new Error('response too large'));
+        }
+      });
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(body || '{}'));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('request timeout')));
+    req.on('error', reject);
+  });
+}
+
+async function getBnbPriceUsdCached(force = false) {
+  const nowMs = Date.now();
+  if (!force && tokenPriceCache.bnbExpiresAtMs > nowMs) {
+    return tokenPriceCache.bnbPriceUsd;
+  }
+
+  try {
+    const json = await fetchJsonHttps('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT', 4000);
+    const priceUsd = normalizeTokenPriceUsd(json?.price, '0');
+    if (Number(priceUsd) > 0) {
+      tokenPriceCache.bnbPriceUsd = priceUsd;
+      tokenPriceCache.bnbCheckedAt = nowSeconds();
+      tokenPriceCache.bnbExpiresAtMs = nowMs + 60_000;
+      return priceUsd;
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('[bnb-price-fetch-error]', error?.message || error);
+  }
+
+  tokenPriceCache.bnbExpiresAtMs = nowMs + 15_000;
+  return tokenPriceCache.bnbPriceUsd || '0';
+}
+
+function buildWalletTokenPriceRows(settings, bnbPriceUsd) {
+  const tokenRows = Array.isArray(settings?.walletTokens) ? settings.walletTokens : [];
+  return [
+    {
+      symbol: 'BNB',
+      contractAddress: ZERO_ADDRESS,
+      tokenAddress: ZERO_ADDRESS,
+      priceUsd: normalizeTokenPriceUsd(bnbPriceUsd, '0'),
+      source: 'binance:BNBUSDT',
+      updatedAt: tokenPriceCache.bnbCheckedAt || nowSeconds(),
+    },
+    ...tokenRows.map((token) => ({
+      symbol: String(token?.symbol || '').trim(),
+      contractAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || '') || String(token?.contractAddress || token?.tokenAddress || ''),
+      tokenAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || '') || String(token?.contractAddress || token?.tokenAddress || ''),
+      priceUsd: tokenPriceUsdFromItem(token),
+      source: Number(tokenPriceUsdFromItem(token)) > 0 ? 'server-config' : 'not-configured',
+      updatedAt: nowSeconds(),
+    })).filter((token) => token.symbol),
+  ];
+}
+
 app.get('/healthz', async (_, res) => {
   const settings = await getRuntimeSettings();
   const rpcHealth = await getRpcHealth(false);
@@ -2555,6 +2655,23 @@ app.get('/api/v1/wallet/default-tokens', async (_req, res, next) => {
   try {
     const settings = await getRuntimeSettings();
     return res.json({ ok: true, data: { tokens: settings.walletTokens } });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get('/api/v1/wallet/token-prices', async (_req, res, next) => {
+  try {
+    const settings = await getRuntimeSettings();
+    const bnbPriceUsd = await getBnbPriceUsdCached(false);
+    return res.json({
+      ok: true,
+      data: {
+        baseCurrency: 'USD',
+        prices: buildWalletTokenPriceRows(settings, bnbPriceUsd),
+        updatedAt: nowSeconds(),
+      },
+    });
   } catch (error) {
     return next(error);
   }

@@ -24,8 +24,12 @@ import android.widget.TextView;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.wallet.data.WalletStorage;
+import org.json.JSONObject;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.List;
+import java.util.Locale;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -157,68 +161,171 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         for (String line : tokenLines) tokenListContainer.addView(createTokenRow(line), Web3Ui.topMargin(getActivity(), 6));
     }
 
+    private static final class TokenDisplayData {
+        String symbol = "TOKEN";
+        String amount = "--";
+        String usdValue = "--";
+        String subtitle = "";
+    }
+
     private View createTokenRow(String line) {
         Web3Ui.Palette p = Web3Ui.palette();
-        String symbol = "TOKEN", amount = "--", sub = "";
-        if (!TextUtils.isEmpty(line)) {
-            String[] parts = line.split(":", 2);
-            if (parts.length == 2) {
-                symbol = parts[0].trim();
-                String rest = parts[1].trim();
-                int contractStart = rest.indexOf('('), contractEnd = rest.indexOf(')');
-                String usdValue = "--";
-                String amountPart = rest;
-                int usdSplit = rest.indexOf("|");
-                if (usdSplit >= 0) {
-                    amountPart = rest.substring(0, usdSplit).trim();
-                    rest = rest.substring(usdSplit + 1).trim();
-                    int space = rest.indexOf("  ");
-                    usdValue = (space > 0 ? rest.substring(0, space) : rest).trim();
-                }
-                if (contractStart >= 0 && contractEnd > contractStart) {
-                    amount = amountPart;
-                    sub = rest.substring(contractStart + 1, contractEnd).trim();
-                } else {
-                    amount = amountPart;
-                    sub = "BNB".equalsIgnoreCase(symbol) ? currentChainName : "";
-                }
-            } else symbol = line;
-        }
+        TokenDisplayData token = parseTokenLine(line);
         LinearLayout row = new LinearLayout(getActivity());
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(10), dp(8), dp(8), dp(8));
         row.setBackground(Web3Ui.rounded(getActivity(), p.softCardBg, 12));
-        row.addView(Web3Ui.tokenBadge(getActivity(), symbol, 36), new LinearLayout.LayoutParams(dp(36), dp(36)));
+        row.addView(Web3Ui.tokenBadge(getActivity(), token.symbol, 36), new LinearLayout.LayoutParams(dp(36), dp(36)));
         LinearLayout info = new LinearLayout(getActivity());
         info.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         infoLp.leftMargin = dp(10);
         row.addView(info, infoLp);
-        info.addView(Web3Ui.text(getActivity(), symbol, 15, p.primaryText, true), Web3Ui.matchWrap());
-        info.addView(Web3Ui.text(getActivity(), sub, 12, p.secondaryText, false), Web3Ui.matchWrap());
+        info.addView(Web3Ui.text(getActivity(), token.symbol, 15, p.primaryText, true), Web3Ui.matchWrap());
+        TextView subtitleView = Web3Ui.text(getActivity(), token.subtitle, 12, p.secondaryText, false);
+        subtitleView.setSingleLine(true);
+        subtitleView.setEllipsize(TextUtils.TruncateAt.END);
+        info.addView(subtitleView, Web3Ui.matchWrap());
+
         LinearLayout right = new LinearLayout(getActivity());
         right.setOrientation(LinearLayout.VERTICAL);
         right.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        String prettyAmount = formatTokenAmount(amount);
-        TextView amountView = Web3Ui.text(getActivity(), prettyAmount + " " + symbol, 15, p.primaryText, true);
+        String prettyAmount = formatTokenAmount(token.amount);
+        TextView amountView = Web3Ui.text(getActivity(), prettyAmount + " " + token.symbol, 15, p.primaryText, true);
         amountView.setGravity(Gravity.RIGHT);
+        amountView.setSingleLine(true);
+        amountView.setEllipsize(TextUtils.TruncateAt.END);
+        amountView.setMaxWidth(dp(184));
         right.addView(amountView);
-        TextView usd = Web3Ui.text(getActivity(), "≈ $" + formatUsdLabel(line), 11, p.mutedText, false);
+        TextView usd = Web3Ui.text(getActivity(), formatUsdDisplay(token.usdValue, token.amount), 11, p.mutedText, false);
         usd.setGravity(Gravity.RIGHT);
+        usd.setSingleLine(true);
+        usd.setEllipsize(TextUtils.TruncateAt.END);
+        usd.setMaxWidth(dp(184));
         right.addView(usd);
-        row.addView(right);
+        LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rightLp.leftMargin = dp(8);
+        row.addView(right, rightLp);
         return row;
+    }
+
+    private TokenDisplayData parseTokenLine(String line) {
+        TokenDisplayData token = new TokenDisplayData();
+        if (TextUtils.isEmpty(line)) {
+            token.subtitle = "BNB".equalsIgnoreCase(token.symbol) ? currentChainName : "";
+            return token;
+        }
+        String raw = line.trim();
+        if (raw.startsWith("{")) {
+            try {
+                JSONObject obj = new JSONObject(raw);
+                token.symbol = firstNonEmpty(obj.optString("symbol", ""), obj.optString("tokenSymbol", ""), "TOKEN");
+                token.amount = sanitizeAmount(firstNonEmpty(obj.optString("amount", ""), obj.optString("balance", ""), "0"), token.symbol);
+                token.usdValue = firstNonEmpty(obj.optString("usdValue", ""), obj.optString("valueUsd", ""), obj.optString("fiatValueUsd", ""), "--");
+                token.subtitle = firstNonEmpty(obj.optString("subtitle", ""), obj.optString("sub", ""), obj.optString("contract", ""), "");
+                if (TextUtils.isEmpty(token.subtitle) && "BNB".equalsIgnoreCase(token.symbol)) {
+                    token.subtitle = currentChainName;
+                }
+                return token;
+            } catch (Throwable ignore) {
+                // 继续走旧格式解析。
+            }
+        }
+
+        String[] parts = raw.split(":", 2);
+        if (parts.length != 2) {
+            token.symbol = raw;
+            token.amount = "--";
+            token.subtitle = "BNB".equalsIgnoreCase(token.symbol) ? currentChainName : "";
+            return token;
+        }
+
+        token.symbol = firstNonEmpty(parts[0].trim(), "TOKEN");
+        String rest = parts[1].trim();
+        int pipe = rest.indexOf('|');
+        String amountPart = pipe >= 0 ? rest.substring(0, pipe).trim() : rest;
+        String usdPart = pipe >= 0 ? rest.substring(pipe + 1).trim() : "";
+        token.amount = sanitizeAmount(amountPart, token.symbol);
+
+        String subtitle = extractParenthetical(pipe >= 0 ? usdPart : rest);
+        if (TextUtils.isEmpty(subtitle)) {
+            subtitle = extractParenthetical(amountPart);
+        }
+        if (!TextUtils.isEmpty(subtitle)) {
+            token.subtitle = subtitle;
+        } else if ("BNB".equalsIgnoreCase(token.symbol)) {
+            token.subtitle = currentChainName;
+        }
+
+        if (!TextUtils.isEmpty(usdPart)) {
+            token.usdValue = sanitizeUsdValue(removeParenthetical(usdPart));
+        }
+        if (isZeroAmount(token.amount) && (TextUtils.isEmpty(token.usdValue) || "--".equals(token.usdValue))) {
+            token.usdValue = "0.00";
+        }
+        return token;
+    }
+
+    private String sanitizeAmount(String amount, String symbol) {
+        String value = amount == null ? "" : amount.trim();
+        int paren = value.indexOf('(');
+        if (paren >= 0) value = value.substring(0, paren).trim();
+        if (!TextUtils.isEmpty(symbol) && value.toUpperCase(Locale.US).endsWith(" " + symbol.toUpperCase(Locale.US))) {
+            value = value.substring(0, value.length() - symbol.length()).trim();
+        }
+        return TextUtils.isEmpty(value) ? "0" : value;
+    }
+
+    private String extractParenthetical(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        int start = value.lastIndexOf('(');
+        int end = value.lastIndexOf(')');
+        if (start >= 0 && end > start) {
+            return value.substring(start + 1, end).trim();
+        }
+        return "";
+    }
+
+    private String removeParenthetical(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        int start = value.lastIndexOf('(');
+        int end = value.lastIndexOf(')');
+        if (start >= 0 && end > start) {
+            return (value.substring(0, start) + value.substring(end + 1)).trim();
+        }
+        return value.trim();
+    }
+
+    private String sanitizeUsdValue(String value) {
+        if (TextUtils.isEmpty(value)) return "--";
+        String result = value.replace("≈", "").replace("$", "").trim();
+        return TextUtils.isEmpty(result) ? "--" : result;
+    }
+
+    private boolean isZeroAmount(String amount) {
+        try {
+            return new BigDecimal(amount.replace(",", "").trim()).compareTo(BigDecimal.ZERO) == 0;
+        } catch (Throwable ignore) {
+            return false;
+        }
     }
 
     private String formatTokenAmount(String amount) {
         try {
-            BigDecimal d = new BigDecimal(amount);
+            BigDecimal d = new BigDecimal(amount.replace(",", "").trim());
             if (d.compareTo(BigDecimal.ZERO) == 0) return "0";
-            if (d.abs().compareTo(new BigDecimal("1")) >= 0) return d.setScale(4, RoundingMode.DOWN).stripTrailingZeros().toPlainString();
-            return d.setScale(6, RoundingMode.DOWN).stripTrailingZeros().toPlainString();
+            BigDecimal abs = d.abs();
+            if (abs.compareTo(new BigDecimal("0.00000001")) < 0) {
+                return d.signum() < 0 ? "<-0.00000001" : "<0.00000001";
+            }
+            int scale = abs.compareTo(BigDecimal.ONE) >= 0 ? 4 : 8;
+            BigDecimal rounded = d.setScale(scale, RoundingMode.DOWN).stripTrailingZeros();
+            DecimalFormat format = new DecimalFormat("#,##0.########", DecimalFormatSymbols.getInstance(Locale.US));
+            format.setRoundingMode(RoundingMode.DOWN);
+            return format.format(rounded);
         } catch (Throwable ignore) {
-            return amount;
+            return TextUtils.isEmpty(amount) ? "--" : amount;
         }
     }
 
@@ -229,16 +336,34 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         return parts.length > 1 ? number + " " + parts[1] : number;
     }
 
-    private String formatUsdLabel(String line) {
-        if (TextUtils.isEmpty(line)) return "--";
-        int colon = line.indexOf(':');
-        if (colon < 0) return "--";
-        String rest = line.substring(colon + 1).trim();
-        int pipe = rest.indexOf('|');
-        if (pipe < 0) return "--";
-        String tail = rest.substring(pipe + 1).trim();
-        int contract = tail.indexOf("  (");
-        return (contract > 0 ? tail.substring(0, contract) : tail).trim();
+    private String formatUsdDisplay(String usdValue, String amount) {
+        String label = sanitizeUsdValue(usdValue);
+        if ((TextUtils.isEmpty(label) || "--".equals(label)) && isZeroAmount(amount)) {
+            label = "0.00";
+        }
+        if (TextUtils.isEmpty(label) || "--".equals(label)) {
+            return "≈ $--";
+        }
+        try {
+            boolean lessThanCent = label.startsWith("<");
+            String numeric = (lessThanCent ? label.substring(1) : label).replace(",", "").trim();
+            BigDecimal value = new BigDecimal(numeric);
+            if (value.compareTo(BigDecimal.ZERO) == 0) return "≈ $0.00";
+            if (lessThanCent || value.compareTo(new BigDecimal("0.01")) < 0) return "≈ $<0.01";
+            DecimalFormat format = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.US));
+            format.setRoundingMode(RoundingMode.HALF_UP);
+            return "≈ $" + format.format(value);
+        } catch (Throwable ignore) {
+            return "≈ $" + label;
+        }
+    }
+
+    private String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) return value;
+        }
+        return "";
     }
 
     private void applyTotalAsset(String totalAsset) {

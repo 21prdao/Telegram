@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.VITE_ADMIN_WEB_BASE || '/admin/',
+  base: process.env.VITE_ADMIN_WEB_BASE || '/etzredpacket/admin/',
   server: {
     port: Number(process.env.VITE_ADMIN_PORT || 5173),
     proxy: {

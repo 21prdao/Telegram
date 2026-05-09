@@ -29,7 +29,9 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.net.HttpURLConnection;
@@ -229,8 +231,34 @@ public class RedPacketRepository {
             token.decimals = optInt(item, "decimals", "tokenDecimals");
             if (token.decimals <= 0) token.decimals = 18;
             token.favorite = true;
+            token.priceUsd = firstNonEmpty(optString(item, "priceUsd", "usdPrice", "price", "price_usd"), "");
             if (!TextUtils.isEmpty(token.contractAddress)) {
                 result.add(token);
+            }
+        }
+        return result;
+    }
+
+    public Map<String, BigDecimal> getTokenPrices() throws Exception {
+        JSONObject root = requestJson("GET", "/wallet/token-prices", null);
+        JSONObject data = unwrapData(root);
+        JSONArray list = data != null ? data.optJSONArray("prices") : null;
+        Map<String, BigDecimal> result = new HashMap<>();
+        if (list == null) {
+            return result;
+        }
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject item = list.optJSONObject(i);
+            if (item == null) continue;
+            BigDecimal price = parsePositiveDecimal(firstNonEmpty(optString(item, "priceUsd", "usdPrice", "price", "price_usd"), "0"));
+            if (price.compareTo(BigDecimal.ZERO) <= 0) continue;
+            String symbol = firstNonEmpty(optString(item, "symbol", "tokenSymbol"), "");
+            String contractAddress = firstNonEmpty(optString(item, "contractAddress", "tokenAddress"), "");
+            if (!TextUtils.isEmpty(symbol)) {
+                result.put(priceKeyForSymbol(symbol), price);
+            }
+            if (!TextUtils.isEmpty(contractAddress)) {
+                result.put(priceKeyForContract(contractAddress), price);
             }
         }
         return result;
@@ -844,6 +872,26 @@ public class RedPacketRepository {
             }
         }
         return false;
+    }
+
+    public static String priceKeyForSymbol(String symbol) {
+        return "symbol:" + (symbol == null ? "" : symbol.trim().toUpperCase(Locale.US));
+    }
+
+    public static String priceKeyForContract(String contractAddress) {
+        return "contract:" + (contractAddress == null ? "" : contractAddress.trim().toLowerCase(Locale.US));
+    }
+
+    public static BigDecimal parsePositiveDecimal(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            BigDecimal decimal = new BigDecimal(value.trim().replace(",", ""));
+            return decimal.compareTo(BigDecimal.ZERO) > 0 ? decimal : BigDecimal.ZERO;
+        } catch (Throwable ignore) {
+            return BigDecimal.ZERO;
+        }
     }
 
     private static String firstNonEmpty(String... values) {
