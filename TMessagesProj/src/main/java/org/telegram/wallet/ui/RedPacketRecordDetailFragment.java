@@ -22,6 +22,7 @@ import org.telegram.wallet.model.RedPacketSendRecordDetail;
 import org.telegram.wallet.redpacket.RedPacketRepository;
 import org.telegram.wallet.security.WalletKeyStore;
 import org.web3j.crypto.Credentials;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -125,20 +126,34 @@ public class RedPacketRecordDetailFragment extends Fragment {
             Toast.makeText(getActivity(), "请先创建或导入钱包", Toast.LENGTH_SHORT).show();
             return;
         }
-        final String packetId = TextUtils.isEmpty(refund.packetIdHex) ? (getArguments() == null ? "" : getArguments().getString(ARG_PACKET_ID, "")) : refund.packetIdHex;
+        final String businessPacketId = !TextUtils.isEmpty(refund.packetId)
+                ? refund.packetId
+                : (getArguments() == null ? "" : getArguments().getString(ARG_PACKET_ID, ""));
+        final String chainPacketId = TextUtils.isEmpty(refund.packetIdHex) ? businessPacketId : refund.packetIdHex;
         final String contract = TextUtils.isEmpty(refund.contractAddress) ? WalletRuntimeConfig.getRedPacketContract() : refund.contractAddress;
+        if (TextUtils.isEmpty(businessPacketId) || TextUtils.isEmpty(chainPacketId) || TextUtils.isEmpty(contract)) {
+            Toast.makeText(getActivity(), "回退参数不完整", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         refundSubmitting = true;
         Toast.makeText(getActivity(), "正在提交回退交易…", Toast.LENGTH_SHORT).show();
         Utilities.globalQueue.postRunnable(() -> {
             try {
-                String txHash = new RedPacketContractService().refund(privateKeyHex, contract, packetId);
+                RedPacketContractService contractService = new RedPacketContractService();
+                String txHash = contractService.refund(privateKeyHex, contract, chainPacketId);
+                TransactionReceipt receipt = contractService.waitForReceipt(txHash);
+                if (!isReceiptSuccess(receipt)) {
+                    throw new IllegalStateException("交易失败：链上回退未成功");
+                }
+
                 String creatorAddress = Credentials.create(privateKeyHex).getAddress();
-                RedPacketRepository.getInstance().confirmRefund(packetId, creatorAddress, txHash);
+                RedPacketRepository.getInstance().confirmRefund(businessPacketId, creatorAddress, txHash);
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(() -> {
                     refundSubmitting = false;
                     Toast.makeText(getActivity(), "回退成功", Toast.LENGTH_SHORT).show();
-                    getActivity().finish();
+                    load();
                 });
             } catch (Throwable t) {
                 FileLog.e(t);
@@ -146,9 +161,18 @@ public class RedPacketRecordDetailFragment extends Fragment {
                 getActivity().runOnUiThread(() -> {
                     refundSubmitting = false;
                     Toast.makeText(getActivity(), "回退失败：" + (t.getMessage() == null ? "unknown" : t.getMessage()), Toast.LENGTH_SHORT).show();
+                    load();
                 });
             }
         });
+    }
+
+    private boolean isReceiptSuccess(TransactionReceipt receipt) {
+        if (receipt == null) {
+            return false;
+        }
+        String status = receipt.getStatus();
+        return "0x1".equalsIgnoreCase(status) || "1".equals(status);
     }
 
     private TextView line(String k, String v) {

@@ -152,7 +152,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         tv.setPadding(dp(8), dp(4), dp(8), dp(4));
         tv.setBackground(Web3Ui.roundedStroke(getActivity(), p.grayBadgeBg, p.grayBadgeBg, 10, 1));
         tv.setOnClickListener(v -> {
-            final String[] labels = new String[]{"全部", "进行中", "已领完", "可过期", "已退款"};
+            final String[] labels = new String[]{"全部", "进行中", "已领完", "已过期", "已退款"};
             final String[] values = new String[]{"all", "active", "empty", "expired", "refunded"};
             PopupMenu menu = new PopupMenu(getActivity(), tv);
             for (int i = 0; i < labels.length; i++) {
@@ -281,7 +281,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
             case "empty":
                 return "已领完";
             case "expired":
-                return "可过期";
+                return "已过期";
             case "refunded":
                 return "已退款";
             case "pending":

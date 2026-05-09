@@ -498,6 +498,21 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
             return;
         }
 
+        final String creatorAddress;
+        try {
+            creatorAddress = Credentials.create(privateKeyHex).getAddress();
+        } catch (Throwable t) {
+            FileLog.e(t);
+            showError("钱包私钥格式错误");
+            return;
+        }
+
+        if (!TextUtils.isEmpty(currentInfo.creatorWallet)
+                && !creatorAddress.equalsIgnoreCase(currentInfo.creatorWallet)) {
+            showToast("只有红包发送人可以退回");
+            return;
+        }
+
         if (!currentInfo.canRefund) {
             showToast("当前不能退回这个红包");
             return;
@@ -509,21 +524,38 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
 
         Utilities.globalQueue.postRunnable(() -> {
             try {
+                String businessPacketId = firstNonEmpty(currentInfo.packetId, packetId);
                 String contractAddress = firstNonEmpty(
                         currentInfo.contractAddress,
                         WalletRuntimeConfig.getRedPacketContract()
                 );
-                String finalPacketId = firstNonEmpty(currentInfo.packetIdHex, packetId);
-                String txHash = new RedPacketContractService().refund(
+                String chainPacketId = firstNonEmpty(currentInfo.packetIdHex, businessPacketId);
+
+                if (TextUtils.isEmpty(businessPacketId) || TextUtils.isEmpty(chainPacketId) || TextUtils.isEmpty(contractAddress)) {
+                    throw new IllegalStateException("回退参数不完整");
+                }
+
+                RedPacketContractService contractService = new RedPacketContractService();
+                String txHash = contractService.refund(
                         privateKeyHex,
                         contractAddress,
-                        finalPacketId
+                        chainPacketId
                 );
+                TransactionReceipt receipt = contractService.waitForReceipt(txHash);
+                if (!isReceiptSuccess(receipt)) {
+                    throw new IllegalStateException("交易失败：链上回退未成功");
+                }
+
+                RedPacketRepository.getInstance().confirmRefund(businessPacketId, creatorAddress, txHash);
 
                 AndroidUtilities.runOnUIThread(() -> {
                     submitting = false;
                     setLoading(false, null);
                     showToast("退回成功：" + safeShortHash(txHash));
+                    NotificationCenter.getInstance(currentAccount).postNotificationName(
+                            NotificationCenter.updateInterfaces,
+                            MessagesController.UPDATE_MASK_MESSAGE_TEXT
+                    );
                     loadPacketInfo();
                 });
             } catch (Throwable t) {
@@ -531,7 +563,7 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
                 AndroidUtilities.runOnUIThread(() -> {
                     submitting = false;
                     setLoading(false, null);
-                    showError("退回失败：" + nonNullMessage(t));
+                    showError(resolveRefundErrorMessage(t));
                 });
             }
         });
@@ -714,6 +746,42 @@ public class OpenRedPacketBottomSheet extends BottomSheet {
             return t.getMessage();
         }
         return t.getClass().getSimpleName();
+    }
+
+    private boolean isReceiptSuccess(TransactionReceipt receipt) {
+        if (receipt == null) {
+            return false;
+        }
+        String status = receipt.getStatus();
+        return "0x1".equalsIgnoreCase(status) || "1".equals(status);
+    }
+
+    private String resolveRefundErrorMessage(Throwable t) {
+        String raw = nonNullMessage(t);
+        String lower = raw == null ? "" : raw.toLowerCase(Locale.US);
+
+        if (containsAny(lower, "insufficient funds", "intrinsic gas too low", "out of gas")) {
+            return "gas 不足：请补充 BNB 后重试";
+        }
+        if (containsAny(lower, "not creator", "creator mismatch", "只有红包发送人")) {
+            return "只有红包发送人可以退回";
+        }
+        if (containsAny(lower, "not expired", "packet not expired")) {
+            return "红包还没过期，暂时不能退回";
+        }
+        if (containsAny(lower, "already refunded", "refunded")) {
+            return "这个红包已经退回";
+        }
+        if (containsAny(lower, "nothing to refund", "empty", "no remaining")) {
+            return "没有可退回的剩余金额";
+        }
+        if (containsAny(lower, "timed out while waiting for receipt", "链上回退未成功", "execution reverted", "transaction failed")) {
+            return "回退交易失败：" + raw;
+        }
+        if (containsAny(lower, "http ", "unable to resolve host", "failed to connect", "timeout", "network")) {
+            return "网络失败：" + raw;
+        }
+        return "退回失败：" + raw;
     }
 
     private String resolveClaimErrorMessage(Throwable t) {

@@ -3673,7 +3673,11 @@ public class ChatActivityEnterView extends FrameLayout implements
                 }
             }
         };
-        redPacketButton.setScaleType(ImageView.ScaleType.CENTER);
+        // PNG 是 200x200，不能用 CENTER，否则会按原始尺寸绘制；
+        // 用 CENTER_INSIDE + 10dp padding，把图标限制在 24dp 内容区，和右侧语音/发送图标尺寸一致。
+        redPacketButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int redPacketPadding = dp(10f);
+        redPacketButton.setPadding(redPacketPadding, redPacketPadding, redPacketPadding, redPacketPadding);
         redPacketButton.setImageResource(R.drawable.msg_input_redpacket);
         redPacketButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_glass_defaultIcon), PorterDuff.Mode.MULTIPLY));
         redPacketButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));

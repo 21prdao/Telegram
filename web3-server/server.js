@@ -1343,12 +1343,15 @@ class MySqlDB {
   }
 
   async getPacket(packetId) {
-    const [rows] = await this.pool.query('SELECT * FROM red_packets WHERE packet_id = ? LIMIT 1', [packetId]);
+    const [rows] = await this.pool.query(
+      'SELECT * FROM red_packets WHERE packet_id = ? OR packet_id_hex = ? LIMIT 1',
+      [packetId, packetId],
+    );
     if (!rows.length) return null;
     const row = rows[0];
     const [claims] = await this.pool.query(
       'SELECT claimer_address FROM red_packet_claims WHERE packet_id = ? ORDER BY id ASC',
-      [packetId],
+      [row.packet_id],
     );
     return this.mapPacket(row, claims);
   }
@@ -1475,6 +1478,14 @@ class MySqlDB {
       const packetRow = packetRows[0];
 
       if (String(packetRow.status) === 'refunded') {
+        const [existingRefunds] = await conn.query(
+          'SELECT id FROM red_packet_refunds WHERE packet_id = ? AND tx_hash = ? LIMIT 1',
+          [packet.packetId, txHash],
+        );
+        if (existingRefunds.length) {
+          await conn.commit();
+          return this.getPacket(packet.packetId);
+        }
         throw new Error('already refunded');
       }
 
@@ -1500,6 +1511,17 @@ class MySqlDB {
     }
 
     return this.getPacket(packet.packetId);
+  }
+
+  async getRefundByPacketTx(packetId, txHash) {
+    const [rows] = await this.pool.query(
+      `SELECT id, packet_id, creator_address, tx_hash, amount_wei, created_at
+       FROM red_packet_refunds
+       WHERE packet_id = ? AND tx_hash = ?
+       LIMIT 1`,
+      [packetId, txHash],
+    );
+    return rows[0] || null;
   }
 
   async getPacketsForAdmin(limit = 100) {
@@ -3315,7 +3337,6 @@ app.post('/api/v1/red-packets/:packetId/claim-confirm', async (req, res) => {
 
 app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
   const packet = await ensurePacket(req.params.packetId, res);
-  console.log(req.params.packetId);
   if (!packet) return;
 
   const creatorAddress = normalizeAddress(req.body?.creatorAddress);
@@ -3323,6 +3344,26 @@ app.post('/api/v1/red-packets/:packetId/refund-confirm', async (req, res) => {
   if (!creatorAddress) return badRequest(res, 'creatorAddress invalid');
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return badRequest(res, 'txHash invalid');
   if (creatorAddress !== packet.creatorWallet) return badRequest(res, 'creator mismatch');
+
+  if (String(packet.status || '') === 'refunded') {
+    const existingRefund = await db.getRefundByPacketTx(packet.packetId, txHash);
+    if (existingRefund) {
+      return res.json({
+        ok: true,
+        data: {
+          packetId: packet.packetId,
+          txHash,
+          refunded: true,
+          status: getPacketStatus(packet),
+          remainingCount: packet.remainingCount,
+          refundAmountWei: String(existingRefund.amount_wei || '0'),
+          alreadyConfirmed: true,
+        },
+      });
+    }
+    return badRequest(res, 'already refunded');
+  }
+
   if (!packet.onchainCreated) return badRequest(res, 'packet not confirmed on chain');
   if (packet.remainingCount <= 0) return badRequest(res, 'nothing to refund');
   if (nowSeconds() <= Number(packet.expiresAt)) return badRequest(res, 'packet not expired');

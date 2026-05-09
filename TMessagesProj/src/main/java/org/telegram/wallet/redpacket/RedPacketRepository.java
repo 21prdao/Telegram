@@ -443,7 +443,38 @@ public class RedPacketRepository {
         JSONObject body = new JSONObject();
         body.put("creatorAddress", creatorAddress);
         body.put("txHash", txHash);
-        requestJson("POST", "/red-packets/" + Uri.encode(packetId) + "/refund-confirm", body);
+
+        Exception lastError = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                requestJson("POST", "/red-packets/" + Uri.encode(packetId) + "/refund-confirm", body);
+                return;
+            } catch (Exception error) {
+                lastError = error;
+                if (!isRefundConfirmRetryable(error) || attempt == 4) {
+                    throw error;
+                }
+                try {
+                    Thread.sleep(1200L + attempt * 800L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw interrupted;
+                }
+            }
+        }
+        if (lastError != null) {
+            throw lastError;
+        }
+    }
+
+    private boolean isRefundConfirmRetryable(Throwable error) {
+        String message = error == null || error.getMessage() == null ? "" : error.getMessage().toLowerCase(Locale.US);
+        return message.contains("transaction not confirmed")
+                || message.contains("receipt timeout")
+                || message.contains("refunded event not found")
+                || message.contains("timeout")
+                || message.contains("failed to connect")
+                || message.contains("unable to resolve host");
     }
 
     public RedPacketSendRecordDetail getSendRecordDetail(String packetId) throws Exception {
@@ -512,16 +543,18 @@ public class RedPacketRepository {
                 if (item == null) continue;
                 RedPacketRefundRecord refund = new RedPacketRefundRecord();
                 refund.refundId = firstNonEmpty(optString(item, "refundId", "refund_id", "id"), "");
+                refund.packetId = firstNonEmpty(optString(item, "packetId", "packet_id"), detail.packetId);
                 refund.amountWei = firstNonEmpty(optString(item, "amountWei", "amount_wei", "remainingAmountWei"), "0");
                 refund.amountDisplay = firstNonEmpty(optString(item, "amountDisplay", "amount", "remainingAmount"), "");
-                refund.packetIdHex = firstNonEmpty(optString(item, "packetIdHex", "packet_id_hex", "onChainPacketId", "onChainPacketIdHex"), detail.packetId);
-                refund.contractAddress = firstNonEmpty(optString(item, "contractAddress", "contract_address"), "");
+                refund.packetIdHex = firstNonEmpty(optString(item, "packetIdHex", "packet_id_hex", "onChainPacketId", "onChainPacketIdHex"), detail.packetIdHex);
+                refund.contractAddress = firstNonEmpty(optString(item, "contractAddress", "contract_address"), detail.contractAddress);
                 refund.status = firstNonEmpty(optString(item, "status"), "");
                 refund.expiresAt = optLong(item, "expiresAt", "expires_at", "expireAt", "expire_at");
                 refund.refunded = optBoolean(item, "refunded") || "refunded".equalsIgnoreCase(refund.status);
                 refund.canRefund = optBoolean(item, "canRefund", "refundable");
+                refund.txHash = firstNonEmpty(optString(item, "txHash", "tx_hash"), "");
                 if (!hasAny(item, "canRefund", "refundable")) {
-                    refund.canRefund = !refund.refunded && isExpired(refund.expiresAt);
+                    refund.canRefund = !refund.refunded && isExpired(refund.expiresAt) && !TextUtils.isEmpty(refund.amountWei) && !"0".equals(refund.amountWei);
                 }
                 detail.refundRecords.add(refund);
             }
@@ -529,6 +562,7 @@ public class RedPacketRepository {
         if (detail.refundRecords.isEmpty() && (detail.canRefund || detail.refunded)) {
             RedPacketRefundRecord fallback = new RedPacketRefundRecord();
             fallback.refundId = detail.packetId;
+            fallback.packetId = detail.packetId;
             fallback.amountWei = detail.remainingAmountWei;
             fallback.amountDisplay = detail.remainingAmountDisplay;
             fallback.canRefund = detail.canRefund;
