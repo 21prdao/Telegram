@@ -107,3 +107,11 @@
 # Use -keep to explicitly keep any other classes shrinking would remove
 -dontoptimize
 -dontobfuscate
+
+-dontwarn groovy.lang.GroovyShell
+-dontwarn java.beans.ConstructorProperties
+-dontwarn java.beans.Transient
+
+-dontwarn groovy.lang.GroovyShell
+-dontwarn java.beans.ConstructorProperties
+-dontwarn java.beans.Transient

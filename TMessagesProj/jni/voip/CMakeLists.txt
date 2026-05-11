@@ -857,7 +857,6 @@ add_library(tgcalls STATIC
         voip/webrtc/pc/peer_connection.cc
         voip/webrtc/pc/audio_rtp_receiver.cc
         voip/webrtc/pc/jsep_ice_candidate.cc
-        voip/webrtc/pc/video_track_source_proxy.cc
         voip/webrtc/pc/external_hmac.cc
         voip/webrtc/pc/simulcast_description.cc
         voip/webrtc/sdk/android/src/jni/pc/add_ice_candidate_observer.cc
@@ -1998,6 +1997,7 @@ add_library(voipandroid STATIC
         voip/webrtc/sdk/android/src/jni/android_histogram.cc
         voip/webrtc/sdk/android/src/jni/java_i420_buffer.cc
         voip/webrtc/sdk/android/src/jni/logging/log_sink.cc
+        voip/webrtc/pc/video_track_source_proxy.cc
 #        voip/webrtc/sdk/android/src/jni/libaom_av1_encoder.cc
         voip/webrtc/sdk/android/src/jni/video_codec_info.cc
         voip/webrtc/sdk/android/src/jni/video_encoder_wrapper.cc
