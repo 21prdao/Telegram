@@ -115,3 +115,13 @@
 -dontwarn groovy.lang.GroovyShell
 -dontwarn java.beans.ConstructorProperties
 -dontwarn java.beans.Transient
+
+# Web3 wallet uses web3j/jackson reflective JSON parsing (RPC responses).
+# Keep full web3j model structure for minified release builds.
+-keep class org.web3j.** { *; }
+-keep class org.bouncycastle.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+
+-dontwarn org.web3j.**
+-dontwarn org.bouncycastle.**
