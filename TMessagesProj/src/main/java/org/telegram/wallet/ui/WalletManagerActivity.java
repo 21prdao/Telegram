@@ -34,7 +34,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
             R.drawable.icon_wallet_2_1
     };
     private static final int[] TAB_ICON_UNSELECTED = {
-            R.drawable.icon_wallet_6_3,
+            R.drawable.icon_wallet_6_2,
             R.drawable.icon_wallet_4_2,
             R.drawable.icon_wallet_2_2
     };
