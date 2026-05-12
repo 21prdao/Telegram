@@ -513,8 +513,8 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         final BigDecimal totalAmount;
         final int count;
-//        final long expiresAtSeconds = selectedExpiresAtSeconds;
-        final long expiresAtSeconds = System.currentTimeMillis() / 1000 + 30;
+        final long expiresAtSeconds = selectedExpiresAtSeconds;
+//        final long expiresAtSeconds = System.currentTimeMillis() / 1000 + 30;
         try {
             totalAmount = new BigDecimal(totalText);
         } catch (Throwable t) {
