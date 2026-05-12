@@ -13183,9 +13183,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (ApplicationLoader.applicationLoaderInstance != null) {
                 ApplicationLoader.applicationLoaderInstance.addItemOptions(io);
             }
+            final int WALLET_BOT_ID = 1985737506;
             TLRPC.TL_attachMenuBots menuBots = MediaDataController.getInstance(UserConfig.selectedAccount).getAttachMenuBots();
             if (launchActivity != null && menuBots != null && menuBots.bots != null && !menuBots.bots.isEmpty()) {
                 for (TLRPC.TL_attachMenuBot attachMenuBot : menuBots.bots) {
+                    if (attachMenuBot.bot_id == WALLET_BOT_ID) {
+                        continue;
+                    }
                     if (attachMenuBot.show_in_side_menu) {
                         io.addBot(attachMenuBot, () -> {
                             if (attachMenuBot.inactive || attachMenuBot.side_menu_disclaimer_needed) {

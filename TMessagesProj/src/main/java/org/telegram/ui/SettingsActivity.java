@@ -943,18 +943,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         // 12 - TelegramStars
         // 13 - MyTON
 
-        TLRPC.TL_attachMenuBots menuBots = MediaDataController.getInstance(UserConfig.selectedAccount).getAttachMenuBots();
-        if (menuBots != null && menuBots.bots != null && !menuBots.bots.isEmpty()) {
-            for (TLRPC.TL_attachMenuBot attachMenuBot : menuBots.bots) {
-                final int WALLET_BOT_ID = 1985737506;
-                if (attachMenuBot.show_in_side_menu && attachMenuBot.bot_id == WALLET_BOT_ID) {
-                    UItem item = SettingCell.Factory.ofBot(attachMenuBot, 0xFF1BA4ED, 0xFF1488E1, R.drawable.settings_wallet);
-                    item.object = attachMenuBot;
-                    items.add(item);
-                }
-            }
-        }
-
         items.add(SettingCell.Factory.of(14, 0xFF1BA4ED, 0xFF1488E1, R.drawable.settings_wallet, getString(R.string.Web3Wallet), getString(R.string.Web3WalletInfo)));
         // Hidden by product customization:
         // 15 - TelegramBusiness
