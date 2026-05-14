@@ -44,8 +44,6 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     };
     private WalletWorkflowCoordinator coordinator;
     private View rpcStatusDot;
-    private LinearLayout actionBarView;
-    private FrameLayout bottomTabsView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -252,7 +252,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabs = new GlassTabView[5];
         tabs[INDEX_CHATS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
         tabs[INDEX_CONTACTS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CONTACTS, R.string.MainTabsContacts);
-        tabs[INDEX_WALLET] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Web3Wallet);
+        tabs[INDEX_WALLET] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.WALLET, R.string.Web3Wallet);
         tabs[INDEX_CALLS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CALLS, R.string.MainTabsCalls);
         tabs[INDEX_PROFILE] = GlassTabView.createAvatar(context, resourceProvider, currentAccount, R.string.MainTabsProfile);
         tabs[INDEX_PROFILE].setOnLongClickListener(v -> {
@@ -265,11 +265,12 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             final int tabIndex = index;
 
             final int position = indexToPosition(index);
+            int finalIndex = index;
             tabs[index].setOnClickListener(v -> {
                 if (viewPager.isManualScrolling() || viewPager.isTouch()) {
                     return;
                 }
-                if (index == INDEX_WALLET) {
+                if (finalIndex == INDEX_WALLET) {
                     WalletNavigator.openWalletManager(getParentActivity());
                     return;
                 }
@@ -803,7 +804,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private void checkUi_callTabVisible(boolean callTabsVisible, boolean animated) {
         if (tabsView != null) {
             tabsView.setViewVisible(tabs[INDEX_WALLET], true, animated);
-            tabsView.setViewVisible(tabs[INDEX_CALLS], true, animated);
+            tabsView.setViewVisible(tabs[INDEX_CALLS], false, animated);
         }
     }
 
