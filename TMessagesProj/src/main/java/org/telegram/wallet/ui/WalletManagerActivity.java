@@ -13,6 +13,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.view.WindowInsets;
 
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -27,6 +28,8 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private LinearLayout homeTab;
     private LinearLayout securityTab;
     private LinearLayout manageTab;
+    private View actionBarView;
+    private FrameLayout bottomTabsView;
 
     private static final int[] TAB_ICON_SELECTED = {
             R.drawable.icon_wallet_6_1,
@@ -63,13 +66,27 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(p.pageBg);
-        root.addView(buildActionBar(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
+        actionBarView = buildActionBar();
+        root.addView(actionBarView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
 
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
         container.setId(containerId);
         root.addView(container, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-        root.addView(buildBottomTabs(), new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+        bottomTabsView = buildBottomTabs();
+        root.addView(bottomTabsView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            int topInset = insets != null ? insets.getSystemWindowInsetTop() : 0;
+            int bottomInset = insets != null ? insets.getSystemWindowInsetBottom() : 0;
+            if (actionBarView != null) {
+                actionBarView.setPadding(actionBarView.getPaddingLeft(), topInset, actionBarView.getPaddingRight(), actionBarView.getPaddingBottom());
+            }
+            if (bottomTabsView != null) {
+                bottomTabsView.setPadding(bottomTabsView.getPaddingLeft(), bottomTabsView.getPaddingTop(), bottomTabsView.getPaddingRight(), bottomInset);
+            }
+            return insets;
+        });
+        root.requestApplyInsets();
         return root;
     }
 
