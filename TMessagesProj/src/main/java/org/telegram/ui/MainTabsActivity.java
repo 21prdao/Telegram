@@ -262,6 +262,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         for (int index = 0; index < tabs.length; index++) {
             final GlassTabView view = tabs[index];
+            final int tabIndex = index;
 
             final int position = indexToPosition(index);
             tabs[index].setOnClickListener(v -> {

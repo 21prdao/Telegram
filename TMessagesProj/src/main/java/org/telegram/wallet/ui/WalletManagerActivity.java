@@ -14,6 +14,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.view.WindowInsets;
 
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -28,6 +29,8 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     private LinearLayout homeTab;
     private LinearLayout securityTab;
     private LinearLayout manageTab;
+    private View actionBarView;
+    private FrameLayout bottomTabsView;
 
     private static final int[] TAB_ICON_SELECTED = {
             R.drawable.icon_wallet_6_1,
