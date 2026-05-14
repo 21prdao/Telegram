@@ -45,7 +45,7 @@ public class RedPacketRecordDetailFragment extends Fragment {
         ScrollView scrollView = new ScrollView(getActivity());
         root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(10), dp(14), dp(18));
+        root.setPadding(dp(10), dp(10), dp(10), dp(18));
         scrollView.addView(root);
         load();
         return scrollView;

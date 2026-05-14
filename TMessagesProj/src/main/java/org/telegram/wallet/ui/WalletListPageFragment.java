@@ -28,9 +28,9 @@ public class WalletListPageFragment extends Fragment implements WalletRefreshabl
         scroll.setBackgroundColor(p.pageBg);
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(12), dp(14), dp(18));
+        root.setPadding(dp(10), dp(12), dp(10), dp(18));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
-        root.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletList), 22, p.primaryText, true), Web3Ui.matchWrap());
+//        root.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletList), 22, p.primaryText, true), Web3Ui.matchWrap());
         root.addView(Web3Ui.text(getActivity(), LocaleController.getString(R.string.Web3WalletTapToSwitch), 14, p.secondaryText, false), Web3Ui.topMargin(getActivity(), 6));
         listContainer = new LinearLayout(getActivity());
         listContainer.setOrientation(LinearLayout.VERTICAL);

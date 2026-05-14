@@ -74,14 +74,14 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
 
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(showRedPacketRecords ? 8 : 12), dp(14), dp(18));
+        root.setPadding(dp(10), dp(showRedPacketRecords ? 8 : 12), dp(10), dp(18));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
 
         if (showRedPacketRecords) {
             root.addView(createRecordSummaryCard(), Web3Ui.matchWrap());
-        } else {
+        }/* else {
             root.addView(Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.WalletTokenList)), Web3Ui.matchWrap());
-        }
+        }*/
 
         listContainer = new LinearLayout(getActivity());
         listContainer.setOrientation(LinearLayout.VERTICAL);

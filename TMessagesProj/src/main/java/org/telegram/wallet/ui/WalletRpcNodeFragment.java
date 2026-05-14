@@ -1,6 +1,5 @@
 package org.telegram.wallet.ui;
 
-import android.app.AlertDialog;
 import android.app.Fragment;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -50,7 +49,8 @@ public class WalletRpcNodeFragment extends Fragment implements WalletRefreshable
         scrollView.setBackgroundColor(p.pageBg);
         LinearLayout content = new LinearLayout(getActivity());
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(14), dp(12), dp(14), dp(18));
+        int hPad = Web3Ui.pageHorizontalPadding(getActivity());
+        content.setPadding(hPad, dp(12), hPad, dp(18));
         scrollView.addView(content, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
 
         content.addView(buildSpeedCard(), Web3Ui.matchWrap());
@@ -74,7 +74,7 @@ public class WalletRpcNodeFragment extends Fragment implements WalletRefreshable
 
         LinearLayout bottom = new LinearLayout(getActivity());
         bottom.setOrientation(LinearLayout.VERTICAL);
-        bottom.setPadding(dp(14), dp(8), dp(14), dp(14));
+        bottom.setPadding(hPad, dp(8), hPad, dp(14));
         bottom.setBackgroundColor(p.pageBg);
         LinearLayout addButton = Web3Ui.actionButton(getActivity(), "添加自定义节点", Web3IconView.PLUS, true);
         addButton.setOnClickListener(v -> showAddCustomNodeDialog());
@@ -116,7 +116,7 @@ public class WalletRpcNodeFragment extends Fragment implements WalletRefreshable
         card.addView(speedRow, Web3Ui.matchWrap());
 
         TextView desc = Web3Ui.text(getActivity(),
-                "区块高度越大，代表节点数据同步更完整，其稳定性更好。在节点速度差不多的情况下，选择高度值大的节点，体验更好。",
+                "自动选择会先排除明显落后的节点，再优先选择延迟更低的节点；速度差不多时，选择区块高度更高的节点。",
                 14, p.secondaryText, false);
         desc.setLineSpacing(dp(2), 1.0f);
         desc.setPadding(0, dp(12), 0, 0);
@@ -160,12 +160,16 @@ public class WalletRpcNodeFragment extends Fragment implements WalletRefreshable
         new Thread(() -> {
             NodeLoadResult result = new NodeLoadResult();
             try {
+                if (forceRefresh) {
+                    WalletRuntimeConfig.clearRpcProbeCache();
+                }
                 WalletRuntimeConfig.ChainConfig config = WalletRuntimeConfig.get(forceRefresh);
                 result.chainId = config.chainId;
                 result.autoSelect = config.autoSelectRpc;
                 result.configBestRpcUrl = config.bestRpcUrl;
                 result.manualRpcUrl = config.selectedRpcUrl;
-                result.probes = new ArrayList<>(WalletRuntimeConfig.probeRpcEndpoints(config.rpcEndpoints, config.chainId));
+                boolean forceProbe = forceRefresh && !config.autoSelectRpc;
+                result.probes = new ArrayList<>(WalletRuntimeConfig.probeRpcEndpoints(config.rpcEndpoints, config.chainId, forceProbe));
                 WalletRuntimeConfig.RpcProbeResult bestProbe = WalletRuntimeConfig.selectBestProbe(result.probes);
                 if (result.autoSelect && bestProbe != null) {
                     WalletRuntimeConfig.rememberAutoBestRpcUrl(bestProbe.url);
@@ -344,73 +348,70 @@ public class WalletRpcNodeFragment extends Fragment implements WalletRefreshable
 
     private void showAddCustomNodeDialog() {
         if (getActivity() == null) return;
-        Web3Ui.Palette p = Web3Ui.palette();
         LinearLayout layout = new LinearLayout(getActivity());
         layout.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(18);
-        layout.setPadding(pad, dp(8), pad, 0);
+        layout.addView(Web3Dialog.tip(getActivity(), "安全提醒：请只添加可信任的 HTTPS RPC 节点。连接恶意节点可能造成余额、交易状态显示异常。"), Web3Ui.matchWrap());
 
-        TextView warning = Web3Ui.text(getActivity(),
-                "安全提醒：\n请添加安全可信任的节点，连接恶意节点可能导致资产风险。",
-                14,
-                p.orange,
-                false);
-        warning.setLineSpacing(dp(2), 1.0f);
-        warning.setPadding(dp(12), dp(10), dp(12), dp(10));
-        warning.setBackground(Web3Ui.roundedStroke(getActivity(), p.dark ? 0x222E261A : 0xFFFFF7EC, p.orange, 12, 1));
-        layout.addView(warning, Web3Ui.matchWrap());
+        EditText nameInput = Web3Dialog.input(getActivity(), "例如：自定义-1", InputType.TYPE_CLASS_TEXT);
+        LinearLayout.LayoutParams nameLp = Web3Ui.topMargin(getActivity(), 14);
+        layout.addView(Web3Dialog.field(getActivity(), "节点名称", nameInput), nameLp);
 
-        EditText nameInput = new EditText(getActivity());
-        nameInput.setSingleLine(true);
-        nameInput.setHint("自定义-1");
-        nameInput.setTextColor(p.primaryText);
-        nameInput.setHintTextColor(p.mutedText);
-        nameInput.setInputType(InputType.TYPE_CLASS_TEXT);
-        LinearLayout.LayoutParams nameLp = Web3Ui.matchWrap();
-        nameLp.topMargin = dp(14);
-        layout.addView(nameInput, nameLp);
+        EditText urlInput = Web3Dialog.input(getActivity(), "https://...",
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+                2,
+                3);
+        LinearLayout.LayoutParams urlLp = Web3Ui.topMargin(getActivity(), 14);
+        layout.addView(Web3Dialog.field(getActivity(), "RPC 链接", urlInput), urlLp);
 
-        EditText urlInput = new EditText(getActivity());
-        urlInput.setHint("请输入自定义节点链接");
-        urlInput.setTextColor(p.primaryText);
-        urlInput.setHintTextColor(p.mutedText);
-        urlInput.setSingleLine(false);
-        urlInput.setMinLines(2);
-        urlInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        LinearLayout.LayoutParams urlLp = Web3Ui.matchWrap();
-        urlLp.topMargin = dp(10);
-        layout.addView(urlInput, urlLp);
-
-        new AlertDialog.Builder(getActivity())
-                .setTitle("添加自定义节点")
-                .setView(layout)
-                .setPositiveButton("确认添加", (dialog, which) -> {
+        Web3Dialog.show(getActivity(),
+                "添加自定义节点",
+                "BNB Smart Chain RPC",
+                Web3IconView.LINK,
+                layout,
+                "确认添加",
+                dialog -> {
+                    String url = urlInput.getText() == null ? "" : urlInput.getText().toString().trim();
+                    if (TextUtils.isEmpty(url) || !(url.startsWith("https://") || url.startsWith("http://"))) {
+                        Toast.makeText(getActivity(), "请输入有效的 RPC 链接", Toast.LENGTH_SHORT).show();
+                        return false;
+                    }
                     try {
-                        WalletRuntimeConfig.addCustomRpcEndpoint(nameInput.getText().toString(), urlInput.getText().toString());
+                        WalletRuntimeConfig.addCustomRpcEndpoint(nameInput.getText() == null ? "" : nameInput.getText().toString(), url);
                         Toast.makeText(getActivity(), "自定义节点已添加", Toast.LENGTH_SHORT).show();
                         loadNodes(true);
+                        return true;
                     } catch (Throwable t) {
                         Toast.makeText(getActivity(), t.getMessage(), Toast.LENGTH_LONG).show();
+                        return false;
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                },
+                "取消",
+                null);
     }
 
     private void showDeleteCustomNodeDialog(WalletRuntimeConfig.RpcProbeResult probe) {
-        if (getActivity() == null) return;
-        new AlertDialog.Builder(getActivity())
-                .setTitle("删除自定义节点")
-                .setMessage(displayNodeName(probe) + "\n" + probe.url)
-                .setPositiveButton("删除", (dialog, which) -> {
+        if (getActivity() == null || probe == null) return;
+        LinearLayout content = new LinearLayout(getActivity());
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(Web3Dialog.tip(getActivity(), "删除后如当前正在使用该节点，将自动回退到可用节点。"), Web3Ui.matchWrap());
+        LinearLayout.LayoutParams msgLp = Web3Ui.topMargin(getActivity(), 14);
+        content.addView(Web3Dialog.message(getActivity(), displayNodeName(probe) + "\n" + probe.url, false), msgLp);
+        Web3Dialog.show(getActivity(),
+                "删除自定义节点",
+                "确认删除该 RPC 节点？",
+                Web3IconView.LINK,
+                content,
+                "删除",
+                dialog -> {
                     if (WalletRuntimeConfig.removeCustomRpcEndpoint(probe.url)) {
                         BscRpcClient.resetWeb3jOnly();
                         Toast.makeText(getActivity(), "已删除自定义节点", Toast.LENGTH_SHORT).show();
                         loadNodes(true);
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                    return true;
+                },
+                "取消",
+                null);
     }
 
     private String displayNodeName(WalletRuntimeConfig.RpcProbeResult probe) {
@@ -436,7 +437,19 @@ public class WalletRpcNodeFragment extends Fragment implements WalletRefreshable
     private String secondaryText(WalletRuntimeConfig.RpcProbeResult probe) {
         if (probe == null) return "";
         if (probe.ok) return "区块高度 " + probe.blockNumber;
-        return TextUtils.isEmpty(probe.error) ? "连接失败" : probe.error;
+        return friendlyRpcError(probe.error);
+    }
+
+    private String friendlyRpcError(String error) {
+        if (TextUtils.isEmpty(error)) return "连接失败";
+        String value = error.trim();
+        String lower = value.toLowerCase(Locale.US);
+        if (lower.contains("timeout")) return "连接超时";
+        if (value.contains("HTTP 429")) return "请求过多，稍后重试";
+        if (lower.contains("chainid mismatch")) return "链 ID 不匹配";
+        if (lower.contains("chainid unavailable")) return "无法识别链 ID";
+        if (value.length() > 32) return value.substring(0, 32) + "...";
+        return value;
     }
 
     private int speedColor(WalletRuntimeConfig.RpcProbeResult probe) {

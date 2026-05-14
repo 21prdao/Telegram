@@ -1,11 +1,12 @@
 package org.telegram.wallet.ui;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import org.telegram.wallet.chain.Bep20Service;
 import org.telegram.wallet.chain.BnbNativeTransferService;
@@ -55,49 +56,91 @@ public class WalletWorkflowCoordinator {
     }
 
     public void showCreateWalletDialog(Runnable onDone) {
-        final EditText input = new EditText(activity);
-        input.setHint("钱包名（可选）");
-        new AlertDialog.Builder(activity)
-                .setTitle("创建钱包")
-                .setView(input)
-                .setPositiveButton("创建", (d, w) -> {
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(Web3Dialog.tip(activity, "创建后请立即到安全中心离线备份私钥。私钥只会加密保存在本机，不会上传服务器。"), Web3Ui.matchWrap());
+
+        EditText input = Web3Dialog.input(activity, "例如：BNB 主钱包", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        LinearLayout.LayoutParams nameLp = Web3Ui.topMargin(activity, 14);
+        content.addView(Web3Dialog.field(activity, "钱包名称（可选）", input), nameLp);
+
+        Web3Dialog.show(activity,
+                "创建钱包",
+                "BNB Smart Chain",
+                Web3IconView.WALLET,
+                content,
+                "创建钱包",
+                dialog -> {
                     try {
-                        WalletStorage.createWallet(activity, input.getText().toString());
+                        WalletStorage.createWallet(activity, input.getText() == null ? "" : input.getText().toString().trim());
                         host.toast("创建成功，已切换到新钱包");
                         safeRun(onDone);
+                        return true;
                     } catch (Throwable t) {
                         host.toast("创建失败：" + t.getMessage());
+                        return false;
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                },
+                "取消",
+                null);
     }
 
     public void showImportWalletDialog(Runnable onDone) {
-        LinearLayout layout = new LinearLayout(activity);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        EditText key = new EditText(activity);
-        key.setHint("私钥（hex）");
-        key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        EditText name = new EditText(activity);
-        name.setHint("钱包名（可选）");
-        layout.addView(key);
-        layout.addView(name);
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
 
-        new AlertDialog.Builder(activity)
-                .setTitle("导入钱包")
-                .setView(layout)
-                .setPositiveButton("导入", (d, w) -> {
+        LinearLayout chips = new LinearLayout(activity);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        TextView privateKeyChip = Web3Dialog.chip(activity, "私钥", true);
+        chips.addView(privateKeyChip, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView chainChip = Web3Dialog.chip(activity, "BNB Smart Chain", false);
+        LinearLayout.LayoutParams chainChipLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        chainChipLp.leftMargin = Web3Ui.dp(activity, 8);
+        chips.addView(chainChip, chainChipLp);
+        content.addView(chips, Web3Ui.matchWrap());
+
+        LinearLayout.LayoutParams tipLp = Web3Ui.topMargin(activity, 12);
+        content.addView(Web3Dialog.tip(activity, "请确认私钥来自可信来源。导入后资产控制权以该私钥为准，任何人获得私钥都可以转走资产。"), tipLp);
+
+        EditText key = Web3Dialog.input(activity, "粘贴 64 位十六进制私钥，支持 0x 前缀",
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+                4,
+                6);
+        LinearLayout.LayoutParams keyLp = Web3Ui.topMargin(activity, 14);
+        content.addView(Web3Dialog.field(activity, "私钥", key), keyLp);
+
+        EditText name = Web3Dialog.input(activity, "例如：交易钱包", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        LinearLayout.LayoutParams nameLp = Web3Ui.topMargin(activity, 14);
+        content.addView(Web3Dialog.field(activity, "钱包名称（可选）", name), nameLp);
+
+        Web3Dialog.show(activity,
+                "导入钱包",
+                "私钥导入 · 本机加密保存",
+                Web3IconView.IMPORT,
+                content,
+                "导入钱包",
+                dialog -> {
+                    String privateKey = normalizePrivateKeyForUi(key.getText() == null ? "" : key.getText().toString());
+                    if (TextUtils.isEmpty(privateKey)) {
+                        host.toast("请输入私钥");
+                        return false;
+                    }
+                    if (!privateKey.matches("^[0-9a-fA-F]{64}$")) {
+                        host.toast("私钥格式错误，请输入 64 位 hex 私钥");
+                        return false;
+                    }
                     try {
-                        WalletStorage.importWallet(activity, key.getText().toString().trim(), name.getText().toString().trim());
+                        WalletStorage.importWallet(activity, privateKey, name.getText() == null ? "" : name.getText().toString().trim());
                         host.toast("导入成功，已切换到导入钱包");
                         safeRun(onDone);
+                        return true;
                     } catch (Throwable t) {
                         host.toast("导入失败：" + t.getMessage());
+                        return false;
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                },
+                "取消",
+                null);
     }
 
     public void showSwitchWalletDialog(Runnable onDone) {
@@ -106,52 +149,99 @@ public class WalletWorkflowCoordinator {
             host.toast("请先创建或导入钱包");
             return;
         }
-        String[] items = new String[wallets.size()];
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        final Dialog[] holder = new Dialog[1];
+        String selected = WalletStorage.getSelectedAddress(activity);
         for (int i = 0; i < wallets.size(); i++) {
-            items[i] = wallets.get(i).name + "  " + shortAddress(wallets.get(i).address);
+            WalletAccount wallet = wallets.get(i);
+            boolean active = selected != null && selected.equalsIgnoreCase(wallet.address);
+            LinearLayout item = Web3Dialog.listItem(activity, wallet.name, shortAddress(wallet.address), active ? "当前" : "切换");
+            final int index = i;
+            item.setOnClickListener(v -> {
+                WalletStorage.setSelectedAddress(activity, wallets.get(index).address);
+                safeRun(onDone);
+                if (holder[0] != null) holder[0].dismiss();
+            });
+            LinearLayout.LayoutParams itemLp = Web3Ui.matchWrap();
+            if (i > 0) itemLp.topMargin = Web3Ui.dp(activity, 10);
+            content.addView(item, itemLp);
         }
-        new AlertDialog.Builder(activity)
-                .setTitle("切换钱包")
-                .setItems(items, (d, which) -> {
-                    WalletStorage.setSelectedAddress(activity, wallets.get(which).address);
-                    safeRun(onDone);
-                })
-                .show();
+        holder[0] = Web3Dialog.show(activity,
+                "切换钱包",
+                "选择当前要使用的钱包",
+                Web3IconView.SWITCH,
+                content,
+                null,
+                null,
+                "关闭",
+                null);
     }
 
     public void showAddTokenDialog(Runnable onDone) {
-        LinearLayout layout = new LinearLayout(activity);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        EditText symbol = new EditText(activity);
-        symbol.setHint("代币符号，例如 USDT");
-        EditText contract = new EditText(activity);
-        contract.setHint("合约地址");
-        EditText decimals = new EditText(activity);
-        decimals.setHint("Decimals，默认 18");
-        decimals.setInputType(InputType.TYPE_CLASS_NUMBER);
-        layout.addView(symbol);
-        layout.addView(contract);
-        layout.addView(decimals);
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(Web3Dialog.tip(activity, "请只添加 BNB Smart Chain 上的 BEP-20 代币合约。错误合约可能导致余额显示不正确。"), Web3Ui.matchWrap());
 
-        new AlertDialog.Builder(activity)
-                .setTitle("添加自定义代币")
-                .setView(layout)
-                .setPositiveButton("保存", (d, w) -> {
-                    int dcm = 18;
-                    if (!TextUtils.isEmpty(decimals.getText())) {
-                        dcm = Integer.parseInt(decimals.getText().toString());
+        EditText symbol = Web3Dialog.input(activity, "例如 USDT", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        LinearLayout.LayoutParams symbolLp = Web3Ui.topMargin(activity, 14);
+        content.addView(Web3Dialog.field(activity, "代币符号", symbol), symbolLp);
+
+        EditText contract = Web3Dialog.input(activity, "0x...", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        LinearLayout.LayoutParams contractLp = Web3Ui.topMargin(activity, 14);
+        content.addView(Web3Dialog.field(activity, "合约地址", contract), contractLp);
+
+        EditText decimals = Web3Dialog.input(activity, "默认 18", InputType.TYPE_CLASS_NUMBER);
+        LinearLayout.LayoutParams decimalsLp = Web3Ui.topMargin(activity, 14);
+        content.addView(Web3Dialog.field(activity, "Decimals", decimals), decimalsLp);
+
+        Web3Dialog.show(activity,
+                "添加自定义代币",
+                "BEP-20 Token",
+                Web3IconView.PLUS,
+                content,
+                "保存",
+                dialog -> {
+                    String symbolText = symbol.getText() == null ? "" : symbol.getText().toString().trim().toUpperCase();
+                    String contractText = contract.getText() == null ? "" : contract.getText().toString().trim();
+                    if (TextUtils.isEmpty(symbolText)) {
+                        host.toast("请输入代币符号");
+                        return false;
                     }
-                    WalletStorage.addOrUpdateCustomToken(
-                            activity,
-                            symbol.getText().toString().trim(),
-                            contract.getText().toString().trim(),
-                            dcm,
-                            true
-                    );
+                    if (!contractText.matches("^0x[0-9a-fA-F]{40}$")) {
+                        host.toast("合约地址格式错误");
+                        return false;
+                    }
+                    int dcm = 18;
+                    String decimalsText = decimals.getText() == null ? "" : decimals.getText().toString().trim();
+                    if (!TextUtils.isEmpty(decimalsText)) {
+                        try {
+                            dcm = Integer.parseInt(decimalsText);
+                        } catch (Throwable ignore) {
+                            host.toast("Decimals 必须是数字");
+                            return false;
+                        }
+                    }
+                    if (dcm < 0 || dcm > 36) {
+                        host.toast("Decimals 范围应为 0-36");
+                        return false;
+                    }
+                    WalletStorage.addOrUpdateCustomToken(activity, symbolText, contractText, dcm, true);
                     safeRun(onDone);
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                    host.toast("代币已添加");
+                    return true;
+                },
+                "取消",
+                null);
+    }
+
+    private String normalizePrivateKeyForUi(String value) {
+        if (value == null) return "";
+        String privateKey = value.trim().replaceAll("\\s+", "");
+        if (privateKey.startsWith("0x") || privateKey.startsWith("0X")) {
+            privateKey = privateKey.substring(2);
+        }
+        return privateKey;
     }
 
     public void loadBalances(BalancesCallback callback) {

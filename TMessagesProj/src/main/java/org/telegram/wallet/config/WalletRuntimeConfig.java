@@ -57,10 +57,17 @@ public final class WalletRuntimeConfig {
     private static final int RPC_PROBE_TIMEOUT_MS = 2_500;
     private static final int RPC_PROBE_TOTAL_TIMEOUT_MS = 7_000;
     private static final long CACHE_TTL_MS = 5 * 60 * 1000L;
+    private static final long RPC_PROBE_CACHE_TTL_MS = 12_000L;
+    private static final long RPC_PROBE_STALE_BLOCK_TOLERANCE = 6L;
+    private static final long RPC_PROBE_SIMILAR_LATENCY_MS = 200L;
 
     private static final Object LOCK = new Object();
+    private static final Object PROBE_LOCK = new Object();
     private static volatile ChainConfig cachedConfig;
     private static volatile long cachedAtMs;
+    private static volatile String cachedProbeSignature;
+    private static volatile List<RpcProbeResult> cachedProbeResults;
+    private static volatile long cachedProbeAtMs;
 
     private WalletRuntimeConfig() {}
 
@@ -69,6 +76,9 @@ public final class WalletRuntimeConfig {
     }
 
     public static ChainConfig get(boolean forceRefresh) {
+        if (forceRefresh) {
+            clearProbeCache();
+        }
         ChainConfig cached = cachedConfig;
         long now = System.currentTimeMillis();
         if (!forceRefresh && cached != null && now - cachedAtMs < CACHE_TTL_MS) {
@@ -95,7 +105,7 @@ public final class WalletRuntimeConfig {
 
             ChainConfig loaded = null;
             try {
-                loaded = loadFromServer();
+                loaded = loadFromServer(forceRefresh);
             } catch (Throwable t) {
                 FileLog.e(t);
             }
@@ -117,6 +127,11 @@ public final class WalletRuntimeConfig {
             cachedConfig = null;
             cachedAtMs = 0L;
         }
+        clearProbeCache();
+    }
+
+    public static void clearRpcProbeCache() {
+        clearProbeCache();
     }
 
     public static String getBestRpcUrl() {
@@ -176,6 +191,7 @@ public final class WalletRuntimeConfig {
         if (preferences != null) {
             preferences.edit()
                     .remove(KEY_SELECTED_RPC)
+                    .remove(KEY_BEST_RPC)
                     .putBoolean(KEY_AUTO_SELECT_RPC, true)
                     .apply();
         }
@@ -257,10 +273,31 @@ public final class WalletRuntimeConfig {
     }
 
     public static List<RpcProbeResult> probeRpcEndpoints(List<RpcEndpoint> endpoints, long expectedChainId) {
+        return probeRpcEndpoints(endpoints, expectedChainId, false);
+    }
+
+    public static List<RpcProbeResult> probeRpcEndpoints(List<RpcEndpoint> endpoints, long expectedChainId, boolean forceProbe) {
         final ArrayList<RpcEndpoint> nodes = dedupeEndpoints(endpoints);
         if (nodes.isEmpty()) return Collections.emptyList();
 
-        int poolSize = Math.max(1, Math.min(nodes.size(), 6));
+        String signature = probeSignature(nodes, expectedChainId);
+        long now = System.currentTimeMillis();
+        if (!forceProbe) {
+            synchronized (PROBE_LOCK) {
+                if (!TextUtils.isEmpty(signature)
+                        && signature.equals(cachedProbeSignature)
+                        && cachedProbeResults != null
+                        && now - cachedProbeAtMs < RPC_PROBE_CACHE_TTL_MS) {
+                    return new ArrayList<>(cachedProbeResults);
+                }
+            }
+        }
+
+        int poolSize = Math.max(1, Math.min(nodes.size(), 8));
+        int waves = Math.max(1, (nodes.size() + poolSize - 1) / poolSize);
+        long totalTimeoutMs = Math.max(RPC_PROBE_TOTAL_TIMEOUT_MS, waves * (RPC_PROBE_TIMEOUT_MS * 2L + 500L));
+        totalTimeoutMs = Math.min(totalTimeoutMs, 12_000L);
+
         ExecutorService executor = Executors.newFixedThreadPool(poolSize);
         ArrayList<Callable<RpcProbeResult>> tasks = new ArrayList<>();
         for (RpcEndpoint endpoint : nodes) {
@@ -269,7 +306,7 @@ public final class WalletRuntimeConfig {
 
         ArrayList<RpcProbeResult> probes = new ArrayList<>();
         try {
-            List<Future<RpcProbeResult>> futures = executor.invokeAll(tasks, RPC_PROBE_TOTAL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            List<Future<RpcProbeResult>> futures = executor.invokeAll(tasks, totalTimeoutMs, TimeUnit.MILLISECONDS);
             for (int i = 0; i < futures.size(); i++) {
                 Future<RpcProbeResult> future = futures.get(i);
                 try {
@@ -290,30 +327,109 @@ public final class WalletRuntimeConfig {
             executor.shutdownNow();
         }
 
-        Collections.sort(probes, (a, b) -> {
-            if (a.ok != b.ok) return a.ok ? -1 : 1;
-            long blockDiff = b.blockNumber - a.blockNumber;
-            if (blockDiff != 0) return blockDiff > 0 ? 1 : -1;
-            return Long.compare(a.latencyMs, b.latencyMs);
-        });
+        sortProbeResults(probes);
+        synchronized (PROBE_LOCK) {
+            cachedProbeSignature = signature;
+            cachedProbeResults = new ArrayList<>(probes);
+            cachedProbeAtMs = System.currentTimeMillis();
+        }
         return probes;
     }
 
     public static RpcProbeResult selectBestProbe(List<RpcProbeResult> probes) {
-        RpcProbeResult best = null;
         if (probes == null) return null;
+        long latestBlock = latestBlockNumber(probes);
+        RpcProbeResult best = null;
         for (RpcProbeResult probe : probes) {
-            if (probe == null || !probe.ok) continue;
-            if (best == null
-                    || probe.blockNumber > best.blockNumber
-                    || (probe.blockNumber == best.blockNumber && probe.latencyMs < best.latencyMs)) {
+            if (probe == null || !probe.ok || !isProbeFresh(probe, latestBlock)) continue;
+            if (best == null || compareProbeQuality(probe, best, latestBlock) < 0) {
                 best = probe;
             }
         }
         return best;
     }
 
-    private static ChainConfig loadFromServer() throws Exception {
+    private static void sortProbeResults(ArrayList<RpcProbeResult> probes) {
+        long latestBlock = latestBlockNumber(probes);
+        Collections.sort(probes, (a, b) -> compareProbeQuality(a, b, latestBlock));
+    }
+
+    private static int compareProbeQuality(RpcProbeResult a, RpcProbeResult b, long latestBlock) {
+        if (a == b) return 0;
+        if (a == null) return 1;
+        if (b == null) return -1;
+        if (a.ok != b.ok) return a.ok ? -1 : 1;
+        if (!a.ok) {
+            int latencyCompare = Long.compare(a.latencyMs, b.latencyMs);
+            if (latencyCompare != 0) return latencyCompare;
+            return String.valueOf(a.name).compareToIgnoreCase(String.valueOf(b.name));
+        }
+
+        boolean aFresh = isProbeFresh(a, latestBlock);
+        boolean bFresh = isProbeFresh(b, latestBlock);
+        if (aFresh != bFresh) return aFresh ? -1 : 1;
+        if (!aFresh) {
+            int blockCompare = Long.compare(b.blockNumber, a.blockNumber);
+            if (blockCompare != 0) return blockCompare;
+            int latencyCompare = Long.compare(a.latencyMs, b.latencyMs);
+            if (latencyCompare != 0) return latencyCompare;
+            return String.valueOf(a.name).compareToIgnoreCase(String.valueOf(b.name));
+        }
+
+        long aBucket = latencyBucket(a.latencyMs);
+        long bBucket = latencyBucket(b.latencyMs);
+        if (aBucket != bBucket) return Long.compare(aBucket, bBucket);
+
+        int blockCompare = Long.compare(b.blockNumber, a.blockNumber);
+        if (blockCompare != 0) return blockCompare;
+        int latencyCompare = Long.compare(a.latencyMs, b.latencyMs);
+        if (latencyCompare != 0) return latencyCompare;
+        return String.valueOf(a.name).compareToIgnoreCase(String.valueOf(b.name));
+    }
+
+    private static long latencyBucket(long latencyMs) {
+        if (latencyMs <= 0) return 0L;
+        if (latencyMs >= Long.MAX_VALUE / 2) return Long.MAX_VALUE / RPC_PROBE_SIMILAR_LATENCY_MS;
+        return latencyMs / RPC_PROBE_SIMILAR_LATENCY_MS;
+    }
+
+    private static boolean isProbeFresh(RpcProbeResult probe, long latestBlock) {
+        if (probe == null || !probe.ok) return false;
+        return latestBlock <= 0 || probe.blockNumber + RPC_PROBE_STALE_BLOCK_TOLERANCE >= latestBlock;
+    }
+
+    private static long latestBlockNumber(List<RpcProbeResult> probes) {
+        long latestBlock = 0L;
+        if (probes == null) return latestBlock;
+        for (RpcProbeResult probe : probes) {
+            if (probe != null && probe.ok && probe.blockNumber > latestBlock) {
+                latestBlock = probe.blockNumber;
+            }
+        }
+        return latestBlock;
+    }
+
+    private static String probeSignature(List<RpcEndpoint> nodes, long expectedChainId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(expectedChainId);
+        if (nodes != null) {
+            for (RpcEndpoint endpoint : nodes) {
+                if (endpoint == null) continue;
+                sb.append('|').append(normalizeRpcUrl(endpoint.url).toLowerCase(Locale.US));
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void clearProbeCache() {
+        synchronized (PROBE_LOCK) {
+            cachedProbeSignature = null;
+            cachedProbeResults = null;
+            cachedProbeAtMs = 0L;
+        }
+    }
+
+    private static ChainConfig loadFromServer(boolean forceProbe) throws Exception {
         String apiBase = WalletConfig.getRedPacketApiBaseUrl();
         JSONObject root = requestJson(apiBase + "/wallet/chain-config");
         JSONObject data = unwrapData(root);
@@ -338,7 +454,7 @@ public final class WalletRuntimeConfig {
         }
 
         ArrayList<RpcEndpoint> allEndpoints = mergeEndpoints(serverEndpoints, loadCustomEndpoints());
-        RpcSelection selection = resolveRpcSelection(allEndpoints, chainId, optString(data, "bestRpcUrl", "rpcUrl"));
+        RpcSelection selection = resolveRpcSelection(allEndpoints, chainId, optString(data, "bestRpcUrl", "rpcUrl"), forceProbe);
         ChainConfig config = new ChainConfig(chainId, contract, serverEndpoints, allEndpoints, selection.bestRpcUrl, selection.autoSelect, selection.selectedRpcUrl, System.currentTimeMillis());
         saveToPreferences(config);
         return config;
@@ -371,7 +487,7 @@ public final class WalletRuntimeConfig {
         );
     }
 
-    private static RpcSelection resolveRpcSelection(List<RpcEndpoint> endpoints, long chainId, String serverBestRpcUrl) {
+    private static RpcSelection resolveRpcSelection(List<RpcEndpoint> endpoints, long chainId, String serverBestRpcUrl, boolean forceProbe) {
         SharedPreferences preferences = prefs();
         boolean auto = preferences == null || preferences.getBoolean(KEY_AUTO_SELECT_RPC, true);
         String manual = preferences == null ? "" : normalizeRpcUrl(preferences.getString(KEY_SELECTED_RPC, ""));
@@ -381,7 +497,7 @@ public final class WalletRuntimeConfig {
             best = manual;
         } else {
             auto = true;
-            best = chooseBestRpcUrl(endpoints, chainId);
+            best = chooseBestRpcUrl(endpoints, chainId, forceProbe);
             String serverBest = normalizeRpcUrl(serverBestRpcUrl);
             if (TextUtils.isEmpty(best) && !TextUtils.isEmpty(serverBest) && containsRpcUrl(endpoints, serverBest)) {
                 best = serverBest;
@@ -394,8 +510,8 @@ public final class WalletRuntimeConfig {
         return new RpcSelection(best, auto, manual);
     }
 
-    private static String chooseBestRpcUrl(List<RpcEndpoint> endpoints, long expectedChainId) {
-        List<RpcProbeResult> probes = probeRpcEndpoints(endpoints, expectedChainId);
+    private static String chooseBestRpcUrl(List<RpcEndpoint> endpoints, long expectedChainId, boolean forceProbe) {
+        List<RpcProbeResult> probes = probeRpcEndpoints(endpoints, expectedChainId, forceProbe);
         RpcProbeResult best = selectBestProbe(probes);
         if (best != null) return best.url;
         ArrayList<RpcEndpoint> urls = dedupeEndpoints(endpoints);
@@ -403,7 +519,7 @@ public final class WalletRuntimeConfig {
     }
 
     private static RpcProbeResult probeRpcEndpoint(RpcEndpoint endpoint, long expectedChainId) {
-        long start = System.currentTimeMillis();
+        long startNanos = System.nanoTime();
         if (endpoint == null || TextUtils.isEmpty(endpoint.url)) {
             return new RpcProbeResult(endpoint, false, Long.MAX_VALUE, 0L, 0L, "empty url");
         }
@@ -413,17 +529,26 @@ public final class WalletRuntimeConfig {
         try {
             String chainIdRaw = callJsonRpc(endpoint.url, "eth_chainId");
             long actualChainId = parseRpcQuantity(chainIdRaw);
-            if (expectedChainId > 0 && actualChainId > 0 && actualChainId != expectedChainId) {
-                throw new IllegalStateException("chainId mismatch: " + actualChainId);
+            if (expectedChainId > 0) {
+                if (actualChainId <= 0) {
+                    throw new IllegalStateException("chainId unavailable");
+                }
+                if (actualChainId != expectedChainId) {
+                    throw new IllegalStateException("chainId mismatch: " + actualChainId);
+                }
             }
             String blockRaw = callJsonRpc(endpoint.url, "eth_blockNumber");
             long blockNumber = parseRpcQuantity(blockRaw);
-            long latency = System.currentTimeMillis() - start;
+            long latency = elapsedMs(startNanos);
             boolean ok = blockNumber > 0;
             return new RpcProbeResult(endpoint, ok, latency, blockNumber, actualChainId, ok ? "" : "empty blockNumber");
         } catch (Throwable t) {
-            return new RpcProbeResult(endpoint, false, System.currentTimeMillis() - start, 0L, 0L, t.getMessage());
+            return new RpcProbeResult(endpoint, false, elapsedMs(startNanos), 0L, 0L, t.getMessage());
         }
+    }
+
+    private static long elapsedMs(long startNanos) {
+        return Math.max(0L, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
     }
 
     private static String callJsonRpc(String rpcUrl, String method) throws Exception {

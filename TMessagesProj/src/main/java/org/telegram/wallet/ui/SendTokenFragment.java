@@ -1,6 +1,5 @@
 package org.telegram.wallet.ui;
 
-import android.app.AlertDialog;
 import android.app.Fragment;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -32,7 +31,7 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
         scroll.setBackgroundColor(p.pageBg);
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(8), dp(14), dp(14));
+        root.setPadding(dp(10), dp(8), dp(10), dp(14));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
         LinearLayout card = Web3Ui.card(getActivity());
         root.addView(card, Web3Ui.matchWrap());
@@ -83,12 +82,27 @@ public class SendTokenFragment extends Fragment implements WalletRefreshable {
         if (TextUtils.isEmpty(to) || !to.matches("^0x[0-9a-fA-F]{40}$")) { host().toast("收款地址格式错误"); return; }
         if (TextUtils.isEmpty(amount)) { host().toast("请输入 BNB 数量"); return; }
         String from = WalletStorage.getSelectedAddress(getActivity());
-        new AlertDialog.Builder(getActivity())
-                .setTitle("确认转账")
-                .setMessage("From: " + WalletWorkflowCoordinator.shortAddress(from) + "\nTo: " + WalletWorkflowCoordinator.shortAddress(to) + "\nAmount: " + amount + " BNB")
-                .setPositiveButton("确认发送", (d, w) -> coordinator().sendNativeTransfer(to, amount, this::refresh))
-                .setNegativeButton("取消", null)
-                .show();
+        LinearLayout content = new LinearLayout(getActivity());
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(Web3Dialog.tip(getActivity(), "链上转账提交后不可撤回，请仔细核对收款地址和金额。"), Web3Ui.matchWrap());
+        LinearLayout.LayoutParams summaryLp = Web3Ui.topMargin(getActivity(), 14);
+        content.addView(Web3Dialog.message(getActivity(),
+                "From: " + WalletWorkflowCoordinator.shortAddress(from) + "\n" +
+                        "To: " + WalletWorkflowCoordinator.shortAddress(to) + "\n" +
+                        "Amount: " + amount + " BNB",
+                false), summaryLp);
+        Web3Dialog.show(getActivity(),
+                "确认转账",
+                "BNB Smart Chain",
+                Web3IconView.SEND,
+                content,
+                "确认发送",
+                dialog -> {
+                    coordinator().sendNativeTransfer(to, amount, this::refresh);
+                    return true;
+                },
+                "取消",
+                null);
     }
 
     @Override public void refresh() {

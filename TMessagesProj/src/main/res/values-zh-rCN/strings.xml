@@ -14155,6 +14155,7 @@
   <string name="WalletRedPacketRecordsLoading">正在加载红包发送记录...</string>
   <string name="WalletRedPacketRecordsEmpty">暂无红包发送记录</string>
   <string name="Web3RedPacketTitleDefault">HTL 红包</string>
+  <string name="Web3WalletTab">钱包</string>
   <string name="Web3Wallet">Web3 钱包</string>
   <string name="Web3WalletInfo">BNB Chain 钱包管理</string>
   <string name="Web3RedPacketCreateTitle">发红包</string>

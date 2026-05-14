@@ -24,7 +24,7 @@ public class WalletManageFragment extends Fragment implements WalletRefreshable 
         scroll.setBackgroundColor(p.pageBg);
         LinearLayout root = new LinearLayout(getActivity());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(8), dp(14), dp(14));
+        root.setPadding(dp(10), dp(8), dp(10), dp(14));
         scroll.addView(root, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
 
         LinearLayout card = Web3Ui.card(getActivity());

@@ -24,8 +24,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
-import androidx.appcompat.app.AlertDialog;
-
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
 import org.telegram.tgnet.TLRPC;
@@ -430,66 +428,30 @@ public class CreateRedPacketBottomSheet extends BottomSheet {
 
         final EditTextBoldCursor pwdInput = createInput(context, "请输入支付密码");
         pwdInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        FrameLayout inputContainer = new FrameLayout(context);
-        FrameLayout.LayoutParams inputLp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        inputLp.leftMargin = AndroidUtilities.dp(8);
-        inputLp.rightMargin = AndroidUtilities.dp(8);
-        inputContainer.addView(pwdInput, inputLp);
 
-        final TextView titleView = new TextView(context);
-        titleView.setText("支付验证");
-        titleView.setTextSize(AndroidUtilities.dp(8));
-        titleView.setTextColor(Color.parseColor("#F08C22"));
-        titleView.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(20), AndroidUtilities.dp(24), AndroidUtilities.dp(8));
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(Web3Dialog.tip(context, "红包创建会发起链上交易。请输入支付密码确认本次操作。"), Web3Ui.matchWrap());
+        LinearLayout.LayoutParams inputLp = Web3Ui.topMargin(context, 14);
+        content.addView(Web3Dialog.field(context, "支付密码", pwdInput), inputLp);
 
-        final AlertDialog dialog = new AlertDialog.Builder(context)
-                .setCustomTitle(titleView)
-                .setMessage("请输入支付密码后继续")
-                .setView(inputContainer)
-                .setPositiveButton(getString(R.string.OK), (dialogInterface, which) -> {
+        Web3Dialog.show(context,
+                "支付验证",
+                "创建链上红包",
+                Web3IconView.LOCK,
+                content,
+                getString(R.string.OK),
+                dialog -> {
                     String pwd = trim(pwdInput.getText() == null ? null : pwdInput.getText().toString());
                     if (!WalletStorage.verifyPaymentPassword(context, pwd)) {
                         showError("支付密码错误");
-                        return;
+                        return false;
                     }
                     performCreate();
-                })
-                .setNegativeButton(getString(R.string.Cancel), null)
-                .create();
-        dialog.setOnShowListener(d -> {
-            int bgColor = getThemedColor(Theme.key_dialogBackground);
-            int resolvedTextColor = getThemedColor(Theme.key_dialogTextBlack);
-            int textColor = Theme.isCurrentThemeDark() ? resolvedTextColor : 0xFF1F2937;
-            int resolvedHintColor = getThemedColor(Theme.key_dialogTextHint);
-            int hintColor = Theme.isCurrentThemeDark() ? resolvedHintColor : 0xFF8A94A6;
-            int accentColor = getThemedColor(Theme.key_dialogButton);
-            int inputBgColor = Theme.blendOver(bgColor, adjustAlpha(0xFF000000, Theme.isCurrentThemeDark() ? 0.18f : 0.06f));
-            int inputStrokeColor = Theme.blendOver(bgColor, adjustAlpha(0xFFFFFFFF, Theme.isCurrentThemeDark() ? 0.12f : 0.18f));
-
-            pwdInput.setTextColor(textColor);
-            pwdInput.setHintTextColor(hintColor);
-            pwdInput.setBackground(createInputBackground(inputBgColor, inputStrokeColor));
-            pwdInput.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(12), AndroidUtilities.dp(14), AndroidUtilities.dp(12));
-
-            Window window = dialog.getWindow();
-            if (window != null) {
-                GradientDrawable bg = new GradientDrawable();
-                bg.setColor(bgColor);
-                bg.setCornerRadius(AndroidUtilities.dp(18));
-                window.setBackgroundDrawable(bg);
-            }
-
-            titleView.setTextColor(textColor);
-
-            TextView messageView = dialog.findViewById(android.R.id.message);
-            if (messageView != null) {
-                messageView.setTextColor(adjustAlpha(textColor, 0.82f));
-            }
-
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(accentColor);
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(adjustAlpha(textColor, 0.8f));
-        });
-        dialog.show();
+                    return true;
+                },
+                getString(R.string.Cancel),
+                null);
     }
 
     private void performCreate() {

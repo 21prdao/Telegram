@@ -54,6 +54,7 @@ public class RedPacketRecordDetailActivity extends Activity {
         TextView spacer = new TextView(this);
         bar.addView(spacer, new LinearLayout.LayoutParams(dp(44), dp(56)));
         root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
+        Web3Ui.attachSystemBarInsets(this, root, bar, 56, null, 0);
 
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();

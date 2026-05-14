@@ -8,13 +8,11 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
-import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.view.WindowInsets;
 
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -76,43 +74,8 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         root.addView(container, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         bottomTabsView = buildBottomTabs();
         root.addView(bottomTabsView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
-        root.setOnApplyWindowInsetsListener((v, insets) -> {
-            applyInsets(insets);
-            return insets;
-        });
-        root.post(() -> {
-            WindowInsets insets = root.getRootWindowInsets();
-            if (insets != null) {
-                applyInsets(insets);
-            }
-        });
+        Web3Ui.attachSystemBarInsets(this, root, actionBarView, 56, bottomTabsView, 52);
         return root;
-    }
-
-    private void applyInsets(WindowInsets insets) {
-        if (insets == null) {
-            return;
-        }
-        int topInset = Math.max(0, insets.getSystemWindowInsetTop());
-        int bottomInset = Math.max(0, insets.getSystemWindowInsetBottom());
-        if (actionBarView != null) {
-            actionBarView.setPadding(actionBarView.getPaddingLeft(), topInset, actionBarView.getPaddingRight(), 0);
-            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) actionBarView.getLayoutParams();
-            int targetHeight = dp(56) + topInset;
-            if (lp != null && lp.height != targetHeight) {
-                lp.height = targetHeight;
-                actionBarView.setLayoutParams(lp);
-            }
-        }
-        if (bottomTabsView != null) {
-            bottomTabsView.setPadding(bottomTabsView.getPaddingLeft(), 0, bottomTabsView.getPaddingRight(), bottomInset);
-            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) bottomTabsView.getLayoutParams();
-            int targetHeight = dp(52) + bottomInset;
-            if (lp != null && lp.height != targetHeight) {
-                lp.height = targetHeight;
-                bottomTabsView.setLayoutParams(lp);
-            }
-        }
     }
 
     private LinearLayout buildActionBar() {
@@ -212,7 +175,20 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     }
 
     private void showDeveloperInfoDialog() {
-        coordinator.checkConnectivity(status -> new android.app.AlertDialog.Builder(this).setTitle(LocaleController.getString(R.string.Web3WalletDeveloperInfo)).setMessage(status).setPositiveButton(LocaleController.getString(R.string.OK), null).show());
+        coordinator.checkConnectivity(status -> {
+            LinearLayout content = new LinearLayout(this);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.addView(Web3Dialog.message(this, status, false), Web3Ui.matchWrap());
+            Web3Dialog.show(this,
+                    LocaleController.getString(R.string.Web3WalletDeveloperInfo),
+                    "当前节点检测",
+                    Web3IconView.LINK,
+                    content,
+                    LocaleController.getString(R.string.OK),
+                    null,
+                    null,
+                    null);
+        });
     }
 
     private void updateRpcNodeIndicator() {

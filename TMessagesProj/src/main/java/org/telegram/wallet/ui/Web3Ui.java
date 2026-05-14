@@ -10,7 +10,10 @@ import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -27,6 +30,12 @@ public final class Web3Ui {
     public static final int BRAND_ORANGE = 0xFFF08C22;
     public static final int BRAND_ORANGE_DARK = 0xFFD97813;
     public static final int ACTIVE_GREEN = 0xFF22C55E;
+
+    // Keep wallet pages visually aligned with Telegram's own compact top bar.
+    public static final int APP_BAR_HEIGHT_DP = 48;
+    public static final int APP_BAR_BUTTON_DP = 48;
+    public static final int APP_BAR_SIDE_PADDING_DP = 8;
+    public static final int PAGE_HORIZONTAL_PADDING_DP = 10;
 
     private Web3Ui() {
     }
@@ -108,10 +117,21 @@ public final class Web3Ui {
         }
         Palette p = palette();
         Window window = activity.getWindow();
+        // Telegram may enter a translucent / edge-to-edge mode on some devices. Clear the
+        // translucent flags here so wallet Activities own their system bar background.
+        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS | WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(p.appBarBg);
         window.setNavigationBarColor(p.pageBg);
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                Window.class.getMethod("setDecorFitsSystemWindows", boolean.class).invoke(window, false);
+            } catch (Throwable ignore) {
+            }
+        }
+        int flags = window.getDecorView().getSystemUiVisibility();
+        flags |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
         if (Build.VERSION.SDK_INT >= 23) {
-            int flags = window.getDecorView().getSystemUiVisibility();
             if (!p.dark) {
                 flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             } else {
@@ -124,12 +144,95 @@ public final class Web3Ui {
                     flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
                 }
             }
-            window.getDecorView().setSystemUiVisibility(flags);
         }
+        window.getDecorView().setSystemUiVisibility(flags);
+    }
+
+    public static void attachSystemBarInsets(Activity activity, View root, View topView, int topBaseHeightDp, View bottomView, int bottomBaseHeightDp) {
+        attachSystemBarInsets(activity, root, topView, topBaseHeightDp, bottomView, bottomBaseHeightDp, null);
+    }
+
+    public static void attachSystemBarInsets(Activity activity, View root, View topView, int topBaseHeightDp, View bottomView, int bottomBaseHeightDp, View bottomSafeAreaView) {
+        if (activity == null || root == null || Build.VERSION.SDK_INT < 20) {
+            return;
+        }
+        final int topBaseHeight = topBaseHeightDp > 0 ? dp(activity, topBaseHeightDp) : -1;
+        final int bottomBaseHeight = bottomBaseHeightDp > 0 ? dp(activity, bottomBaseHeightDp) : -1;
+        final int topLeft = topView == null ? 0 : topView.getPaddingLeft();
+        final int topRight = topView == null ? 0 : topView.getPaddingRight();
+        final int topBottom = topView == null ? 0 : topView.getPaddingBottom();
+        final int bottomLeft = bottomView == null ? 0 : bottomView.getPaddingLeft();
+        final int bottomTop = bottomView == null ? 0 : bottomView.getPaddingTop();
+        final int bottomRight = bottomView == null ? 0 : bottomView.getPaddingRight();
+        final int rootLeft = root.getPaddingLeft();
+        final int rootTop = root.getPaddingTop();
+        final int rootRight = root.getPaddingRight();
+        final int rootBottom = root.getPaddingBottom();
+        final int safeLeft = bottomSafeAreaView == null ? 0 : bottomSafeAreaView.getPaddingLeft();
+        final int safeTop = bottomSafeAreaView == null ? 0 : bottomSafeAreaView.getPaddingTop();
+        final int safeRight = bottomSafeAreaView == null ? 0 : bottomSafeAreaView.getPaddingRight();
+        final int safeBottom = bottomSafeAreaView == null ? 0 : bottomSafeAreaView.getPaddingBottom();
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            int topInset = Math.max(0, insets.getSystemWindowInsetTop());
+            int bottomInset = Math.max(0, insets.getSystemWindowInsetBottom());
+            if (topView != null) {
+                topView.setPadding(topLeft, topInset, topRight, topBottom);
+                if (topBaseHeight > 0) {
+                    ViewGroup.LayoutParams lp = topView.getLayoutParams();
+                    if (lp != null && lp.height != topBaseHeight + topInset) {
+                        lp.height = topBaseHeight + topInset;
+                        topView.setLayoutParams(lp);
+                    }
+                }
+            }
+            if (bottomView != null) {
+                bottomView.setPadding(bottomLeft, bottomTop, bottomRight, bottomInset);
+                if (bottomBaseHeight > 0) {
+                    ViewGroup.LayoutParams lp = bottomView.getLayoutParams();
+                    if (lp != null && lp.height != bottomBaseHeight + bottomInset) {
+                        lp.height = bottomBaseHeight + bottomInset;
+                        bottomView.setLayoutParams(lp);
+                    }
+                }
+                root.setPadding(rootLeft, rootTop, rootRight, rootBottom);
+            } else {
+                root.setPadding(rootLeft, rootTop, rootRight, rootBottom + bottomInset);
+            }
+            if (bottomSafeAreaView != null) {
+                bottomSafeAreaView.setPadding(safeLeft, safeTop, safeRight, safeBottom + bottomInset);
+            }
+            return insets;
+        });
+        root.post(() -> {
+            try {
+                root.requestApplyInsets();
+                WindowInsets insets = root.getRootWindowInsets();
+                if (insets != null) {
+                    root.dispatchApplyWindowInsets(insets);
+                }
+            } catch (Throwable ignore) {
+            }
+        });
     }
 
     public static int dp(Context context, float value) {
         return (int) Math.ceil(value * context.getResources().getDisplayMetrics().density);
+    }
+
+    public static int appBarHeight(Context context) {
+        return dp(context, APP_BAR_HEIGHT_DP);
+    }
+
+    public static int appBarButtonSize(Context context) {
+        return dp(context, APP_BAR_BUTTON_DP);
+    }
+
+    public static int appBarSidePadding(Context context) {
+        return dp(context, APP_BAR_SIDE_PADDING_DP);
+    }
+
+    public static int pageHorizontalPadding(Context context) {
+        return dp(context, PAGE_HORIZONTAL_PADDING_DP);
     }
 
     public static TextView text(Context context, String value, float sp, int color, boolean bold) {
