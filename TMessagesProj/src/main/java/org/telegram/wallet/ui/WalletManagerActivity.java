@@ -8,6 +8,7 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -43,6 +44,8 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     };
     private WalletWorkflowCoordinator coordinator;
     private View rpcStatusDot;
+    private LinearLayout actionBarView;
+    private FrameLayout bottomTabsView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,18 +79,42 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         bottomTabsView = buildBottomTabs();
         root.addView(bottomTabsView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            int topInset = insets != null ? insets.getSystemWindowInsetTop() : 0;
-            int bottomInset = insets != null ? insets.getSystemWindowInsetBottom() : 0;
-            if (actionBarView != null) {
-                actionBarView.setPadding(actionBarView.getPaddingLeft(), topInset, actionBarView.getPaddingRight(), actionBarView.getPaddingBottom());
-            }
-            if (bottomTabsView != null) {
-                bottomTabsView.setPadding(bottomTabsView.getPaddingLeft(), bottomTabsView.getPaddingTop(), bottomTabsView.getPaddingRight(), bottomInset);
-            }
+            applyInsets(insets);
             return insets;
         });
-        root.requestApplyInsets();
+        root.post(() -> {
+            WindowInsets insets = root.getRootWindowInsets();
+            if (insets != null) {
+                applyInsets(insets);
+            }
+        });
         return root;
+    }
+
+    private void applyInsets(WindowInsets insets) {
+        if (insets == null) {
+            return;
+        }
+        int topInset = Math.max(0, insets.getSystemWindowInsetTop());
+        int bottomInset = Math.max(0, insets.getSystemWindowInsetBottom());
+        if (actionBarView != null) {
+            actionBarView.setPadding(actionBarView.getPaddingLeft(), topInset, actionBarView.getPaddingRight(), 0);
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) actionBarView.getLayoutParams();
+            int targetHeight = dp(56) + topInset;
+            if (lp != null && lp.height != targetHeight) {
+                lp.height = targetHeight;
+                actionBarView.setLayoutParams(lp);
+            }
+        }
+        if (bottomTabsView != null) {
+            bottomTabsView.setPadding(bottomTabsView.getPaddingLeft(), 0, bottomTabsView.getPaddingRight(), bottomInset);
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) bottomTabsView.getLayoutParams();
+            int targetHeight = dp(52) + bottomInset;
+            if (lp != null && lp.height != targetHeight) {
+                lp.height = targetHeight;
+                bottomTabsView.setLayoutParams(lp);
+            }
+        }
     }
 
     private LinearLayout buildActionBar() {

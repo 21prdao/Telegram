@@ -64,7 +64,7 @@ import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 import org.telegram.ui.Components.glass.GlassTabView;
 import org.telegram.ui.Stories.recorder.HintView2;
-import org.telegram.wallet.ui.WalletManagerActivity;
+import org.telegram.wallet.navigation.WalletNavigator;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -81,7 +81,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     private static final int INDEX_CHATS = 0;
     private static final int INDEX_CONTACTS = 1;
-    private static final int INDEX_SETTINGS = 2;
+    private static final int INDEX_WALLET = 2;
     private static final int INDEX_CALLS = 3;
     private static final int INDEX_PROFILE = 4;
 
@@ -97,7 +97,6 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
 
     private IUpdateLayout updateLayout;
-    private boolean dropCallsFragmentAfterPageScroll;
 
     private UpdateLayoutWrapper updateLayoutWrapper;
     private FrameLayout tabsViewWrapper;
@@ -253,7 +252,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabs = new GlassTabView[5];
         tabs[INDEX_CHATS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
         tabs[INDEX_CONTACTS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CONTACTS, R.string.MainTabsContacts);
-        tabs[INDEX_SETTINGS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Web3Wallet);
+        tabs[INDEX_WALLET] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Web3Wallet);
         tabs[INDEX_CALLS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CALLS, R.string.MainTabsCalls);
         tabs[INDEX_PROFILE] = GlassTabView.createAvatar(context, resourceProvider, currentAccount, R.string.MainTabsProfile);
         tabs[INDEX_PROFILE].setOnLongClickListener(v -> {
@@ -270,8 +269,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
                 if (viewPager.isManualScrolling() || viewPager.isTouch()) {
                     return;
                 }
-                if (tabIndex == INDEX_SETTINGS) {
-                    startActivity(new android.content.Intent(getParentActivity(), WalletManagerActivity.class));
+                if (index == INDEX_WALLET) {
+                    WalletNavigator.openWalletManager(getParentActivity());
                     return;
                 }
 
@@ -290,7 +289,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             tabsView.addView(tabs[index]);
             tabsView.setViewVisible(view, true, false);
         }
-        checkUi_callTabVisible(getUserConfig().showCallsTab, false);
+        checkUi_callTabVisible(false, false);
 
         selectTab(viewPager.getCurrentPosition(), false);
 
@@ -483,10 +482,6 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         if (viewPager != null) {
             final int currentPosition = viewPager.getCurrentPosition();
-            if (currentPosition != POSITION_CALLS_OR_SETTINGS && dropCallsFragmentAfterPageScroll) {
-                dropFragmentAtPosition(POSITION_CALLS_OR_SETTINGS);
-                dropCallsFragmentAfterPageScroll = false;
-            }
             if (currentPosition != POSITION_PROFILE) {
                 dropFragmentAtPosition(POSITION_PROFILE);
             }
@@ -559,15 +554,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             args.putBoolean("hasMainTabs", true);
             return new ContactsActivity(args);
         } else if (position == POSITION_CALLS_OR_SETTINGS) {
-            if (getUserConfig().showCallsTab) {
-                Bundle args = new Bundle();
-                args.putBoolean("needFinishFragment", false);
-                args.putBoolean("hasMainTabs", true);
-                return new CallLogActivity(args);
-            }
             Bundle args = new Bundle();
+            args.putBoolean("needFinishFragment", false);
             args.putBoolean("hasMainTabs", true);
-            return new SettingsActivity(args);
+            return new CallLogActivity(args);
         } else if (position == POSITION_CHATS) {
             Bundle args = new Bundle();
             args.putBoolean("hasMainTabs", true);
@@ -725,15 +715,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         } else if (id == NotificationCenter.needSetDayNightTheme) {
             clearAllHiddenFragments();
         } else if (id == NotificationCenter.callTabsVisibleToggled) {
-            final boolean callTabsVisible = getUserConfig().showCallsTab;
-            checkUi_callTabVisible(callTabsVisible, true);
-            if (viewPager != null && viewPager.getCurrentPosition() == POSITION_CALLS_OR_SETTINGS) {
-                viewPager.scrollToPosition(POSITION_CHATS);
-                selectTab(POSITION_CHATS, true);
-                dropCallsFragmentAfterPageScroll = true;
-            } else {
-                dropFragmentAtPosition(POSITION_CALLS_OR_SETTINGS);
-            }
+            checkUi_callTabVisible(false, true);
         } else if (id == NotificationCenter.mainUserInfoChanged) {
             if (tabs != null && tabs[INDEX_PROFILE] != null) {
                 tabs[INDEX_PROFILE].updateUserAvatar(currentAccount);
@@ -820,8 +802,8 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     private void checkUi_callTabVisible(boolean callTabsVisible, boolean animated) {
         if (tabsView != null) {
-            tabsView.setViewVisible(tabs[INDEX_SETTINGS], !callTabsVisible, animated);
-            tabsView.setViewVisible(tabs[INDEX_CALLS], callTabsVisible, animated);
+            tabsView.setViewVisible(tabs[INDEX_WALLET], true, animated);
+            tabsView.setViewVisible(tabs[INDEX_CALLS], true, animated);
         }
     }
 
