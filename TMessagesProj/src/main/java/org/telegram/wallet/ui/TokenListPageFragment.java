@@ -2,6 +2,8 @@ package org.telegram.wallet.ui;
 
 import android.app.Fragment;
 import android.os.Bundle;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -9,7 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
+import android.widget.PopupWindow;
 import android.widget.ScrollView;
 import android.content.Intent;
 import android.net.Uri;
@@ -79,9 +81,10 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
 
         if (showRedPacketRecords) {
             root.addView(createRecordSummaryCard(), Web3Ui.matchWrap());
-        }/* else {
-            root.addView(Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.WalletTokenList)), Web3Ui.matchWrap());
-        }*/
+        }
+//        else {
+//            root.addView(Web3Ui.sectionTitle(getActivity(), 0, LocaleController.getString(R.string.WalletTokenList)), Web3Ui.matchWrap());
+//        }
 
         listContainer = new LinearLayout(getActivity());
         listContainer.setOrientation(LinearLayout.VERTICAL);
@@ -148,32 +151,73 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
 
     private TextView filterButton(String text, String status) {
         Web3Ui.Palette p = Web3Ui.palette();
-        TextView tv = Web3Ui.text(getActivity(), text, 11, p.primaryText, true);
-        tv.setPadding(dp(8), dp(4), dp(8), dp(4));
-        tv.setBackground(Web3Ui.roundedStroke(getActivity(), p.grayBadgeBg, p.grayBadgeBg, 10, 1));
-        tv.setOnClickListener(v -> {
-            final String[] labels = new String[]{"全部", "进行中", "已领完", "已过期", "已退款"};
-            final String[] values = new String[]{"all", "active", "empty", "expired", "refunded"};
-            PopupMenu menu = new PopupMenu(getActivity(), tv);
-            for (int i = 0; i < labels.length; i++) {
-                menu.getMenu().add(0, i, i, labels[i]);
-            }
-            menu.setOnMenuItemClickListener(item -> {
-                int which = item.getItemId();
-                if (which < 0 || which >= values.length) {
-                    return false;
-                }
-                currentStatusFilter = values[which];
-                tv.setText(labels[which]);
-                if (showRedPacketRecords && listContainer != null) {
-                    listContainer.removeAllViews();
-                    renderRedPacketRecords();
-                }
-                return true;
-            });
-            menu.show();
-        });
+        TextView tv = Web3Ui.text(getActivity(), text + "  ▾", 11, p.primaryText, true);
+        tv.setGravity(Gravity.CENTER);
+        tv.setSingleLine(true);
+        tv.setPadding(dp(10), dp(5), dp(10), dp(5));
+        tv.setBackground(Web3Ui.roundedStroke(getActivity(), p.grayBadgeBg, p.border, 12, 1));
+        tv.setOnClickListener(v -> showStatusFilterPopup(tv));
         return tv;
+    }
+
+    private void showStatusFilterPopup(TextView anchor) {
+        if (getActivity() == null || anchor == null) {
+            return;
+        }
+        final String[] labels = new String[]{"全部", "进行中", "已领完", "已过期", "已退款"};
+        final String[] values = new String[]{"all", "active", "empty", "expired", "refunded"};
+        Web3Ui.Palette p = Web3Ui.palette();
+
+        LinearLayout panel = new LinearLayout(getActivity());
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(8), dp(8), dp(8), dp(8));
+        panel.setBackground(Web3Ui.roundedStroke(getActivity(), p.cardBg, p.border, 16, 1));
+        Web3Ui.setElevation(panel, 14);
+
+        final PopupWindow popup = new PopupWindow(getActivity());
+        for (int i = 0; i < labels.length; i++) {
+            TextView row = statusPopupRow(labels[i], values[i], anchor, popup);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40));
+            if (i > 0) {
+                rowLp.topMargin = dp(2);
+            }
+            panel.addView(row, rowLp);
+        }
+
+        int popupWidth = dp(146);
+        popup.setContentView(panel);
+        popup.setWidth(popupWidth);
+        popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+        popup.setFocusable(true);
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            popup.setElevation(dp(12));
+        }
+        int xoff = anchor.getWidth() - popupWidth;
+        popup.showAsDropDown(anchor, xoff, dp(8));
+    }
+
+    private TextView statusPopupRow(String label, String value, TextView anchor, PopupWindow popup) {
+        Web3Ui.Palette p = Web3Ui.palette();
+        boolean active = value.equalsIgnoreCase(currentStatusFilter);
+        TextView row = Web3Ui.text(getActivity(), (active ? "✓  " : "    ") + label, 14, active ? p.orange : p.primaryText, active);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setSingleLine(true);
+        row.setPadding(dp(14), 0, dp(14), 0);
+        row.setBackground(Web3Ui.rounded(getActivity(), active ? (p.dark ? 0x29362418 : 0xFFFFF4E8) : 0x00000000, 12));
+        row.setOnClickListener(v -> {
+            currentStatusFilter = value;
+            anchor.setText(label + "  ▾");
+            if (popup != null) {
+                popup.dismiss();
+            }
+            if (showRedPacketRecords && listContainer != null) {
+                listContainer.removeAllViews();
+                renderRedPacketRecords();
+            }
+        });
+        return row;
     }
 
     private void renderTokens() {

@@ -107,8 +107,44 @@ public final class WalletStorage {
     }
 
     public static void setSelectedAddress(Context context, String address) {
-        prefs(context).edit().putString(KEY_SELECTED, address).apply();
-        WalletKeyStore.setSelectedAddress(context, address);
+        if (TextUtils.isEmpty(address)) {
+            prefs(context).edit().remove(KEY_SELECTED).apply();
+            WalletKeyStore.clearSelectedAddress(context);
+        } else {
+            prefs(context).edit().putString(KEY_SELECTED, address).apply();
+            WalletKeyStore.setSelectedAddress(context, address);
+        }
+    }
+
+    public static boolean deleteWallet(Context context, String address) {
+        if (TextUtils.isEmpty(address)) {
+            return false;
+        }
+        List<WalletAccount> wallets = getWallets(context);
+        List<WalletAccount> remaining = new ArrayList<>();
+        boolean removed = false;
+        for (WalletAccount account : wallets) {
+            if (account != null && !TextUtils.isEmpty(account.address) && address.equalsIgnoreCase(account.address)) {
+                removed = true;
+            } else if (account != null) {
+                remaining.add(account);
+            }
+        }
+        if (!removed) {
+            return false;
+        }
+        persistWallets(context, remaining);
+        WalletKeyStore.deleteWalletPrivateKey(context, address);
+
+        String selected = prefs(context).getString(KEY_SELECTED, null);
+        if (TextUtils.isEmpty(selected) || address.equalsIgnoreCase(selected)) {
+            if (!remaining.isEmpty()) {
+                setSelectedAddress(context, remaining.get(0).address);
+            } else {
+                setSelectedAddress(context, null);
+            }
+        }
+        return true;
     }
 
     public static boolean hasAnyWallet(Context context) {

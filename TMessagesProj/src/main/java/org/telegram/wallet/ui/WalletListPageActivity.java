@@ -56,11 +56,11 @@ public class WalletListPageActivity extends Activity implements WalletWorkflowCo
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(16), 0, dp(16), 0);
+        bar.setPadding(Web3Ui.appBarSidePadding(this), 0, Web3Ui.appBarSidePadding(this), 0);
         bar.setBackgroundColor(p.appBarBg);
         FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(56)));
+        bar.addView(back, new LinearLayout.LayoutParams(Web3Ui.appBarButtonSize(this), Web3Ui.appBarHeight(this)));
         TextView title = Web3Ui.text(this, titleText, 18, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
         bar.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -72,9 +72,9 @@ public class WalletListPageActivity extends Activity implements WalletWorkflowCo
                 ((WalletRpcNodeFragment) fragment).forceRefreshNodes();
             }
         });
-        bar.addView(right, new LinearLayout.LayoutParams(dp(44), dp(56)));
-        root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
-        Web3Ui.attachSystemBarInsets(this, root, bar, 56, null, 0);
+        bar.addView(right, new LinearLayout.LayoutParams(Web3Ui.appBarButtonSize(this), Web3Ui.appBarHeight(this)));
+        root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Web3Ui.appBarHeight(this)));
+        Web3Ui.attachSystemBarInsets(this, root, bar, Web3Ui.APP_BAR_HEIGHT_DP, null, 0);
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
         container.setId(containerId);

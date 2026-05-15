@@ -19,6 +19,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.Theme;
 
 import java.math.BigDecimal;
@@ -32,9 +33,9 @@ public final class Web3Ui {
     public static final int ACTIVE_GREEN = 0xFF22C55E;
 
     // Keep wallet pages visually aligned with Telegram's own compact top bar.
-    public static final int APP_BAR_HEIGHT_DP = 48;
-    public static final int APP_BAR_BUTTON_DP = 48;
-    public static final int APP_BAR_SIDE_PADDING_DP = 8;
+    public static final int APP_BAR_HEIGHT_DP = 56;
+    public static final int APP_BAR_BUTTON_DP = 54;
+    public static final int APP_BAR_SIDE_PADDING_DP = 0;
     public static final int PAGE_HORIZONTAL_PADDING_DP = 10;
 
     private Web3Ui() {
@@ -307,6 +308,17 @@ public final class Web3Ui {
         Palette p = palette();
         FrameLayout box = new FrameLayout(context);
         box.setBackgroundColor(0x00000000);
+        if (icon == Web3IconView.BACK) {
+            ImageView backView = new ImageView(context);
+            BackDrawable backDrawable = new BackDrawable(false);
+            backDrawable.setColor(p.primaryText);
+            backView.setImageDrawable(backDrawable);
+            backView.setScaleType(ImageView.ScaleType.CENTER);
+            // Same visual size used by Telegram's ActionBar back control.
+            FrameLayout.LayoutParams backLp = new FrameLayout.LayoutParams(dp(context, 24), dp(context, 24), Gravity.CENTER);
+            box.addView(backView, backLp);
+            return box;
+        }
         Web3IconView iconView = new Web3IconView(context, icon, p.primaryText);
         FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(context, 25), dp(context, 25), Gravity.CENTER);
         box.addView(iconView, iconLp);

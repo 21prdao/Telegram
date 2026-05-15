@@ -14131,7 +14131,7 @@
   <string name="Web3WalletChainLabel">链：%1$s</string>
   <string name="Web3WalletQuickActions">快捷操作</string>
   <string name="Web3WalletAddToken">添加代币</string>
-  <string name="Web3WalletTokenList">Token 列表</string>
+  <string name="Web3WalletTokenList">代币列表</string>
   <string name="Web3WalletNoTokenHint">暂无 Token，点击“添加代币”开始</string>
   <string name="Web3WalletAddressCopied">地址已复制</string>
   <string name="Web3WalletListSwitchTitle">钱包列表 / 切换钱包</string>

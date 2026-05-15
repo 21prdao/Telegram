@@ -66,7 +66,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(p.pageBg);
         actionBarView = buildActionBar();
-        root.addView(actionBarView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
+        root.addView(actionBarView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Web3Ui.appBarHeight(this)));
 
         FrameLayout container = new FrameLayout(this);
         containerId = android.view.View.generateViewId();
@@ -74,7 +74,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         root.addView(container, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         bottomTabsView = buildBottomTabs();
         root.addView(bottomTabsView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
-        Web3Ui.attachSystemBarInsets(this, root, actionBarView, 56, bottomTabsView, 52);
+        Web3Ui.attachSystemBarInsets(this, root, actionBarView, Web3Ui.APP_BAR_HEIGHT_DP, bottomTabsView, 52);
         return root;
     }
 
@@ -83,12 +83,12 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(16), 0, dp(16), 0);
+        bar.setPadding(Web3Ui.appBarSidePadding(this), 0, Web3Ui.appBarSidePadding(this), 0);
         bar.setBackgroundColor(p.appBarBg);
 
         FrameLayout back = Web3Ui.iconButton(this, Web3IconView.BACK);
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(56)));
+        bar.addView(back, new LinearLayout.LayoutParams(Web3Ui.appBarButtonSize(this), Web3Ui.appBarHeight(this)));
 
         TextView title = Web3Ui.text(this, LocaleController.getString(R.string.Web3WalletProTitle), 19, p.primaryText, true);
         title.setGravity(Gravity.CENTER);
@@ -100,10 +100,10 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
         rpcStatusDot = new View(this);
         rpcStatusDot.setBackground(Web3Ui.rounded(this, Web3Ui.palette().orange, 4));
         FrameLayout.LayoutParams dotLp = new FrameLayout.LayoutParams(dp(8), dp(8), Gravity.RIGHT | Gravity.TOP);
-        dotLp.topMargin = dp(14);
-        dotLp.rightMargin = dp(7);
+        dotLp.topMargin = dp(12);
+        dotLp.rightMargin = dp(8);
         nodeButton.addView(rpcStatusDot, dotLp);
-        bar.addView(nodeButton, new LinearLayout.LayoutParams(dp(44), dp(56)));
+        bar.addView(nodeButton, new LinearLayout.LayoutParams(Web3Ui.appBarButtonSize(this), Web3Ui.appBarHeight(this)));
         return bar;
     }
 

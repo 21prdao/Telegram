@@ -162,14 +162,19 @@ public final class Web3Dialog {
         } else {
             editText.setInputType(inputType);
         }
-        editText.setPadding(dp(context, 14), 0, dp(context, 14), 0);
-        editText.setMinHeight(dp(context, minLines > 1 ? 92 : 48));
+        int inputHeight = dp(context, minLines > 1 ? 108 : 56);
+        editText.setPadding(dp(context, 14), dp(context, 4), dp(context, 14), dp(context, 4));
+        editText.setMinHeight(inputHeight);
+        editText.setMinimumHeight(inputHeight);
+        if (maxLines <= 1) {
+            editText.setHeight(inputHeight);
+        }
         editText.setSingleLine(maxLines <= 1);
         editText.setMinLines(minLines);
         editText.setMaxLines(Math.max(minLines, maxLines));
         editText.setGravity(minLines > 1 ? (Gravity.TOP | Gravity.LEFT) : Gravity.CENTER_VERTICAL);
         if (minLines > 1) {
-            editText.setPadding(dp(context, 14), dp(context, 12), dp(context, 14), dp(context, 12));
+            editText.setPadding(dp(context, 14), dp(context, 14), dp(context, 14), dp(context, 14));
         }
         editText.setBackground(Web3Ui.roundedStroke(context, p.softCardBg, p.border, 14, 1));
         return editText;

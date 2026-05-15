@@ -72,7 +72,22 @@ public final class WalletKeyStore {
     }
 
     public static void setSelectedAddress(Context context, String address) {
-        prefs(context).edit().putString(KEY_SELECTED_ADDRESS, address).apply();
+        if (address == null || address.length() == 0) {
+            prefs(context).edit().remove(KEY_SELECTED_ADDRESS).apply();
+        } else {
+            prefs(context).edit().putString(KEY_SELECTED_ADDRESS, address).apply();
+        }
+    }
+
+    public static void clearSelectedAddress(Context context) {
+        prefs(context).edit().remove(KEY_SELECTED_ADDRESS).apply();
+    }
+
+    public static void deleteWalletPrivateKey(Context context, String address) {
+        if (address == null || address.length() == 0) {
+            return;
+        }
+        prefs(context).edit().remove(buildWalletKey(address)).apply();
     }
 
     @Nullable
