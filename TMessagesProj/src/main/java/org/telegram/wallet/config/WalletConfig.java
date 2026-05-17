@@ -16,6 +16,12 @@ public final class WalletConfig {
     public static final long BSC_CHAIN_ID = BuildConfig.BSC_CHAIN_ID;
     public static final String RED_PACKET_CONTRACT = BuildConfig.RED_PACKET_CONTRACT;
 
+    /**
+     * Wallet screen market-price refresh cadence.
+     * 60 seconds keeps the UI fresh while avoiding excessive server/API traffic.
+     */
+    public static final long TOKEN_PRICE_REFRESH_INTERVAL_MS = 30_000L;
+
     private WalletConfig() {}
 
     public static List<String> getBuildRpcUrls() {

@@ -228,7 +228,8 @@ public class WalletWorkflowCoordinator {
                     }
                     WalletStorage.addOrUpdateCustomToken(activity, symbolText, contractText, dcm, true);
                     safeRun(onDone);
-                    host.toast("代币已添加");
+                    host.toast("代币已添加，正在同步图标和行情");
+                    syncCustomTokenMetadata(symbolText, contractText, dcm, onDone);
                     return true;
                 },
                 "取消",
@@ -268,8 +269,18 @@ public class WalletWorkflowCoordinator {
                 }
                 List<TokenAsset> mergedTokens = WalletStorage.mergeTokens(defaultTokens, tokens);
                 Map<String, BigDecimal> priceMap = buildConfiguredPriceMap(mergedTokens);
+                Map<String, String> iconMap = buildConfiguredIconMap(mergedTokens);
                 try {
-                    priceMap.putAll(RedPacketRepository.getInstance().getTokenPrices());
+                    RedPacketRepository.TokenMetadata metadata = RedPacketRepository.getInstance().getTokenMetadata();
+                    priceMap.putAll(metadata.prices);
+                    iconMap.putAll(metadata.iconUrls);
+                } catch (Throwable ignore) {
+                }
+                try {
+                    RedPacketRepository.TokenMetadata metadata = RedPacketRepository.getInstance().getTokenMetadataForContracts(mergedTokens);
+                    priceMap.putAll(metadata.prices);
+                    iconMap.putAll(metadata.iconUrls);
+                    persistRemoteTokenMetadata(mergedTokens, metadata);
                 } catch (Throwable ignore) {
                 }
 
@@ -279,7 +290,10 @@ public class WalletWorkflowCoordinator {
                         bnb.toPlainString(),
                         bnbPriceUsd,
                         calculateUsdValue(bnb, bnbPriceUsd),
-                        "BNB Smart Chain"
+                        "BNB Smart Chain",
+                        resolveIconUrl("BNB", "", iconMap, ""),
+                        "",
+                        18
                 ));
 
                 for (TokenAsset token : mergedTokens) {
@@ -287,13 +301,83 @@ public class WalletWorkflowCoordinator {
                     BigDecimal amount = safeDecimal(bal);
                     BigDecimal usdPrice = resolveUsdPrice(token.symbol, token.contractAddress, priceMap, token.priceUsd);
                     String usd = calculateUsdValue(amount, usdPrice);
-                    tokenLines.add(buildTokenLine(token.symbol, bal, usdPrice, usd, shortAddress(token.contractAddress)));
+                    tokenLines.add(buildTokenLine(
+                            token.symbol,
+                            bal,
+                            usdPrice,
+                            usd,
+                            shortAddress(token.contractAddress),
+                            resolveIconUrl(token.symbol, token.contractAddress, iconMap, token.iconUrl),
+                            token.contractAddress,
+                            token.decimals
+                    ));
                 }
                 activity.runOnUiThread(() -> callback.onResult(selected, bnb.toPlainString() + " BNB", "BNB Smart Chain", tokenLines));
             } catch (Throwable t) {
                 activity.runOnUiThread(() -> callback.onResult(selected, "资产查询失败", "BNB Smart Chain", new java.util.ArrayList<>()));
             }
         }).start();
+    }
+
+    private void syncCustomTokenMetadata(String symbol, String contractAddress, int decimals, Runnable onDone) {
+        new Thread(() -> {
+            try {
+                RedPacketRepository.TokenMetadata metadata = RedPacketRepository.getInstance().getTokenMetadataForContract(contractAddress, symbol);
+                String iconUrl = lookupIcon(metadata, symbol, contractAddress);
+                BigDecimal price = lookupPrice(metadata, symbol, contractAddress);
+                String priceText = price.compareTo(BigDecimal.ZERO) > 0 ? price.stripTrailingZeros().toPlainString() : "";
+                if (TextUtils.isEmpty(iconUrl) && TextUtils.isEmpty(priceText)) {
+                    return;
+                }
+                WalletStorage.addOrUpdateCustomToken(activity, symbol, contractAddress, decimals, true, priceText, iconUrl);
+                activity.runOnUiThread(() -> {
+                    safeRun(onDone);
+                    if (!TextUtils.isEmpty(iconUrl) || !TextUtils.isEmpty(priceText)) {
+                        host.toast("代币资料已同步");
+                    }
+                });
+            } catch (Throwable ignore) {
+            }
+        }, "wallet-token-metadata-sync").start();
+    }
+
+    private void persistRemoteTokenMetadata(List<TokenAsset> tokens, RedPacketRepository.TokenMetadata metadata) {
+        if (tokens == null || metadata == null) return;
+        for (TokenAsset token : tokens) {
+            if (token == null || TextUtils.isEmpty(token.contractAddress)) continue;
+            String iconUrl = lookupIcon(metadata, token.symbol, token.contractAddress);
+            BigDecimal price = lookupPrice(metadata, token.symbol, token.contractAddress);
+            String priceText = price.compareTo(BigDecimal.ZERO) > 0 ? price.stripTrailingZeros().toPlainString() : "";
+            if (!TextUtils.isEmpty(iconUrl) || !TextUtils.isEmpty(priceText)) {
+                WalletStorage.updateCustomTokenMetadata(activity, token.contractAddress, priceText, iconUrl);
+            }
+        }
+    }
+
+    private String lookupIcon(RedPacketRepository.TokenMetadata metadata, String symbol, String contractAddress) {
+        if (metadata == null) return "";
+        if (!TextUtils.isEmpty(contractAddress)) {
+            String byContract = metadata.iconUrls.get(RedPacketRepository.priceKeyForContract(contractAddress));
+            if (!TextUtils.isEmpty(byContract)) return byContract;
+        }
+        if (!TextUtils.isEmpty(symbol)) {
+            String bySymbol = metadata.iconUrls.get(RedPacketRepository.priceKeyForSymbol(symbol));
+            if (!TextUtils.isEmpty(bySymbol)) return bySymbol;
+        }
+        return "";
+    }
+
+    private BigDecimal lookupPrice(RedPacketRepository.TokenMetadata metadata, String symbol, String contractAddress) {
+        if (metadata == null) return BigDecimal.ZERO;
+        if (!TextUtils.isEmpty(contractAddress)) {
+            BigDecimal byContract = metadata.prices.get(RedPacketRepository.priceKeyForContract(contractAddress));
+            if (byContract != null && byContract.compareTo(BigDecimal.ZERO) > 0) return byContract;
+        }
+        if (!TextUtils.isEmpty(symbol)) {
+            BigDecimal bySymbol = metadata.prices.get(RedPacketRepository.priceKeyForSymbol(symbol));
+            if (bySymbol != null && bySymbol.compareTo(BigDecimal.ZERO) > 0) return bySymbol;
+        }
+        return BigDecimal.ZERO;
     }
 
     private Map<String, BigDecimal> buildConfiguredPriceMap(List<TokenAsset> tokens) {
@@ -311,6 +395,35 @@ public class WalletWorkflowCoordinator {
             }
         }
         return result;
+    }
+
+    private Map<String, String> buildConfiguredIconMap(List<TokenAsset> tokens) {
+        Map<String, String> result = new HashMap<>();
+        if (tokens == null) return result;
+        for (TokenAsset token : tokens) {
+            if (token == null || TextUtils.isEmpty(token.iconUrl)) continue;
+            if (!TextUtils.isEmpty(token.symbol)) {
+                result.put(RedPacketRepository.priceKeyForSymbol(token.symbol), token.iconUrl.trim());
+            }
+            if (!TextUtils.isEmpty(token.contractAddress)) {
+                result.put(RedPacketRepository.priceKeyForContract(token.contractAddress), token.iconUrl.trim());
+            }
+        }
+        return result;
+    }
+
+    private String resolveIconUrl(String symbol, String contractAddress, Map<String, String> iconMap, String configuredIconUrl) {
+        if (iconMap != null) {
+            if (!TextUtils.isEmpty(contractAddress)) {
+                String byContract = iconMap.get(RedPacketRepository.priceKeyForContract(contractAddress));
+                if (!TextUtils.isEmpty(byContract)) return byContract;
+            }
+            if (!TextUtils.isEmpty(symbol)) {
+                String bySymbol = iconMap.get(RedPacketRepository.priceKeyForSymbol(symbol));
+                if (!TextUtils.isEmpty(bySymbol)) return bySymbol;
+            }
+        }
+        return TextUtils.isEmpty(configuredIconUrl) ? "" : configuredIconUrl.trim();
     }
 
     private BigDecimal resolveUsdPrice(String symbol, String contractAddress, Map<String, BigDecimal> priceMap, String configuredPrice) {
@@ -337,7 +450,7 @@ public class WalletWorkflowCoordinator {
         return BigDecimal.ZERO;
     }
 
-    private String buildTokenLine(String symbol, String amount, BigDecimal priceUsd, String usdValue, String subtitle) {
+    private String buildTokenLine(String symbol, String amount, BigDecimal priceUsd, String usdValue, String subtitle, String iconUrl, String contractAddress, int decimals) {
         try {
             JSONObject obj = new JSONObject();
             obj.put("symbol", TextUtils.isEmpty(symbol) ? "TOKEN" : symbol.trim());
@@ -345,6 +458,12 @@ public class WalletWorkflowCoordinator {
             obj.put("priceUsd", priceUsd != null && priceUsd.compareTo(BigDecimal.ZERO) > 0 ? priceUsd.stripTrailingZeros().toPlainString() : "");
             obj.put("usdValue", TextUtils.isEmpty(usdValue) ? "--" : usdValue);
             obj.put("subtitle", TextUtils.isEmpty(subtitle) ? "" : subtitle);
+            obj.put("contractAddress", TextUtils.isEmpty(contractAddress) ? "" : contractAddress.trim());
+            obj.put("tokenAddress", TextUtils.isEmpty(contractAddress) ? "" : contractAddress.trim());
+            obj.put("decimals", decimals >= 0 ? decimals : 18);
+            if (!TextUtils.isEmpty(iconUrl)) {
+                obj.put("iconUrl", iconUrl.trim());
+            }
             return obj.toString();
         } catch (Throwable ignore) {
             String safeSymbol = TextUtils.isEmpty(symbol) ? "TOKEN" : symbol.trim();

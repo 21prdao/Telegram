@@ -7,6 +7,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -26,12 +28,8 @@ import org.telegram.messenger.R;
 import org.telegram.wallet.data.WalletStorage;
 import org.json.JSONObject;
 
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.util.List;
 import java.util.Locale;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     private TextView totalAssetView;
@@ -40,6 +38,17 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     private LinearLayout tokenListContainer;
     private String currentAddress;
     private String currentChainName = "BNB Smart Chain";
+    private final Handler tokenPriceRefreshHandler = new Handler(Looper.getMainLooper());
+    private volatile boolean loadingBalances;
+    private final Runnable tokenPriceRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isAdded() && getActivity() != null && tokenListContainer != null) {
+                refresh();
+                scheduleTokenPriceRefresh();
+            }
+        }
+    };
 
     public static WalletHomeFragment newInstance() { return new WalletHomeFragment(); }
 
@@ -123,6 +132,36 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         return scroll;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (tokenListContainer != null) {
+            refresh();
+            scheduleTokenPriceRefresh();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        stopTokenPriceRefresh();
+        super.onPause();
+    }
+
+    @Override
+    public void onDestroyView() {
+        stopTokenPriceRefresh();
+        super.onDestroyView();
+    }
+
+    private void scheduleTokenPriceRefresh() {
+        tokenPriceRefreshHandler.removeCallbacks(tokenPriceRefreshRunnable);
+        tokenPriceRefreshHandler.postDelayed(tokenPriceRefreshRunnable, WalletUiRefreshPolicy.TOKEN_PRICE_REFRESH_INTERVAL_MS);
+    }
+
+    private void stopTokenPriceRefresh() {
+        tokenPriceRefreshHandler.removeCallbacks(tokenPriceRefreshRunnable);
+    }
+
     @Override public void refresh() {
         final android.app.Activity activity = getActivity();
         if (activity == null || !isAdded()) return;
@@ -135,20 +174,27 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
             chainNameView.setText(LocaleController.formatString(R.string.Web3WalletChainLabel, currentChainName));
             renderTokenLines(snapshot.tokenLines);
         }
-        coordinator().loadBalances((selectedAddress, totalAsset, chainName, tokenLines) -> {
-            if (!isAdded()) return;
-            android.app.Activity callbackActivity = getActivity();
-            if (callbackActivity == null || walletAddressView == null || totalAssetView == null || chainNameView == null || tokenListContainer == null) {
-                return;
-            }
-            currentAddress = selectedAddress;
-            currentChainName = TextUtils.isEmpty(chainName) ? "BNB Smart Chain" : chainName;
-            walletAddressView.setText(LocaleController.formatString(R.string.Web3WalletAddressLabel, TextUtils.isEmpty(selectedAddress) ? LocaleController.getString(R.string.Web3WalletAddressNotCreated) : WalletWorkflowCoordinator.shortAddress(selectedAddress)));
-            applyTotalAsset(totalAsset);
-            chainNameView.setText(LocaleController.formatString(R.string.Web3WalletChainLabel, currentChainName));
-            renderTokenLines(tokenLines);
-            WalletStorage.saveHomeSnapshot(callbackActivity, selectedAddress, totalAsset, currentChainName, tokenLines);
-        });
+        if (loadingBalances) return;
+        loadingBalances = true;
+        try {
+            coordinator().loadBalances((selectedAddress, totalAsset, chainName, tokenLines) -> {
+                loadingBalances = false;
+                if (!isAdded()) return;
+                android.app.Activity callbackActivity = getActivity();
+                if (callbackActivity == null || walletAddressView == null || totalAssetView == null || chainNameView == null || tokenListContainer == null) {
+                    return;
+                }
+                currentAddress = selectedAddress;
+                currentChainName = TextUtils.isEmpty(chainName) ? "BNB Smart Chain" : chainName;
+                walletAddressView.setText(LocaleController.formatString(R.string.Web3WalletAddressLabel, TextUtils.isEmpty(selectedAddress) ? LocaleController.getString(R.string.Web3WalletAddressNotCreated) : WalletWorkflowCoordinator.shortAddress(selectedAddress)));
+                applyTotalAsset(totalAsset);
+                chainNameView.setText(LocaleController.formatString(R.string.Web3WalletChainLabel, currentChainName));
+                renderTokenLines(tokenLines);
+                WalletStorage.saveHomeSnapshot(callbackActivity, selectedAddress, totalAsset, currentChainName, tokenLines);
+            });
+        } catch (Throwable ignore) {
+            loadingBalances = false;
+        }
     }
 
     private void renderTokenLines(List<String> tokenLines) {
@@ -165,7 +211,11 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         String symbol = "TOKEN";
         String amount = "--";
         String usdValue = "--";
+        String priceUsd = "";
         String subtitle = "";
+        String iconUrl = "";
+        String contractAddress = "";
+        int decimals = 18;
     }
 
     private View createTokenRow(String line) {
@@ -176,14 +226,14 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(10), dp(8), dp(8), dp(8));
         row.setBackground(Web3Ui.rounded(getActivity(), p.softCardBg, 12));
-        row.addView(Web3Ui.tokenBadge(getActivity(), token.symbol, 36), new LinearLayout.LayoutParams(dp(36), dp(36)));
+        row.addView(Web3Ui.tokenBadge(getActivity(), token.symbol, token.iconUrl, 36), new LinearLayout.LayoutParams(dp(36), dp(36)));
         LinearLayout info = new LinearLayout(getActivity());
         info.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams infoLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         infoLp.leftMargin = dp(10);
         row.addView(info, infoLp);
         info.addView(Web3Ui.text(getActivity(), token.symbol, 15, p.primaryText, true), Web3Ui.matchWrap());
-        TextView subtitleView = Web3Ui.text(getActivity(), token.subtitle, 12, p.secondaryText, false);
+        TextView subtitleView = Web3Ui.text(getActivity(), WalletUiFormat.formatUsdPrice(token.priceUsd), 12, p.secondaryText, false);
         subtitleView.setSingleLine(true);
         subtitleView.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(subtitleView, Web3Ui.matchWrap());
@@ -191,14 +241,14 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout right = new LinearLayout(getActivity());
         right.setOrientation(LinearLayout.VERTICAL);
         right.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        String prettyAmount = formatTokenAmount(token.amount);
-        TextView amountView = Web3Ui.text(getActivity(), prettyAmount + " " + token.symbol, 15, p.primaryText, true);
+        String prettyAmount = WalletUiFormat.formatTokenAmount(token.amount);
+        TextView amountView = Web3Ui.text(getActivity(), prettyAmount, 15, p.primaryText, true);
         amountView.setGravity(Gravity.RIGHT);
         amountView.setSingleLine(true);
         amountView.setEllipsize(TextUtils.TruncateAt.END);
         amountView.setMaxWidth(dp(184));
         right.addView(amountView);
-        TextView usd = Web3Ui.text(getActivity(), formatUsdDisplay(token.usdValue, token.amount), 11, p.mutedText, false);
+        TextView usd = Web3Ui.text(getActivity(), WalletUiFormat.formatUsdValue(token.usdValue, token.amount), 11, p.mutedText, false);
         usd.setGravity(Gravity.RIGHT);
         usd.setSingleLine(true);
         usd.setEllipsize(TextUtils.TruncateAt.END);
@@ -207,6 +257,7 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         rightLp.leftMargin = dp(8);
         row.addView(right, rightLp);
+        row.setOnClickListener(v -> openTokenDetail(token));
         return row;
     }
 
@@ -223,7 +274,12 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
                 token.symbol = firstNonEmpty(obj.optString("symbol", ""), obj.optString("tokenSymbol", ""), "TOKEN");
                 token.amount = sanitizeAmount(firstNonEmpty(obj.optString("amount", ""), obj.optString("balance", ""), "0"), token.symbol);
                 token.usdValue = firstNonEmpty(obj.optString("usdValue", ""), obj.optString("valueUsd", ""), obj.optString("fiatValueUsd", ""), "--");
+                token.priceUsd = firstNonEmpty(obj.optString("priceUsd", ""), obj.optString("usdPrice", ""), obj.optString("price", ""), obj.optString("price_usd", ""), "");
                 token.subtitle = firstNonEmpty(obj.optString("subtitle", ""), obj.optString("sub", ""), obj.optString("contract", ""), "");
+                token.iconUrl = firstNonEmpty(obj.optString("iconUrl", ""), obj.optString("icon_url", ""), obj.optString("logoUrl", ""), obj.optString("logo", ""), obj.optString("imageUrl", ""), obj.optString("image", ""), "");
+                token.contractAddress = firstNonEmpty(obj.optString("contractAddress", ""), obj.optString("tokenAddress", ""), obj.optString("address", ""), "");
+                token.decimals = obj.optInt("decimals", obj.optInt("tokenDecimals", 18));
+                if (token.decimals < 0 || token.decimals > 36) token.decimals = 18;
                 if (TextUtils.isEmpty(token.subtitle) && "BNB".equalsIgnoreCase(token.symbol)) {
                     token.subtitle = currentChainName;
                 }
@@ -304,58 +360,26 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
     }
 
     private boolean isZeroAmount(String amount) {
-        try {
-            return new BigDecimal(amount.replace(",", "").trim()).compareTo(BigDecimal.ZERO) == 0;
-        } catch (Throwable ignore) {
-            return false;
-        }
+        return WalletUiFormat.isZeroAmount(amount);
     }
 
     private String formatTokenAmount(String amount) {
-        try {
-            BigDecimal d = new BigDecimal(amount.replace(",", "").trim());
-            if (d.compareTo(BigDecimal.ZERO) == 0) return "0";
-            BigDecimal abs = d.abs();
-            if (abs.compareTo(new BigDecimal("0.00000001")) < 0) {
-                return d.signum() < 0 ? "<-0.00000001" : "<0.00000001";
-            }
-            int scale = abs.compareTo(BigDecimal.ONE) >= 0 ? 4 : 8;
-            BigDecimal rounded = d.setScale(scale, RoundingMode.DOWN).stripTrailingZeros();
-            DecimalFormat format = new DecimalFormat("#,##0.########", DecimalFormatSymbols.getInstance(Locale.US));
-            format.setRoundingMode(RoundingMode.DOWN);
-            return format.format(rounded);
-        } catch (Throwable ignore) {
-            return TextUtils.isEmpty(amount) ? "--" : amount;
-        }
+        return WalletUiFormat.formatTokenAmount(amount);
     }
 
     private String formatAssetAmount(String totalAsset) {
         String[] parts = totalAsset.split(" ");
         if (parts.length < 1) return totalAsset;
-        String number = formatTokenAmount(parts[0]);
+        String number = WalletUiFormat.formatTokenAmount(parts[0]);
         return parts.length > 1 ? number + " " + parts[1] : number;
     }
 
+    private String formatMarketPriceDisplay(String priceUsd) {
+        return WalletUiFormat.formatUsdPrice(priceUsd);
+    }
+
     private String formatUsdDisplay(String usdValue, String amount) {
-        String label = sanitizeUsdValue(usdValue);
-        if ((TextUtils.isEmpty(label) || "--".equals(label)) && isZeroAmount(amount)) {
-            label = "0.00";
-        }
-        if (TextUtils.isEmpty(label) || "--".equals(label)) {
-            return "≈ $--";
-        }
-        try {
-            boolean lessThanCent = label.startsWith("<");
-            String numeric = (lessThanCent ? label.substring(1) : label).replace(",", "").trim();
-            BigDecimal value = new BigDecimal(numeric);
-            if (value.compareTo(BigDecimal.ZERO) == 0) return "≈ $0.00";
-            if (lessThanCent || value.compareTo(new BigDecimal("0.01")) < 0) return "≈ $<0.01";
-            DecimalFormat format = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.US));
-            format.setRoundingMode(RoundingMode.HALF_UP);
-            return "≈ $" + format.format(value);
-        } catch (Throwable ignore) {
-            return "≈ $" + label;
-        }
+        return WalletUiFormat.formatUsdValue(usdValue, amount);
     }
 
     private String firstNonEmpty(String... values) {
@@ -388,6 +412,21 @@ public class WalletHomeFragment extends Fragment implements WalletRefreshable {
         Intent intent = new Intent(getActivity(), TokenListPageActivity.class);
         intent.putExtra(TokenListPageActivity.EXTRA_SHOW_RECORDS, false);
         intent.putExtra(TokenListPageActivity.EXTRA_AUTO_OPEN_ADD, true);
+        startActivity(intent);
+    }
+
+    private void openTokenDetail(TokenDisplayData token) {
+        if (getActivity() == null || token == null) return;
+        Intent intent = TokenDetailActivity.intentFor(
+                getActivity(),
+                token.symbol,
+                token.contractAddress,
+                token.decimals,
+                token.amount,
+                token.priceUsd,
+                token.usdValue,
+                token.iconUrl
+        );
         startActivity(intent);
     }
 

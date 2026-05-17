@@ -2,6 +2,8 @@ package org.telegram.wallet.ui;
 
 import android.app.Fragment;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
@@ -27,11 +29,13 @@ import org.telegram.wallet.model.RedPacketClaimRecord;
 import org.telegram.wallet.model.TokenAsset;
 import org.telegram.wallet.redpacket.RedPacketRepository;
 
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class TokenListPageFragment extends Fragment implements WalletRefreshable {
     private static final String ARG_RECORD = "arg_record";
@@ -48,6 +52,17 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
     private boolean hasMoreRecords = true;
     private SwipeRefreshLayout swipeRefreshLayout;
     private String currentStatusFilter = "all";
+    private volatile boolean tokenListMetadataLoading;
+    private final Handler tokenPriceRefreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable tokenPriceRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!showRedPacketRecords && isAdded() && getActivity() != null && listContainer != null) {
+                refresh();
+                scheduleTokenPriceRefresh();
+            }
+        }
+    };
 
     public static TokenListPageFragment tokenList() {
         TokenListPageFragment f = new TokenListPageFragment();
@@ -102,6 +117,32 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         }
         refresh();
         return scroll;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (!showRedPacketRecords && listContainer != null) {
+            refresh();
+            scheduleTokenPriceRefresh();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        tokenPriceRefreshHandler.removeCallbacks(tokenPriceRefreshRunnable);
+        super.onPause();
+    }
+
+    @Override
+    public void onDestroyView() {
+        tokenPriceRefreshHandler.removeCallbacks(tokenPriceRefreshRunnable);
+        super.onDestroyView();
+    }
+
+    private void scheduleTokenPriceRefresh() {
+        tokenPriceRefreshHandler.removeCallbacks(tokenPriceRefreshRunnable);
+        tokenPriceRefreshHandler.postDelayed(tokenPriceRefreshRunnable, WalletUiRefreshPolicy.TOKEN_PRICE_REFRESH_INTERVAL_MS);
     }
 
     @Override
@@ -231,10 +272,19 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         for (TokenAsset token : localTokens) {
             listContainer.addView(createTokenCard(token), Web3Ui.topMargin(getActivity(), 8));
         }
+        if (tokenListMetadataLoading) {
+            return;
+        }
+        tokenListMetadataLoading = true;
         new Thread(() -> {
             try {
                 List<TokenAsset> defaults = RedPacketRepository.getInstance().getDefaultTokens();
                 List<TokenAsset> merged = WalletStorage.mergeTokens(defaults, localTokens);
+                try {
+                    RedPacketRepository.TokenMetadata metadata = RedPacketRepository.getInstance().getTokenMetadataForContracts(merged);
+                    applyTokenMetadata(merged, metadata);
+                } catch (Throwable ignore) {
+                }
                 if (getActivity() == null) {
                     return;
                 }
@@ -252,8 +302,57 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
                     }
                 });
             } catch (Throwable ignore) {
+            } finally {
+                tokenListMetadataLoading = false;
             }
         }, "wallet-token-list").start();
+    }
+
+    private void applyTokenMetadata(List<TokenAsset> tokens, RedPacketRepository.TokenMetadata metadata) {
+        if (tokens == null || metadata == null) return;
+        for (TokenAsset token : tokens) {
+            if (token == null) continue;
+            String iconUrl = lookupIcon(metadata.iconUrls, token.symbol, token.contractAddress);
+            BigDecimal price = lookupPrice(metadata.prices, token.symbol, token.contractAddress);
+            String priceText = price.compareTo(BigDecimal.ZERO) > 0 ? price.stripTrailingZeros().toPlainString() : "";
+            if (!TextUtils.isEmpty(iconUrl)) {
+                token.iconUrl = iconUrl;
+            }
+            if (!TextUtils.isEmpty(priceText)) {
+                token.priceUsd = priceText;
+            }
+            if (!TextUtils.isEmpty(iconUrl) || !TextUtils.isEmpty(priceText)) {
+                if (getActivity() != null) {
+                    WalletStorage.updateCustomTokenMetadata(getActivity(), token.contractAddress, priceText, iconUrl);
+                }
+            }
+        }
+    }
+
+    private String lookupIcon(Map<String, String> iconMap, String symbol, String contractAddress) {
+        if (iconMap == null) return "";
+        if (!TextUtils.isEmpty(contractAddress)) {
+            String byContract = iconMap.get(RedPacketRepository.priceKeyForContract(contractAddress));
+            if (!TextUtils.isEmpty(byContract)) return byContract;
+        }
+        if (!TextUtils.isEmpty(symbol)) {
+            String bySymbol = iconMap.get(RedPacketRepository.priceKeyForSymbol(symbol));
+            if (!TextUtils.isEmpty(bySymbol)) return bySymbol;
+        }
+        return "";
+    }
+
+    private BigDecimal lookupPrice(Map<String, BigDecimal> priceMap, String symbol, String contractAddress) {
+        if (priceMap == null) return BigDecimal.ZERO;
+        if (!TextUtils.isEmpty(contractAddress)) {
+            BigDecimal byContract = priceMap.get(RedPacketRepository.priceKeyForContract(contractAddress));
+            if (byContract != null && byContract.compareTo(BigDecimal.ZERO) > 0) return byContract;
+        }
+        if (!TextUtils.isEmpty(symbol)) {
+            BigDecimal bySymbol = priceMap.get(RedPacketRepository.priceKeyForSymbol(symbol));
+            if (bySymbol != null && bySymbol.compareTo(BigDecimal.ZERO) > 0) return bySymbol;
+        }
+        return BigDecimal.ZERO;
     }
 
     private LinearLayout createTokenCard(TokenAsset token) {
@@ -265,7 +364,7 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         card.setBackground(Web3Ui.rounded(getActivity(), p.cardBg, 14));
         Web3Ui.setElevation(card, 0);
 
-        card.addView(Web3Ui.tokenBadge(getActivity(), token.symbol, 42), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        card.addView(Web3Ui.tokenBadge(getActivity(), token.symbol, token.iconUrl, 42), new LinearLayout.LayoutParams(dp(42), dp(42)));
 
         LinearLayout info = new LinearLayout(getActivity());
         info.setOrientation(LinearLayout.VERTICAL);
@@ -274,25 +373,35 @@ public class TokenListPageFragment extends Fragment implements WalletRefreshable
         card.addView(info, infoLp);
 
         info.addView(Web3Ui.text(getActivity(), token.symbol, 18, p.primaryText, true), Web3Ui.matchWrap());
-
-        LinearLayout meta = new LinearLayout(getActivity());
-        meta.setOrientation(LinearLayout.HORIZONTAL);
-        meta.setGravity(Gravity.CENTER_VERTICAL);
-        meta.addView(new Web3IconView(getActivity(), Web3IconView.COPY, p.mutedText), new LinearLayout.LayoutParams(dp(18), dp(18)));
-
-        TextView addr = Web3Ui.text(getActivity(), WalletWorkflowCoordinator.shortAddress(token.contractAddress), 13, p.secondaryText, false);
-        LinearLayout.LayoutParams addrLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        addrLp.leftMargin = dp(6);
-        meta.addView(addr, addrLp);
-        meta.addView(Web3Ui.text(getActivity(), "  |  ", 13, p.mutedText, false));
-        meta.addView(new Web3IconView(getActivity(), Web3IconView.CUBE, p.mutedText), new LinearLayout.LayoutParams(dp(18), dp(18)));
-        meta.addView(Web3Ui.text(getActivity(), " decimals=" + token.decimals, 13, p.secondaryText, false));
-        info.addView(meta, Web3Ui.topMargin(getActivity(), 4));
+        TextView price = Web3Ui.text(getActivity(), WalletUiFormat.formatUsdPrice(token.priceUsd), 13, p.secondaryText, false);
+        price.setSingleLine(true);
+        price.setEllipsize(TextUtils.TruncateAt.END);
+        info.addView(price, Web3Ui.topMargin(getActivity(), 4));
 
         card.addView(new Web3IconView(getActivity(), Web3IconView.CHEVRON, p.mutedText), new LinearLayout.LayoutParams(dp(18), dp(18)));
+        card.setOnClickListener(v -> openTokenDetail(token));
         return card;
     }
 
+    private void openTokenDetail(TokenAsset token) {
+        if (getActivity() == null || token == null) return;
+        Intent intent = TokenDetailActivity.intentFor(
+                getActivity(),
+                token.symbol,
+                token.contractAddress,
+                token.decimals,
+                "",
+                token.priceUsd,
+                "",
+                token.iconUrl
+        );
+        getActivity().startActivity(intent);
+    }
+
+
+    private String formatMarketPriceDisplay(String priceUsd) {
+        return WalletUiFormat.formatUsdPrice(priceUsd);
+    }
 
     private String normalizeStatus(String status) {
         String safeStatus = safe(status, "").trim().toLowerCase(Locale.US);

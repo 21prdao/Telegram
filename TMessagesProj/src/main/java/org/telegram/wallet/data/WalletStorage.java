@@ -177,6 +177,14 @@ public final class WalletStorage {
                 token.decimals = o.optInt("decimals", 18);
                 token.favorite = o.optBoolean("favorite", false);
                 token.priceUsd = o.optString("priceUsd", "");
+                token.iconUrl = firstNonEmpty(
+                        o.optString("iconUrl", ""),
+                        o.optString("icon_url", ""),
+                        o.optString("logoUrl", ""),
+                        o.optString("logo", ""),
+                        o.optString("imageUrl", ""),
+                        o.optString("image", "")
+                );
                 result.add(token);
             }
             return result;
@@ -282,9 +290,14 @@ public final class WalletStorage {
         token.decimals = source.decimals > 0 ? source.decimals : 18;
         token.favorite = source.favorite;
         token.priceUsd = source.priceUsd == null ? "" : source.priceUsd;
+        token.iconUrl = source.iconUrl == null ? "" : source.iconUrl;
         result.add(token);
     }
     public static void addOrUpdateCustomToken(Context context, String symbol, String contractAddress, int decimals, boolean favorite) {
+        addOrUpdateCustomToken(context, symbol, contractAddress, decimals, favorite, "", "");
+    }
+
+    public static void addOrUpdateCustomToken(Context context, String symbol, String contractAddress, int decimals, boolean favorite, String priceUsd, String iconUrl) {
         if (TextUtils.isEmpty(symbol) || TextUtils.isEmpty(contractAddress)) {
             return;
         }
@@ -295,6 +308,12 @@ public final class WalletStorage {
                 token.symbol = symbol;
                 token.decimals = decimals;
                 token.favorite = favorite;
+                if (!TextUtils.isEmpty(priceUsd)) {
+                    token.priceUsd = priceUsd;
+                }
+                if (!TextUtils.isEmpty(iconUrl)) {
+                    token.iconUrl = iconUrl;
+                }
                 updated = true;
                 break;
             }
@@ -305,9 +324,40 @@ public final class WalletStorage {
             token.contractAddress = contractAddress;
             token.decimals = decimals;
             token.favorite = favorite;
+            token.priceUsd = TextUtils.isEmpty(priceUsd) ? "" : priceUsd;
+            token.iconUrl = TextUtils.isEmpty(iconUrl) ? "" : iconUrl;
             all.add(token);
         }
         persistTokens(context, all);
+    }
+
+    public static boolean updateCustomTokenMetadata(Context context, String contractAddress, String priceUsd, String iconUrl) {
+        if (TextUtils.isEmpty(contractAddress) || (TextUtils.isEmpty(priceUsd) && TextUtils.isEmpty(iconUrl))) {
+            return false;
+        }
+        List<TokenAsset> all = getTokens(context);
+        boolean changed = false;
+        for (TokenAsset token : all) {
+            if (token == null || TextUtils.isEmpty(token.contractAddress)) {
+                continue;
+            }
+            if (!contractAddress.equalsIgnoreCase(token.contractAddress)) {
+                continue;
+            }
+            if (!TextUtils.isEmpty(priceUsd) && !priceUsd.equals(token.priceUsd)) {
+                token.priceUsd = priceUsd;
+                changed = true;
+            }
+            if (!TextUtils.isEmpty(iconUrl) && !iconUrl.equals(token.iconUrl)) {
+                token.iconUrl = iconUrl;
+                changed = true;
+            }
+            break;
+        }
+        if (changed) {
+            persistTokens(context, all);
+        }
+        return changed;
     }
 
 
@@ -492,11 +542,26 @@ public final class WalletStorage {
                 if (!TextUtils.isEmpty(token.priceUsd)) {
                     o.put("priceUsd", token.priceUsd);
                 }
+                if (!TextUtils.isEmpty(token.iconUrl)) {
+                    o.put("iconUrl", token.iconUrl);
+                }
                 arr.put(o);
             } catch (Throwable ignore) {
             }
         }
         prefs(context).edit().putString(KEY_TOKENS, arr.toString()).apply();
+    }
+
+    private static String firstNonEmpty(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     private static SharedPreferences prefs(Context context) {

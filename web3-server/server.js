@@ -72,13 +72,28 @@ const BOOTSTRAP_APP_UPLOAD_PUBLIC_PATH = normalizePublicPath(process.env.APP_UPL
 const BOOTSTRAP_APP_UPLOAD_DIR = path.resolve(process.env.APP_UPLOAD_DIR || path.join(__dirname, 'uploads', 'apks'));
 const BOOTSTRAP_APP_UPLOAD_URL_BASE = String(process.env.APP_UPLOAD_URL_BASE || '').trim().replace(/\/+$/, '');
 const BOOTSTRAP_MAX_APK_UPLOAD_BYTES = Math.max(numberFromEnv(process.env.MAX_APK_UPLOAD_BYTES, 150 * 1024 * 1024), 1024 * 1024);
+const BOOTSTRAP_TOKEN_ICON_PUBLIC_PATH = normalizePublicPath(process.env.TOKEN_ICON_PUBLIC_PATH || '/uploads/token-icons');
+const BOOTSTRAP_TOKEN_ICON_DIR = path.resolve(process.env.TOKEN_ICON_DIR || path.join(__dirname, 'uploads', 'token-icons'));
+const BOOTSTRAP_MAX_TOKEN_ICON_UPLOAD_BYTES = Math.max(numberFromEnv(process.env.MAX_TOKEN_ICON_UPLOAD_BYTES, 2 * 1024 * 1024), 64 * 1024);
+const DEFAULT_BNB_ICON_URL = 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/info/logo.png';
+const BOOTSTRAP_BNB_ICON_URL = String(process.env.BNB_ICON_URL || DEFAULT_BNB_ICON_URL).trim();
+const BOOTSTRAP_TOKEN_ICON_REGISTRY = parseTokenIconRegistryForBootstrap(process.env.TOKEN_ICON_REGISTRY || process.env.TOKEN_ICON_MAP || '[]');
+const BOOTSTRAP_TOKEN_PRICE_AUTO_ENABLED = parseBooleanFlag(process.env.TOKEN_PRICE_AUTO_ENABLED, true);
+const BOOTSTRAP_TOKEN_PRICE_EXTERNAL_TTL_SECONDS = Math.max(numberFromEnv(process.env.TOKEN_PRICE_EXTERNAL_TTL_SECONDS, 60), 30);
+const BOOTSTRAP_TOKEN_PRICE_PROVIDER_ORDER = normalizeTokenPriceProviderOrderForBootstrap(process.env.TOKEN_PRICE_PROVIDER_ORDER || '["dexscreener","defillama","coingecko"]');
+const BOOTSTRAP_TOKEN_PRICE_REGISTRY = parseTokenPriceRegistryForBootstrap(process.env.TOKEN_PRICE_REGISTRY || process.env.TOKEN_PRICE_MAP || '[]');
+const BSC_STABLE_PRICE_ADDRESSES = new Set([
+  '0x55d398326f99059ff775485246999027b3197955', // USDT on BNB Smart Chain
+  '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d', // USDC on BNB Smart Chain
+  '0xe9e7cea3dedca5984780bafc599bd69add087d56', // BUSD on BNB Smart Chain
+]);
 const BUILTIN_DEFAULT_WALLET_TOKENS = [
-  { symbol: 'ETZ', contractAddress: '0xc78dabf21594c76ad98a0b3ed103fcfcd9499999', decimals: 18, priceUsd: '0' },
-  { symbol: 'Piao', contractAddress: '0x68973e906a64b283ac90eb88cd561ba6c6681103', decimals: 18, priceUsd: '0' },
-  { symbol: 'Tea', contractAddress: '0x3142Db225d0262973715606c85B2B50a66f9b00C', decimals: 18, priceUsd: '0' },
-  { symbol: 'Dimei', contractAddress: '0xb299d5bdf3c17d14aafb305f97b16c5aa0999921', decimals: 18, priceUsd: '0' },
-  { symbol: 'Mu', contractAddress: '0x7677421f49776addcfc18cb851df0c24d02d8888', decimals: 18, priceUsd: '0' },
-  { symbol: 'Goods', contractAddress: '0x80B75C9c6773D255c32ADA8E971c0C4ba03088d0', decimals: 18, priceUsd: '0' },
+  { symbol: 'ETZ', contractAddress: '0xc78dabf21594c76ad98a0b3ed103fcfcd9499999', decimals: 18, priceUsd: '0', iconUrl: '' },
+  { symbol: 'Piao', contractAddress: '0x68973e906a64b283ac90eb88cd561ba6c6681103', decimals: 18, priceUsd: '0', iconUrl: '' },
+  { symbol: 'Tea', contractAddress: '0x3142Db225d0262973715606c85B2B50a66f9b00C', decimals: 18, priceUsd: '0', iconUrl: '' },
+  { symbol: 'Dimei', contractAddress: '0xb299d5bdf3c17d14aafb305f97b16c5aa0999921', decimals: 18, priceUsd: '0', iconUrl: '' },
+  { symbol: 'Mu', contractAddress: '0x7677421f49776addcfc18cb851df0c24d02d8888', decimals: 18, priceUsd: '0', iconUrl: '' },
+  { symbol: 'Goods', contractAddress: '0x80B75C9c6773D255c32ADA8E971c0C4ba03088d0', decimals: 18, priceUsd: '0', iconUrl: '' },
 ];
 
 
@@ -266,12 +281,85 @@ const RUNTIME_SETTING_DEFINITIONS = [
     description: '客户端 /api/v1/client/proxy 返回的 secret。',
   },
   {
+    key: 'bnbIconUrl',
+    group: 'wallet',
+    label: 'BNB 图标地址',
+    type: 'string',
+    defaultValue: BOOTSTRAP_BNB_ICON_URL,
+    maxLength: 1024,
+    description: 'BNB 原生币图标 URL。默认使用公开 BSC 图标；也可填完整 http/https 地址，或填 tokenIconPublicPath 下的文件名。',
+  },
+  {
+    key: 'tokenIconPublicPath',
+    group: 'wallet',
+    label: '代币图标公开路径',
+    type: 'string',
+    defaultValue: BOOTSTRAP_TOKEN_ICON_PUBLIC_PATH,
+    required: true,
+    maxLength: 128,
+    description: '服务端公开代币图标的 URL path，例如 /uploads/token-icons。',
+  },
+  {
+    key: 'tokenIconDir',
+    group: 'wallet',
+    label: '代币图标保存目录',
+    type: 'string',
+    defaultValue: BOOTSTRAP_TOKEN_ICON_DIR,
+    required: true,
+    maxLength: 512,
+    description: '服务端本地保存代币图标 PNG/JPG/WebP/GIF 文件的目录。',
+  },
+  {
+    key: 'tokenIconRegistry',
+    group: 'wallet',
+    label: '自定义代币图标库',
+    type: 'json',
+    defaultValue: BOOTSTRAP_TOKEN_ICON_REGISTRY,
+    description: '用户在客户端手动添加代币时，服务端先按合约地址匹配这里配置的图标；未配置时会自动查找 tokenIconDir 下的 合约地址.png，并尝试从公开代币图库解析。支持数组 [{symbol, contractAddress, iconUrl}]，也支持对象 {"0x...":"xxx.png"}。',
+  },
+  {
+    key: 'tokenPriceAutoEnabled',
+    group: 'wallet',
+    label: '自动获取代币行情价格',
+    type: 'number',
+    defaultValue: BOOTSTRAP_TOKEN_PRICE_AUTO_ENABLED ? 1 : 0,
+    min: 0,
+    max: 1,
+    description: '1=启用服务端自动按 BSC 合约地址查询行情价格；0=只使用后台手动配置价格。',
+  },
+  {
+    key: 'tokenPriceExternalTtlSeconds',
+    group: 'wallet',
+    label: '行情价格缓存时间（秒）',
+    type: 'number',
+    defaultValue: BOOTSTRAP_TOKEN_PRICE_EXTERNAL_TTL_SECONDS,
+    min: 30,
+    max: 86400,
+    description: '服务端从外部行情源获取代币价格后的缓存时间。当前默认 60 秒；如果外部接口限流，可调高到 300-900 秒。',
+  },
+  {
+    key: 'tokenPriceProviderOrder',
+    group: 'wallet',
+    label: '行情价格来源优先级',
+    type: 'json',
+    defaultValue: BOOTSTRAP_TOKEN_PRICE_PROVIDER_ORDER,
+    description: '数组格式，例如 ["dexscreener","defillama","coingecko"]。服务端会按顺序尝试，找到有效价格即返回。',
+  },
+  {
+    key: 'tokenPriceRegistry',
+    group: 'wallet',
+    label: '自定义代币价格库',
+    type: 'json',
+    defaultValue: BOOTSTRAP_TOKEN_PRICE_REGISTRY,
+    description: '手动价格兜底库。支持数组 [{symbol, contractAddress, priceUsd}]，也支持对象 {"0x...":"0.123"}。优先级高于外部行情源。',
+  },
+  {
     key: 'walletTokens',
     group: 'wallet',
     label: '默认钱包代币列表',
     type: 'json',
     defaultValue: BUILTIN_DEFAULT_WALLET_TOKENS,
-    description: '客户端 /api/v1/wallet/default-tokens 返回的默认代币数组；每个代币可配置 priceUsd，用于客户端计算美元估值。',
+    description: '客户端 /api/v1/wallet/default-tokens 返回的默认代币数组；每个代币可配置 priceUsd 和 iconUrl。iconUrl 留空时会自动查找 tokenIconDir 下的 合约地址.png。',
   },
 ];
 const RUNTIME_SETTING_DEFINITION_MAP = new Map(RUNTIME_SETTING_DEFINITIONS.map((definition) => [definition.key, definition]));
@@ -735,13 +823,13 @@ function normalizeSettingString(value, definition) {
   if (definition.key === 'publicHost' || definition.key === 'appUploadUrlBase') {
     text = text.replace(/\/+$/, '');
   }
-  if (definition.key === 'appUploadPublicPath') {
+  if (definition.key === 'appUploadPublicPath' || definition.key === 'tokenIconPublicPath') {
     text = normalizePublicPath(text || definition.defaultValue);
     if (!text.startsWith('/uploads')) {
-      throw new Error('APK 公开下载路径必须以 /uploads 开头，避免覆盖管理后台或业务接口');
+      throw new Error(`${definition.label}必须以 /uploads 开头，避免覆盖管理后台或业务接口`);
     }
   }
-  if (definition.key === 'appUploadDir') {
+  if (definition.key === 'appUploadDir' || definition.key === 'tokenIconDir') {
     if (!text) text = definition.defaultValue;
     text = path.resolve(text);
   }
@@ -771,22 +859,185 @@ function normalizeSettingNumber(value, definition) {
   return integer;
 }
 
+function decimalNumberToPlainString(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return '';
+  if (number === 0) return '0';
+  if (number >= 1e-6 && number < 1e21) {
+    const text = String(number);
+    return text.includes('e') || text.includes('E')
+      ? number.toFixed(18).replace(/0+$/, '').replace(/\.$/, '')
+      : text;
+  }
+  return number.toFixed(24).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 function normalizeTokenPriceUsd(value, fallback = '0') {
   if (value === undefined || value === null || value === '') return String(fallback);
   const text = String(value).trim().replace(/,/g, '');
   if (!text) return String(fallback);
-  if (!/^(?:\d+|\d*\.\d+)$/.test(text)) return String(fallback);
   const number = Number(text);
   if (!Number.isFinite(number) || number < 0) return String(fallback);
-  // 保留字符串，避免 JSON / MySQL 往返时把小数精度压成科学计数法。
-  let normalized = text.replace(/^0+(?=\d)/, '') || '0';
-  if (normalized.startsWith('.')) normalized = `0${normalized}`;
-  return normalized;
+
+  let normalized = '';
+  if (/[eE]/.test(text)) {
+    normalized = decimalNumberToPlainString(number);
+  } else if (/^(?:\d+|\d*\.\d+)$/.test(text)) {
+    normalized = text.replace(/^0+(?=\d)/, '') || '0';
+    if (normalized.startsWith('.')) normalized = `0${normalized}`;
+  } else {
+    normalized = decimalNumberToPlainString(number);
+  }
+  return normalized || String(fallback);
 }
 
 function tokenPriceUsdFromItem(item) {
   if (!item || typeof item !== 'object') return '0';
   return normalizeTokenPriceUsd(item.priceUsd ?? item.usdPrice ?? item.price ?? item.price_usd, '0');
+}
+
+function normalizeTokenIconUrlForStorage(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  return text.slice(0, 1024);
+}
+
+function normalizeTokenIconRegistrySetting(value) {
+  let tokens = value;
+  if (typeof tokens === 'string') {
+    const raw = tokens.trim();
+    tokens = raw ? JSON.parse(raw) : [];
+  }
+
+  // 支持两种配置格式：
+  // 1) [{ symbol, contractAddress, iconUrl, decimals, priceUsd }]
+  // 2) { "0x...": "etz.png", "0x...": { "symbol": "ETZ", "iconUrl": "etz.png" } }
+  if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
+    if (Array.isArray(tokens.tokens)) {
+      tokens = tokens.tokens;
+    } else {
+      tokens = Object.entries(tokens).map(([contractAddress, item]) => {
+        if (item && typeof item === 'object') {
+          return { contractAddress, ...item };
+        }
+        return { contractAddress, iconUrl: item };
+      });
+    }
+  }
+
+  if (!Array.isArray(tokens)) throw new Error('自定义代币图标库必须是数组或对象');
+  if (tokens.length > 500) throw new Error('自定义代币图标库最多配置 500 个');
+
+  const result = [];
+  const seen = new Set();
+  tokens.forEach((item, index) => {
+    if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 个代币图标配置无效`);
+    const symbol = String(item.symbol || item.tokenSymbol || '').trim().slice(0, 32);
+    const contractAddressRaw = String(item.contractAddress || item.tokenAddress || item.address || '').trim();
+    const contractAddress = normalizeAddress(contractAddressRaw);
+    if (!contractAddress) throw new Error(`第 ${index + 1} 个代币 contractAddress 无效`);
+
+    const decimalsRaw = item.decimals ?? item.tokenDecimals;
+    let decimals = Number(decimalsRaw);
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) decimals = 18;
+
+    const priceUsd = tokenPriceUsdFromItem(item);
+    const iconUrl = normalizeTokenIconUrlForStorage(item.iconUrl ?? item.icon_url ?? item.logoUrl ?? item.logo ?? item.imageUrl ?? item.image ?? '');
+    if (!iconUrl) throw new Error(`第 ${index + 1} 个代币 iconUrl 不能为空`);
+
+    if (seen.has(contractAddress)) return;
+    seen.add(contractAddress);
+    result.push({ symbol, contractAddress, decimals, priceUsd, iconUrl });
+  });
+  return result;
+}
+
+function parseTokenIconRegistryForBootstrap(value) {
+  try {
+    return normalizeTokenIconRegistrySetting(value);
+  } catch (_) {
+    return [];
+  }
+}
+
+const TOKEN_PRICE_PROVIDER_ALLOW_LIST = new Set(['dexscreener', 'defillama', 'coingecko']);
+
+function normalizeTokenPriceProviderOrderSetting(value) {
+  let providers = value;
+  if (typeof providers === 'string') {
+    const raw = providers.trim();
+    if (!raw) return ['dexscreener', 'defillama', 'coingecko'];
+    if (raw.startsWith('[')) providers = JSON.parse(raw);
+    else providers = raw.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(providers)) throw new Error('行情价格来源优先级必须是数组');
+  const result = [];
+  const seen = new Set();
+  providers.forEach((item) => {
+    const provider = String(item || '').trim().toLowerCase();
+    if (!TOKEN_PRICE_PROVIDER_ALLOW_LIST.has(provider) || seen.has(provider)) return;
+    seen.add(provider);
+    result.push(provider);
+  });
+  return result.length ? result : ['dexscreener', 'defillama', 'coingecko'];
+}
+
+function normalizeTokenPriceProviderOrderForBootstrap(value) {
+  try {
+    return normalizeTokenPriceProviderOrderSetting(value);
+  } catch (_) {
+    return ['dexscreener', 'defillama', 'coingecko'];
+  }
+}
+
+function normalizeTokenPriceRegistrySetting(value) {
+  let tokens = value;
+  if (typeof tokens === 'string') {
+    const raw = tokens.trim();
+    tokens = raw ? JSON.parse(raw) : [];
+  }
+
+  // 支持：
+  // 1) [{ symbol, contractAddress, priceUsd }]
+  // 2) { "0x...": "0.123", "0x...": { "symbol": "ABC", "priceUsd": "0.123" } }
+  if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
+    if (Array.isArray(tokens.tokens)) {
+      tokens = tokens.tokens;
+    } else {
+      tokens = Object.entries(tokens).map(([contractAddress, item]) => {
+        if (item && typeof item === 'object') return { contractAddress, ...item };
+        return { contractAddress, priceUsd: item };
+      });
+    }
+  }
+
+  if (!Array.isArray(tokens)) throw new Error('自定义代币价格库必须是数组或对象');
+  if (tokens.length > 1000) throw new Error('自定义代币价格库最多配置 1000 个');
+
+  const result = [];
+  const seen = new Set();
+  tokens.forEach((item, index) => {
+    if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 个代币价格配置无效`);
+    const symbol = String(item.symbol || item.tokenSymbol || '').trim().slice(0, 32);
+    const contractAddressRaw = String(item.contractAddress || item.tokenAddress || item.address || '').trim();
+    const contractAddress = normalizeAddress(contractAddressRaw);
+    if (!contractAddress && !symbol) throw new Error(`第 ${index + 1} 个代币价格配置必须填写 contractAddress 或 symbol`);
+    const priceUsd = tokenPriceUsdFromItem(item);
+    if (Number(priceUsd) <= 0) throw new Error(`第 ${index + 1} 个代币 priceUsd 必须大于 0`);
+    const key = contractAddress || `symbol:${symbol.toUpperCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push({ symbol, contractAddress, tokenAddress: contractAddress, priceUsd });
+  });
+  return result;
+}
+
+function parseTokenPriceRegistryForBootstrap(value) {
+  try {
+    return normalizeTokenPriceRegistrySetting(value);
+  } catch (_) {
+    return [];
+  }
 }
 
 function normalizeWalletTokensSetting(value) {
@@ -810,7 +1061,8 @@ function normalizeWalletTokensSetting(value) {
       throw new Error(`第 ${index + 1} 个代币 decimals 必须是 0-36 的整数`);
     }
     const priceUsd = tokenPriceUsdFromItem(item);
-    return { symbol, contractAddress, decimals, priceUsd };
+    const iconUrl = normalizeTokenIconUrlForStorage(item.iconUrl ?? item.icon_url ?? item.logoUrl ?? item.logo ?? item.imageUrl ?? item.image ?? '');
+    return { symbol, contractAddress, decimals, priceUsd, iconUrl };
   });
 }
 
@@ -821,6 +1073,9 @@ function normalizeSettingValueForStorage(key, value) {
   if (definition.type === 'number') return normalizeSettingNumber(value, definition);
   if (definition.type === 'json') {
     if (key === 'walletTokens') return normalizeWalletTokensSetting(value);
+    if (key === 'tokenIconRegistry') return normalizeTokenIconRegistrySetting(value);
+    if (key === 'tokenPriceRegistry') return normalizeTokenPriceRegistrySetting(value);
+    if (key === 'tokenPriceProviderOrder') return normalizeTokenPriceProviderOrderSetting(value);
     if (key === 'rpcUrls') return normalizeRpcUrlsSetting(value);
     return typeof value === 'string' ? JSON.parse(value) : value;
   }
@@ -854,6 +1109,18 @@ function buildRuntimeSettingsFromRows(rows = []) {
   settings.maxApkUploadBytes = settings.maxApkUploadMB * 1024 * 1024;
   settings.appUploadPublicPath = normalizePublicPath(settings.appUploadPublicPath || BOOTSTRAP_APP_UPLOAD_PUBLIC_PATH);
   settings.appUploadDir = path.resolve(settings.appUploadDir || BOOTSTRAP_APP_UPLOAD_DIR);
+  settings.tokenIconPublicPath = normalizePublicPath(settings.tokenIconPublicPath || BOOTSTRAP_TOKEN_ICON_PUBLIC_PATH);
+  settings.tokenIconDir = path.resolve(settings.tokenIconDir || BOOTSTRAP_TOKEN_ICON_DIR);
+  settings.bnbIconUrl = normalizeTokenIconUrlForStorage(settings.bnbIconUrl || '');
+  settings.tokenIconRegistry = Array.isArray(settings.tokenIconRegistry) ? settings.tokenIconRegistry : [];
+  settings.tokenPriceRegistry = Array.isArray(settings.tokenPriceRegistry) ? settings.tokenPriceRegistry : [];
+  settings.tokenPriceAutoEnabled = Number(settings.tokenPriceAutoEnabled ?? 1) === 1 ? 1 : 0;
+  settings.tokenPriceExternalTtlSeconds = Math.min(Math.max(Number(settings.tokenPriceExternalTtlSeconds || BOOTSTRAP_TOKEN_PRICE_EXTERNAL_TTL_SECONDS), 30), 86400);
+  try {
+    settings.tokenPriceProviderOrder = normalizeTokenPriceProviderOrderSetting(settings.tokenPriceProviderOrder);
+  } catch (_) {
+    settings.tokenPriceProviderOrder = BOOTSTRAP_TOKEN_PRICE_PROVIDER_ORDER;
+  }
   settings.publicHost = String(settings.publicHost || BOOTSTRAP_PUBLIC_HOST).replace(/\/+$/, '');
   settings.appUploadUrlBase = String(settings.appUploadUrlBase || '').trim().replace(/\/+$/, '');
   try {
@@ -918,6 +1185,17 @@ async function getRuntimeSettings(force = false) {
   return values;
 }
 
+async function ensureRuntimeDirectories() {
+  try {
+    const settings = await getRuntimeSettings(true);
+    await fs.promises.mkdir(path.resolve(settings.appUploadDir || BOOTSTRAP_APP_UPLOAD_DIR), { recursive: true });
+    await fs.promises.mkdir(path.resolve(settings.tokenIconDir || BOOTSTRAP_TOKEN_ICON_DIR), { recursive: true });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('[runtime-directory-ensure-error]', error?.message || error);
+  }
+}
+
 function sanitizeOriginalFilename(value) {
   const basename = path.basename(String(value || 'app.apk')).trim();
   const safe = basename.replace(/[^a-zA-Z0-9._()\-\u4e00-\u9fa5 ]/g, '_').slice(0, 180);
@@ -939,6 +1217,13 @@ function createClientUploadError(message, statusCode = 400) {
   return error;
 }
 
+function formatUploadSizeLimit(bytes) {
+  const value = Number(bytes || 0);
+  if (value >= 1024 * 1024) return `${Math.floor(value / 1024 / 1024)}MB`;
+  if (value >= 1024) return `${Math.floor(value / 1024)}KB`;
+  return `${value}B`;
+}
+
 function readRequestBody(req, maxBytes, maxFileBytes = maxBytes) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -950,7 +1235,7 @@ function readRequestBody(req, maxBytes, maxFileBytes = maxBytes) {
       total += chunk.length;
       if (total > maxBytes) {
         settled = true;
-        reject(createClientUploadError(`APK 文件不能超过 ${Math.floor(maxFileBytes / 1024 / 1024)}MB`, 413));
+        reject(createClientUploadError(`上传文件不能超过 ${formatUploadSizeLimit(maxFileBytes)}`, 413));
         req.destroy();
         return;
       }
@@ -999,7 +1284,7 @@ async function parseMultipartForm(req, maxBytes, maxFileBytes = maxBytes) {
   const contentType = String(req.get('content-type') || '');
   const boundaryMatch = contentType.match(/multipart\/form-data\s*;\s*boundary=(?:"([^"]+)"|([^;]+))/i);
   const boundaryText = (boundaryMatch?.[1] || boundaryMatch?.[2] || '').trim();
-  if (!boundaryText) throw createClientUploadError('请使用 multipart/form-data 上传 APK');
+  if (!boundaryText) throw createClientUploadError('请使用 multipart/form-data 上传文件');
 
   const body = await readRequestBody(req, maxBytes, maxFileBytes);
   const boundary = Buffer.from(`--${boundaryText}`);
@@ -1073,6 +1358,64 @@ async function saveUploadedApk(file, versionCode, settings) {
     apkOriginalName: originalName,
     apkSizeBytes: file.size,
     apkSha256: sha256,
+  };
+}
+
+function detectTokenIconExtension(buffer, originalName = '', mimeType = '') {
+  const nameExt = path.extname(String(originalName || '')).toLowerCase().replace(/^\./, '');
+  const normalizedNameExt = nameExt === 'jpeg' ? 'jpg' : nameExt;
+  const mime = String(mimeType || '').toLowerCase();
+
+  let magicExt = '';
+  if (buffer && buffer.length >= 12) {
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) magicExt = 'png';
+    else if (buffer[0] === 0xff && buffer[1] === 0xd8) magicExt = 'jpg';
+    else if (buffer.slice(0, 6).toString('ascii') === 'GIF87a' || buffer.slice(0, 6).toString('ascii') === 'GIF89a') magicExt = 'gif';
+    else if (buffer.slice(0, 4).toString('ascii') === 'RIFF' && buffer.slice(8, 12).toString('ascii') === 'WEBP') magicExt = 'webp';
+  }
+
+  if (magicExt) return magicExt;
+  if (['png', 'jpg', 'webp', 'gif'].includes(normalizedNameExt) && mime.startsWith('image/')) return normalizedNameExt;
+  return '';
+}
+
+async function saveUploadedTokenIcon(file, settings, fields = {}) {
+  if (!file || !file.buffer || !file.size) return null;
+
+  const maxBytes = BOOTSTRAP_MAX_TOKEN_ICON_UPLOAD_BYTES;
+  if (file.size > maxBytes) {
+    throw createClientUploadError(`代币图标不能超过 ${formatUploadSizeLimit(maxBytes)}`, 413);
+  }
+
+  const ext = detectTokenIconExtension(file.buffer, file.originalName, file.mimeType);
+  if (!ext) {
+    throw createClientUploadError('只支持 PNG、JPG、WebP、GIF 图片');
+  }
+
+  const uploadDir = path.resolve(settings?.tokenIconDir || BOOTSTRAP_TOKEN_ICON_DIR);
+  await fs.promises.mkdir(uploadDir, { recursive: true });
+
+  const sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+  const requestedName = String(fields.filename || fields.fileName || fields.name || '').trim();
+  let filename = '';
+  if (requestedName) {
+    const safeRequested = sanitizeOriginalFilename(requestedName);
+    const base = safeRequested.replace(/\.[^.]*$/, '') || `token-${Date.now()}-${sha256.slice(0, 12)}`;
+    filename = `${base}.${ext}`;
+  } else {
+    const contractAddress = normalizeAddress(fields.contractAddress || fields.tokenAddress || fields.address || '');
+    filename = contractAddress ? `${contractAddress}.${ext}` : `token-${Date.now()}-${sha256.slice(0, 12)}.${ext}`;
+  }
+  const filePath = path.join(uploadDir, filename);
+  await fs.promises.writeFile(filePath, file.buffer);
+
+  return {
+    filename,
+    iconUrl: resolveTokenIconUrl(filename, settings),
+    sizeBytes: file.size,
+    sha256,
+    mimeType: file.mimeType || `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+    publicPath: normalizePublicPath(settings?.tokenIconPublicPath || BOOTSTRAP_TOKEN_ICON_PUBLIC_PATH),
   };
 }
 
@@ -1318,6 +1661,24 @@ class MySqlDB {
           current,
         ],
       );
+    }
+
+    const tokenPriceTtlDefinition = RUNTIME_SETTING_DEFINITION_MAP.get('tokenPriceExternalTtlSeconds');
+    if (tokenPriceTtlDefinition) {
+      await this.pool.query(
+        `UPDATE system_settings
+         SET setting_value = ?, label = ?, description = ?, updated_at = ?
+         WHERE setting_key = 'tokenPriceExternalTtlSeconds'
+           AND updated_by = 'env-bootstrap'
+           AND setting_value = '300'`,
+        [
+          serializeSettingValue(tokenPriceTtlDefinition.defaultValue, tokenPriceTtlDefinition.type),
+          tokenPriceTtlDefinition.label,
+          tokenPriceTtlDefinition.description || '',
+          current,
+        ],
+      );
+      clearRuntimeSettingsCache();
     }
   }
 
@@ -2532,6 +2893,106 @@ function fetchJsonHttps(url, timeoutMs = 4000) {
   });
 }
 
+
+const tokenExternalIconCache = new Map();
+
+function trustWalletAssetIconUrlForContract(contractAddress) {
+  const address = normalizeAddress(contractAddress || '');
+  if (!address || address === ZERO_ADDRESS) return '';
+  try {
+    return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/assets/${getAddress(address)}/logo.png`;
+  } catch (_) {
+    return '';
+  }
+}
+
+function requestRemoteImageHead(url, timeoutMs = 2500, redirectsLeft = 2) {
+  return new Promise((resolve) => {
+    let parsed;
+    try {
+      parsed = new URL(String(url || '').trim());
+    } catch (_) {
+      resolve({ ok: false, statusCode: 0, contentType: '', url: '' });
+      return;
+    }
+
+    if (parsed.protocol !== 'https:') {
+      resolve({ ok: false, statusCode: 0, contentType: '', url: parsed.toString() });
+      return;
+    }
+
+    const req = https.request(parsed, {
+      method: 'HEAD',
+      timeout: timeoutMs,
+      headers: {
+        Accept: 'image/*,*/*;q=0.6',
+        'User-Agent': 'TelegramWalletTokenIconResolver/1.0',
+      },
+    }, (res) => {
+      const statusCode = Number(res.statusCode || 0);
+      const location = String(res.headers.location || '').trim();
+      const contentType = String(res.headers['content-type'] || '').toLowerCase();
+      res.resume();
+
+      if (statusCode >= 300 && statusCode < 400 && location && redirectsLeft > 0) {
+        try {
+          const nextUrl = new URL(location, parsed).toString();
+          requestRemoteImageHead(nextUrl, timeoutMs, redirectsLeft - 1).then(resolve);
+          return;
+        } catch (_) {
+          // fall through to false.
+        }
+      }
+
+      const okStatus = statusCode >= 200 && statusCode < 300;
+      const okType = !contentType || contentType.startsWith('image/') || contentType.includes('octet-stream');
+      resolve({ ok: okStatus && okType, statusCode, contentType, url: parsed.toString() });
+    });
+
+    req.on('timeout', () => req.destroy(new Error('token icon lookup timeout')));
+    req.on('error', () => resolve({ ok: false, statusCode: 0, contentType: '', url: parsed.toString() }));
+    req.end();
+  });
+}
+
+async function getVerifiedExternalTokenIconUrl(contractAddress) {
+  const url = trustWalletAssetIconUrlForContract(contractAddress);
+  if (!url) return '';
+
+  const nowMs = Date.now();
+  const cached = tokenExternalIconCache.get(url);
+  if (cached && cached.expiresAt > nowMs) {
+    return cached.ok ? cached.url : '';
+  }
+
+  const result = await requestRemoteImageHead(url, 2500, 2);
+  tokenExternalIconCache.set(url, {
+    ok: Boolean(result.ok),
+    url: result.ok ? (result.url || url) : url,
+    expiresAt: nowMs + (result.ok ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000),
+  });
+  return result.ok ? (result.url || url) : '';
+}
+
+async function enrichTokenMetadataWithAutoIcon(metadata) {
+  if (!metadata || metadata.iconUrl) return metadata;
+  const address = normalizeAddress(metadata.contractAddress || metadata.tokenAddress || '');
+  if (!address || address === ZERO_ADDRESS) return metadata;
+
+  const iconUrl = await getVerifiedExternalTokenIconUrl(address);
+  if (!iconUrl) return metadata;
+
+  return {
+    ...metadata,
+    contractAddress: address,
+    tokenAddress: address,
+    iconUrl,
+    source: metadata.source && metadata.source !== 'not-configured'
+      ? `${metadata.source}+trustwallet-assets`
+      : 'trustwallet-assets',
+  };
+}
+
 async function getBnbPriceUsdCached(force = false) {
   const nowMs = Date.now();
   if (!force && tokenPriceCache.bnbExpiresAtMs > nowMs) {
@@ -2556,26 +3017,512 @@ async function getBnbPriceUsdCached(force = false) {
   return tokenPriceCache.bnbPriceUsd || '0';
 }
 
-function buildWalletTokenPriceRows(settings, bnbPriceUsd) {
+const tokenExternalPriceCache = new Map();
+
+function parseExternalPriceUsd(value) {
+  const normalized = normalizeTokenPriceUsd(value, '0');
+  return Number(normalized) > 0 ? normalized : '0';
+}
+
+function getTokenPriceCacheKey(contractAddress) {
+  const address = normalizeAddress(contractAddress || '');
+  return address || '';
+}
+
+async function fetchDefiLlamaTokenPriceUsd(contractAddress) {
+  const address = normalizeAddress(contractAddress || '');
+  if (!address || address === ZERO_ADDRESS) return null;
+  const checksumAddress = getAddress(address);
+  const ids = [`bsc:${checksumAddress}`, `bsc:${address}`];
+  const encoded = encodeURIComponent(ids[0]);
+  const urls = [
+    `https://api.llama.fi/prices/current/${encoded}?searchWidth=4h`,
+    `https://coins.llama.fi/prices/current/${encoded}?searchWidth=4h`,
+  ];
+  let item = null;
+  for (const url of urls) {
+    try {
+      const json = await fetchJsonHttps(url, 4500);
+      const coins = json?.coins || {};
+      item = coins[ids[0]] || coins[ids[1]] || coins[ids[0].toLowerCase()] || coins[ids[1].toLowerCase()];
+      if (item) break;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[defillama-price-fetch-error]', error?.message || error);
+    }
+  }
+  const priceUsd = parseExternalPriceUsd(item?.price);
+  if (Number(priceUsd) <= 0) return null;
+  return {
+    priceUsd,
+    source: 'defillama',
+    updatedAt: Number(item?.timestamp || 0) || nowSeconds(),
+    confidence: Number.isFinite(Number(item?.confidence)) ? Number(item.confidence) : undefined,
+  };
+}
+
+async function fetchCoinGeckoTokenPriceUsd(contractAddress) {
+  const address = normalizeAddress(contractAddress || '');
+  if (!address || address === ZERO_ADDRESS) return null;
+  const json = await fetchJsonHttps(`https://api.coingecko.com/api/v3/simple/token_price/binance-smart-chain?contract_addresses=${encodeURIComponent(address)}&vs_currencies=usd`, 4500);
+  const item = json?.[address] || json?.[address.toLowerCase()] || json?.[getAddress(address)];
+  const priceUsd = parseExternalPriceUsd(item?.usd);
+  if (Number(priceUsd) <= 0) return null;
+  return { priceUsd, source: 'coingecko', updatedAt: nowSeconds() };
+}
+
+async function fetchDexScreenerTokenPriceUsd(contractAddress) {
+  const address = normalizeAddress(contractAddress || '');
+  if (!address || address === ZERO_ADDRESS) return null;
+  const json = await fetchJsonHttps(`https://api.dexscreener.com/tokens/v1/bsc/${encodeURIComponent(address)}`, 4500);
+  const pairs = Array.isArray(json) ? json : (Array.isArray(json?.pairs) ? json.pairs : []);
+  const candidates = pairs
+    .filter((pair) => {
+      const chainId = String(pair?.chainId || '').toLowerCase();
+      const baseAddress = normalizeAddress(pair?.baseToken?.address || '');
+      const priceUsd = parseExternalPriceUsd(pair?.priceUsd);
+      return chainId === 'bsc' && baseAddress === address && Number(priceUsd) > 0;
+    })
+    .map((pair) => ({
+      priceUsd: parseExternalPriceUsd(pair.priceUsd),
+      liquidityUsd: Number(pair?.liquidity?.usd || 0) || 0,
+      pairAddress: String(pair?.pairAddress || ''),
+      dexId: String(pair?.dexId || ''),
+    }))
+    .sort((a, b) => b.liquidityUsd - a.liquidityUsd);
+  if (!candidates.length) return null;
+  return {
+    priceUsd: candidates[0].priceUsd,
+    source: 'dexscreener',
+    updatedAt: nowSeconds(),
+    liquidityUsd: candidates[0].liquidityUsd,
+    pairAddress: candidates[0].pairAddress,
+    dexId: candidates[0].dexId,
+  };
+}
+
+async function fetchExternalTokenPriceUsd(provider, contractAddress) {
+  if (provider === 'defillama') return fetchDefiLlamaTokenPriceUsd(contractAddress);
+  if (provider === 'coingecko') return fetchCoinGeckoTokenPriceUsd(contractAddress);
+  if (provider === 'dexscreener') return fetchDexScreenerTokenPriceUsd(contractAddress);
+  return null;
+}
+
+function getPriceProviderOrder(settings) {
+  try {
+    return normalizeTokenPriceProviderOrderSetting(settings?.tokenPriceProviderOrder || BOOTSTRAP_TOKEN_PRICE_PROVIDER_ORDER);
+  } catch (_) {
+    return BOOTSTRAP_TOKEN_PRICE_PROVIDER_ORDER;
+  }
+}
+
+
+function getKnownStableTokenPriceUsd(contractAddress) {
+  const address = normalizeAddress(contractAddress || '');
+  if (!address || !BSC_STABLE_PRICE_ADDRESSES.has(address)) return null;
+  return {
+    contractAddress: address,
+    tokenAddress: address,
+    priceUsd: '1',
+    source: 'stablecoin-address',
+    updatedAt: nowSeconds(),
+  };
+}
+
+async function getExternalTokenPriceUsdCached(contractAddress, settings, force = false) {
+  const address = getTokenPriceCacheKey(contractAddress);
+  if (!address || address === ZERO_ADDRESS) return null;
+  const stablePrice = getKnownStableTokenPriceUsd(address);
+  if (stablePrice) return stablePrice;
+  if (Number(settings?.tokenPriceAutoEnabled ?? 1) !== 1) return null;
+  const nowMs = Date.now();
+  const cached = tokenExternalPriceCache.get(address);
+  if (!force && cached && cached.expiresAt > nowMs) return cached.ok ? cached.data : null;
+  for (const provider of getPriceProviderOrder(settings)) {
+    try {
+      const result = await fetchExternalTokenPriceUsd(provider, address);
+      if (result && Number(result.priceUsd) > 0) {
+        const ttlSeconds = Math.min(Math.max(Number(settings?.tokenPriceExternalTtlSeconds || BOOTSTRAP_TOKEN_PRICE_EXTERNAL_TTL_SECONDS), 30), 86400);
+        const data = {
+          contractAddress: address,
+          tokenAddress: address,
+          priceUsd: normalizeTokenPriceUsd(result.priceUsd, '0'),
+          source: result.source || provider,
+          updatedAt: Number(result.updatedAt || 0) || nowSeconds(),
+          confidence: result.confidence,
+          liquidityUsd: result.liquidityUsd,
+          pairAddress: result.pairAddress || '',
+          dexId: result.dexId || '',
+        };
+        tokenExternalPriceCache.set(address, { ok: true, data, expiresAt: nowMs + ttlSeconds * 1000 });
+        return data;
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[token-price-fetch-error]', provider, address, error?.message || error);
+    }
+  }
+  tokenExternalPriceCache.set(address, { ok: false, data: null, expiresAt: nowMs + 60 * 1000 });
+  return null;
+}
+
+async function enrichTokenMetadataWithAutoPrice(metadata, settings, force = false) {
+  if (!metadata) return metadata;
+  const address = normalizeAddress(metadata.contractAddress || metadata.tokenAddress || '');
+  const existingPrice = normalizeTokenPriceUsd(metadata.priceUsd, '0');
+  if (Number(existingPrice) > 0) {
+    return { ...metadata, priceUsd: existingPrice, priceSource: metadata.priceSource || metadata.source || 'server-config' };
+  }
+  if (address === ZERO_ADDRESS || String(metadata.symbol || '').trim().toUpperCase() === 'BNB') {
+    const bnbPriceUsd = await getBnbPriceUsdCached(force);
+    return { ...metadata, contractAddress: ZERO_ADDRESS, tokenAddress: ZERO_ADDRESS, priceUsd: normalizeTokenPriceUsd(bnbPriceUsd, '0'), priceSource: 'binance:BNBUSDT', source: metadata.source && metadata.source !== 'not-configured' ? `${metadata.source}+binance:BNBUSDT` : 'binance:BNBUSDT', updatedAt: tokenPriceCache.bnbCheckedAt || nowSeconds() };
+  }
+  const resolved = await getExternalTokenPriceUsdCached(address, settings, force);
+  if (!resolved || Number(resolved.priceUsd) <= 0) return { ...metadata, priceUsd: '0', priceSource: metadata.priceSource || 'not-configured' };
+  return {
+    ...metadata,
+    contractAddress: address,
+    tokenAddress: address,
+    priceUsd: resolved.priceUsd,
+    priceSource: resolved.source,
+    liquidityUsd: resolved.liquidityUsd ?? metadata.liquidityUsd,
+    priceConfidence: resolved.confidence ?? metadata.priceConfidence,
+    pairAddress: resolved.pairAddress || metadata.pairAddress || '',
+    dexId: resolved.dexId || metadata.dexId || '',
+    source: metadata.source && metadata.source !== 'not-configured' ? `${metadata.source}+${resolved.source}` : resolved.source,
+    updatedAt: resolved.updatedAt || metadata.updatedAt || nowSeconds(),
+  };
+}
+
+async function enrichTokenMetadata(metadata, settings, options = {}) {
+  const withIcon = await enrichTokenMetadataWithAutoIcon(metadata);
+  return enrichTokenMetadataWithAutoPrice(withIcon, settings, Boolean(options.forcePrice));
+}
+
+async function enrichTokenMetadataRows(rows, settings, options = {}) {
+  const enriched = await Promise.all((Array.isArray(rows) ? rows : []).map((row) => enrichTokenMetadata(row, settings, options)));
+  return mergeTokenMetadataRows(enriched);
+}
+
+function parseContractAddressList(value, maxItems = 100) {
+  const seen = new Set();
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, maxItems)
+    .map((item) => normalizeAddress(item))
+    .filter((address) => {
+      if (!address || seen.has(address)) return false;
+      seen.add(address);
+      return true;
+    });
+}
+
+function encodePublicPathSegments(value) {
+  return String(value || '')
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+function resolvePublicAssetUrl(value, settings, publicPath) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.toString();
+  } catch (_) {
+    // Not an absolute URL; continue as path or filename.
+  }
+
+  const publicHost = String(settings?.publicHost || BOOTSTRAP_PUBLIC_HOST).trim().replace(/\/+$/, '');
+  if (!publicHost) return raw;
+  if (raw.startsWith('/')) return `${publicHost}${raw}`;
+  if (raw.includes('/')) return `${publicHost}/${encodePublicPathSegments(raw.replace(/^\/+/, ''))}`;
+  const normalizedPublicPath = normalizePublicPath(publicPath || BOOTSTRAP_TOKEN_ICON_PUBLIC_PATH);
+  return `${publicHost}${normalizedPublicPath}/${encodeURIComponent(raw)}`;
+}
+
+function resolveTokenIconUrl(value, settings) {
+  return resolvePublicAssetUrl(value, settings, settings?.tokenIconPublicPath || BOOTSTRAP_TOKEN_ICON_PUBLIC_PATH);
+}
+
+const TOKEN_ICON_FILE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+
+function sanitizeTokenIconFilenameBase(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.replace(/[^a-zA-Z0-9_.@()\-]/g, '').slice(0, 128);
+}
+
+function buildLocalTokenIconCandidates(contractAddress, symbol) {
+  const bases = [];
+  const seenBase = new Set();
+  const addBase = (value) => {
+    const safe = sanitizeTokenIconFilenameBase(value);
+    if (!safe) return;
+    for (const candidate of [safe, safe.toLowerCase(), safe.toUpperCase()]) {
+      if (!candidate || seenBase.has(candidate)) continue;
+      seenBase.add(candidate);
+      bases.push(candidate);
+    }
+  };
+
+  const address = normalizeAddress(contractAddress || '');
+  if (address && address !== ZERO_ADDRESS) {
+    addBase(address);
+    addBase(address.replace(/^0x/i, ''));
+    try {
+      const checksum = getAddress(address);
+      addBase(checksum);
+      addBase(checksum.replace(/^0x/i, ''));
+    } catch (_) {
+      // normalizeAddress already validates; keep this defensive.
+    }
+  }
+
+  const symbolText = String(symbol || '').trim();
+  if (symbolText && (!address || address === ZERO_ADDRESS)) {
+    addBase(symbolText);
+  }
+  if (address === ZERO_ADDRESS || symbolText.toUpperCase() === 'BNB') {
+    addBase('bnb');
+    addBase('BNB');
+  }
+
+  const filenames = [];
+  const seenFile = new Set();
+  for (const base of bases) {
+    for (const ext of TOKEN_ICON_FILE_EXTENSIONS) {
+      const filename = `${base}.${ext}`;
+      const key = filename.toLowerCase();
+      if (seenFile.has(key)) continue;
+      seenFile.add(key);
+      filenames.push(filename);
+    }
+  }
+  return filenames;
+}
+
+function findLocalTokenIconFilename(settings, contractAddress, symbol) {
+  const iconDir = path.resolve(settings?.tokenIconDir || BOOTSTRAP_TOKEN_ICON_DIR);
+  const candidates = buildLocalTokenIconCandidates(contractAddress, symbol);
+  for (const filename of candidates) {
+    const safeName = path.basename(filename);
+    if (!safeName || safeName !== filename) continue;
+    const filePath = path.join(iconDir, safeName);
+    try {
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        return safeName;
+      }
+    } catch (_) {
+      // Ignore unreadable files and keep checking candidates.
+    }
+  }
+  return '';
+}
+
+function resolveLocalTokenIconUrl(settings, contractAddress, symbol) {
+  const filename = findLocalTokenIconFilename(settings, contractAddress, symbol);
+  return filename ? resolveTokenIconUrl(filename, settings) : '';
+}
+
+function withLocalTokenIcon(metadata, settings) {
+  if (!metadata || metadata.iconUrl) return metadata;
+  const iconUrl = resolveLocalTokenIconUrl(settings, metadata.contractAddress || metadata.tokenAddress || '', metadata.symbol || '');
+  if (!iconUrl) return metadata;
+  return {
+    ...metadata,
+    iconUrl,
+    source: metadata.source && metadata.source !== 'not-configured'
+      ? `${metadata.source}+local-token-icons`
+      : 'local-token-icons',
+  };
+}
+
+function buildWalletTokenRows(settings) {
   const tokenRows = Array.isArray(settings?.walletTokens) ? settings.walletTokens : [];
-  return [
+  return tokenRows
+    .map((token) => ({
+      symbol: String(token?.symbol || '').trim(),
+      contractAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || '') || String(token?.contractAddress || token?.tokenAddress || ''),
+      tokenAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || '') || String(token?.contractAddress || token?.tokenAddress || ''),
+      decimals: Number.isInteger(Number(token?.decimals)) ? Number(token.decimals) : 18,
+      priceUsd: tokenPriceUsdFromItem(token),
+      iconUrl: resolveTokenIconUrl(token?.iconUrl ?? token?.icon_url ?? token?.logoUrl ?? token?.logo ?? token?.imageUrl ?? token?.image ?? '', settings)
+        || resolveLocalTokenIconUrl(settings, token?.contractAddress || token?.tokenAddress || '', token?.symbol || ''),
+      source: 'walletTokens',
+    }))
+    .filter((token) => token.symbol && token.contractAddress);
+}
+
+function buildTokenIconRegistryRows(settings) {
+  const tokenRows = Array.isArray(settings?.tokenIconRegistry) ? settings.tokenIconRegistry : [];
+  return tokenRows
+    .map((token) => ({
+      symbol: String(token?.symbol || token?.tokenSymbol || '').trim(),
+      contractAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || token?.address || '') || String(token?.contractAddress || token?.tokenAddress || token?.address || ''),
+      tokenAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || token?.address || '') || String(token?.contractAddress || token?.tokenAddress || token?.address || ''),
+      decimals: Number.isInteger(Number(token?.decimals ?? token?.tokenDecimals)) ? Number(token.decimals ?? token.tokenDecimals) : 18,
+      priceUsd: tokenPriceUsdFromItem(token),
+      iconUrl: resolveTokenIconUrl(token?.iconUrl ?? token?.icon_url ?? token?.logoUrl ?? token?.logo ?? token?.imageUrl ?? token?.image ?? '', settings)
+        || resolveLocalTokenIconUrl(settings, token?.contractAddress || token?.tokenAddress || token?.address || '', token?.symbol || token?.tokenSymbol || ''),
+      source: 'tokenIconRegistry',
+    }))
+    .filter((token) => token.contractAddress && token.iconUrl);
+}
+
+function buildTokenPriceRegistryRows(settings) {
+  const tokenRows = Array.isArray(settings?.tokenPriceRegistry) ? settings.tokenPriceRegistry : [];
+  return tokenRows
+    .map((token) => {
+      const symbol = String(token?.symbol || token?.tokenSymbol || '').trim();
+      const contractAddress = normalizeAddress(token?.contractAddress || token?.tokenAddress || token?.address || '');
+      return {
+        symbol,
+        contractAddress: contractAddress || String(token?.contractAddress || token?.tokenAddress || token?.address || ''),
+        tokenAddress: contractAddress || String(token?.contractAddress || token?.tokenAddress || token?.address || ''),
+        decimals: Number.isInteger(Number(token?.decimals ?? token?.tokenDecimals)) ? Number(token.decimals ?? token.tokenDecimals) : 18,
+        priceUsd: tokenPriceUsdFromItem(token),
+        iconUrl: '',
+        source: 'tokenPriceRegistry',
+        priceSource: 'tokenPriceRegistry',
+        updatedAt: nowSeconds(),
+      };
+    })
+    .filter((token) => (token.contractAddress || token.symbol) && Number(token.priceUsd) > 0);
+}
+
+function mergeTokenMetadataRows(rows = []) {
+  const byKey = new Map();
+  const orderedKeys = [];
+
+  for (const row of rows) {
+    if (!row) continue;
+    const contractAddress = normalizeAddress(row.contractAddress || row.tokenAddress || '');
+    const symbol = String(row.symbol || '').trim();
+    if (!contractAddress && !symbol) continue;
+    const key = contractAddress || `symbol:${symbol.toUpperCase()}`;
+    const previous = byKey.get(key) || {};
+    if (!byKey.has(key)) orderedKeys.push(key);
+
+    byKey.set(key, {
+      ...previous,
+      ...row,
+      symbol: symbol || previous.symbol || '',
+      contractAddress: contractAddress || previous.contractAddress || row.contractAddress || '',
+      tokenAddress: contractAddress || previous.tokenAddress || row.tokenAddress || '',
+      decimals: Number.isInteger(Number(row.decimals)) ? Number(row.decimals) : (Number.isInteger(Number(previous.decimals)) ? Number(previous.decimals) : 18),
+      priceUsd: Number(tokenPriceUsdFromItem(row)) > 0 ? tokenPriceUsdFromItem(row) : (previous.priceUsd || '0'),
+      priceSource: row.priceSource || previous.priceSource || (Number(tokenPriceUsdFromItem(row)) > 0 ? (row.source || 'server-config') : ''),
+      iconUrl: row.iconUrl || previous.iconUrl || '',
+      source: previous.source && row.source && previous.source !== row.source ? `${previous.source}+${row.source}` : (row.source || previous.source || 'server-config'),
+      updatedAt: row.updatedAt || previous.updatedAt || nowSeconds(),
+    });
+  }
+
+  return orderedKeys.map((key) => byKey.get(key));
+}
+
+function buildTokenMetadataRows(settings, bnbPriceUsd) {
+  const walletRows = buildWalletTokenRows(settings).map((token) => ({
+    symbol: token.symbol,
+    contractAddress: token.contractAddress,
+    tokenAddress: token.tokenAddress,
+    decimals: token.decimals,
+    priceUsd: token.priceUsd,
+    iconUrl: token.iconUrl,
+    source: Number(token.priceUsd) > 0 ? 'walletTokens' : 'not-configured',
+    updatedAt: nowSeconds(),
+  }));
+
+  const registryRows = buildTokenIconRegistryRows(settings).map((token) => ({
+    symbol: token.symbol,
+    contractAddress: token.contractAddress,
+    tokenAddress: token.tokenAddress,
+    decimals: token.decimals,
+    priceUsd: token.priceUsd,
+    iconUrl: token.iconUrl,
+    source: 'tokenIconRegistry',
+    updatedAt: nowSeconds(),
+  }));
+
+  const priceRows = buildTokenPriceRegistryRows(settings).map((token) => ({
+    symbol: token.symbol,
+    contractAddress: token.contractAddress,
+    tokenAddress: token.tokenAddress,
+    decimals: token.decimals,
+    priceUsd: token.priceUsd,
+    iconUrl: '',
+    priceSource: 'tokenPriceRegistry',
+    source: 'tokenPriceRegistry',
+    updatedAt: nowSeconds(),
+  }));
+
+  return mergeTokenMetadataRows([
     {
       symbol: 'BNB',
       contractAddress: ZERO_ADDRESS,
       tokenAddress: ZERO_ADDRESS,
+      decimals: 18,
       priceUsd: normalizeTokenPriceUsd(bnbPriceUsd, '0'),
+      iconUrl: resolveTokenIconUrl(settings?.bnbIconUrl || '', settings) || resolveLocalTokenIconUrl(settings, ZERO_ADDRESS, 'BNB'),
       source: 'binance:BNBUSDT',
       updatedAt: tokenPriceCache.bnbCheckedAt || nowSeconds(),
     },
-    ...tokenRows.map((token) => ({
-      symbol: String(token?.symbol || '').trim(),
-      contractAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || '') || String(token?.contractAddress || token?.tokenAddress || ''),
-      tokenAddress: normalizeAddress(token?.contractAddress || token?.tokenAddress || '') || String(token?.contractAddress || token?.tokenAddress || ''),
-      priceUsd: tokenPriceUsdFromItem(token),
-      source: Number(tokenPriceUsdFromItem(token)) > 0 ? 'server-config' : 'not-configured',
+    ...walletRows,
+    ...registryRows,
+    ...priceRows,
+  ]);
+}
+
+function buildWalletTokenPriceRows(settings, bnbPriceUsd) {
+  return buildTokenMetadataRows(settings, bnbPriceUsd);
+}
+
+function findWalletTokenMetadata(settings, contractAddress, symbol, bnbPriceUsd) {
+  const lookupAddress = normalizeAddress(contractAddress || '');
+  const lookupSymbol = String(symbol || '').trim().toUpperCase();
+  const rows = buildTokenMetadataRows(settings, bnbPriceUsd);
+  let found = null;
+
+  if (lookupAddress) {
+    found = rows.find((row) => normalizeAddress(row.contractAddress || row.tokenAddress || '') === lookupAddress) || null;
+    if (found) {
+      return withLocalTokenIcon(found, settings);
+    }
+    // 传入了合约地址时，不按 symbol 兜底，避免不同合约但同名代币误用别人的图标。
+    return withLocalTokenIcon({
+      symbol: String(symbol || '').trim(),
+      contractAddress: lookupAddress,
+      tokenAddress: lookupAddress,
+      decimals: 18,
+      priceUsd: '0',
+      iconUrl: '',
+      source: 'not-configured',
       updatedAt: nowSeconds(),
-    })).filter((token) => token.symbol),
-  ];
+    }, settings);
+  }
+
+  if (lookupSymbol) {
+    found = rows.find((row) => String(row.symbol || '').trim().toUpperCase() === lookupSymbol) || null;
+  }
+
+  if (found) {
+    return withLocalTokenIcon(found, settings);
+  }
+
+  return withLocalTokenIcon({
+    symbol: String(symbol || '').trim(),
+    contractAddress: String(contractAddress || '').trim(),
+    tokenAddress: String(contractAddress || '').trim(),
+    decimals: 18,
+    priceUsd: '0',
+    iconUrl: '',
+    source: 'not-configured',
+    updatedAt: nowSeconds(),
+  }, settings);
 }
 
 app.get('/healthz', async (_, res) => {
@@ -2654,27 +3601,124 @@ app.get('/api/v1/wallet/chain-config', async (_req, res, next) => {
 app.get('/api/v1/wallet/default-tokens', async (_req, res, next) => {
   try {
     const settings = await getRuntimeSettings();
-    return res.json({ ok: true, data: { tokens: settings.walletTokens } });
+    return res.json({ ok: true, data: { tokens: buildWalletTokenRows(settings) } });
   } catch (error) {
     return next(error);
   }
 });
 
-app.get('/api/v1/wallet/token-prices', async (_req, res, next) => {
+app.get('/api/v1/wallet/token-prices', async (req, res, next) => {
   try {
     const settings = await getRuntimeSettings();
-    const bnbPriceUsd = await getBnbPriceUsdCached(false);
+    const forcePrice = parseBooleanFlag(req.query.force, false);
+    const bnbPriceUsd = await getBnbPriceUsdCached(forcePrice);
+    const requestedAddresses = parseContractAddressList(
+      req.query.contractAddresses || req.query.tokenAddresses || req.query.addresses || '',
+      100,
+    );
+    let rows = buildWalletTokenPriceRows(settings, bnbPriceUsd);
+    if (requestedAddresses.length) {
+      rows = mergeTokenMetadataRows([
+        rows.find((row) => normalizeAddress(row.contractAddress || row.tokenAddress || '') === ZERO_ADDRESS),
+        ...requestedAddresses.map((address) => findWalletTokenMetadata(settings, address, '', bnbPriceUsd)),
+        ...rows,
+      ]);
+    }
+    const prices = await enrichTokenMetadataRows(rows, settings, { forcePrice });
     return res.json({
       ok: true,
       data: {
         baseCurrency: 'USD',
-        prices: buildWalletTokenPriceRows(settings, bnbPriceUsd),
+        prices,
         updatedAt: nowSeconds(),
       },
     });
   } catch (error) {
     return next(error);
   }
+});
+
+app.get(['/api/v1/wallet/token-metadata', '/api/v1/wallet/token-meta'], async (req, res, next) => {
+  try {
+    const contractAddressesRaw = String(req.query.contractAddresses || req.query.tokenAddresses || req.query.addresses || '').trim();
+    const settings = await getRuntimeSettings();
+
+    if (contractAddressesRaw) {
+      const bnbPriceUsd = await getBnbPriceUsdCached(false);
+      const addresses = parseContractAddressList(contractAddressesRaw, 100);
+      const tokens = await Promise.all(addresses.map(async (address) => {
+        const metadata = findWalletTokenMetadata(settings, address, '', bnbPriceUsd);
+        return enrichTokenMetadata(metadata, settings);
+      }));
+
+      return res.json({
+        ok: true,
+        data: {
+          baseCurrency: 'USD',
+          tokens,
+          updatedAt: nowSeconds(),
+        },
+      });
+    }
+
+    const contractAddressRaw = String(req.query.contractAddress || req.query.tokenAddress || req.query.address || '').trim();
+    const symbol = String(req.query.symbol || req.query.tokenSymbol || '').trim().slice(0, 32);
+    const normalizedAddress = normalizeAddress(contractAddressRaw);
+    const isNativeBnb = normalizedAddress === ZERO_ADDRESS || symbol.toUpperCase() === 'BNB';
+
+    if (!normalizedAddress && contractAddressRaw && !isNativeBnb) {
+      return badRequest(res, 'contractAddress invalid');
+    }
+    if (!normalizedAddress && !symbol) {
+      return badRequest(res, 'contractAddress or symbol required');
+    }
+
+    const bnbPriceUsd = isNativeBnb ? await getBnbPriceUsdCached(false) : (tokenPriceCache.bnbPriceUsd || '0');
+    const metadata = await enrichTokenMetadata(
+      findWalletTokenMetadata(settings, normalizedAddress || contractAddressRaw, symbol, bnbPriceUsd),
+      settings,
+    );
+    return res.json({
+      ok: true,
+      data: {
+        ...metadata,
+        baseCurrency: 'USD',
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.use((req, res, next) => {
+  Promise.resolve().then(async () => {
+    if (!['GET', 'HEAD'].includes(req.method)) return next();
+
+    let settings;
+    try {
+      settings = await getRuntimeSettings();
+    } catch (_) {
+      settings = buildRuntimeSettingsFromRows([]);
+    }
+
+    const publicPath = normalizePublicPath(settings.tokenIconPublicPath || BOOTSTRAP_TOKEN_ICON_PUBLIC_PATH);
+    if (req.path !== publicPath && !req.path.startsWith(`${publicPath}/`)) return next();
+
+    const relativePath = decodeURIComponent(req.path.slice(publicPath.length).replace(/^\/+/, ''));
+    const filename = path.basename(relativePath);
+    if (!filename || filename !== relativePath || !/\.(?:png|jpe?g|webp|gif)$/i.test(filename)) {
+      return res.status(404).json({ ok: false, message: 'not found' });
+    }
+
+    const filePath = path.join(path.resolve(settings.tokenIconDir || BOOTSTRAP_TOKEN_ICON_DIR), filename);
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Cache-Control', 'public, max-age=2592000');
+    }
+    return res.sendFile(filePath, (error) => {
+      if (error) return next();
+      return undefined;
+    });
+  }).catch(next);
 });
 
 app.use((req, res, next) => {
@@ -2944,6 +3988,127 @@ app.post(`${ADMIN_BASE_PATH}/client-versions/:id/enabled`, adminRequireAuth, adm
   return res.json({ ok: true, data: version });
 }));
 
+
+app.post([`${ADMIN_BASE_PATH}/token-icons`, `${ADMIN_BASE_PATH}/token-icons/upload`], adminRequireAuth, adminAsync(async (req, res) => {
+  const runtimeSettings = await getRuntimeSettings();
+  let form;
+  try {
+    form = await parseMultipartForm(req, BOOTSTRAP_MAX_TOKEN_ICON_UPLOAD_BYTES + (64 * 1024), BOOTSTRAP_MAX_TOKEN_ICON_UPLOAD_BYTES);
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ ok: false, message: error.message || '图标上传失败' });
+  }
+
+  const uploadFile = (form.files || []).find((file) => ['iconFile', 'tokenIcon', 'image', 'file', 'upload'].includes(file.fieldname));
+  if (!uploadFile) return badRequest(res, '请选择代币图标文件');
+
+  const fields = form.fields || {};
+  const contractAddressRaw = String(fields.contractAddress || fields.tokenAddress || fields.address || '').trim();
+  const contractAddress = contractAddressRaw ? normalizeAddress(contractAddressRaw) : '';
+  if (contractAddressRaw && !contractAddress) return badRequest(res, 'contractAddress invalid');
+
+  const symbol = String(fields.symbol || fields.tokenSymbol || '').trim().slice(0, 32);
+  const decimalsRaw = fields.decimals ?? fields.tokenDecimals;
+  let decimals = Number(decimalsRaw);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) decimals = 18;
+  const priceUsd = normalizeTokenPriceUsd(fields.priceUsd ?? fields.price_usd ?? fields.price, '0');
+
+  try {
+    const icon = await saveUploadedTokenIcon(uploadFile, runtimeSettings, fields);
+    if (!icon) return badRequest(res, '图标保存失败');
+
+    let savedTo = 'fileOnly';
+    let savedToRegistry = false;
+    let tokenIconRegistryCount = Array.isArray(runtimeSettings.tokenIconRegistry) ? runtimeSettings.tokenIconRegistry.length : 0;
+    const shouldSaveToRegistry = parseBooleanFlag(fields.saveToRegistry, Boolean(contractAddress));
+    if (shouldSaveToRegistry) {
+      if (!contractAddress) return badRequest(res, '自动写入 tokenIconRegistry 时必须填写有效合约地址');
+      const currentRegistry = normalizeTokenIconRegistrySetting(runtimeSettings.tokenIconRegistry || []);
+      const nextRegistry = [
+        { symbol, contractAddress, decimals, priceUsd, iconUrl: icon.filename },
+        ...currentRegistry.filter((item) => normalizeAddress(item.contractAddress || item.tokenAddress || item.address || '') !== contractAddress),
+      ];
+      const nextSettings = await db.saveRuntimeSettings({ tokenIconRegistry: nextRegistry }, req.adminUser || ADMIN_USERNAME);
+      savedTo = 'tokenIconRegistry';
+      savedToRegistry = true;
+      tokenIconRegistryCount = Array.isArray(nextSettings.tokenIconRegistry) ? nextSettings.tokenIconRegistry.length : nextRegistry.length;
+    }
+
+    return res.json({
+      ok: true,
+      data: {
+        ...icon,
+        url: icon.iconUrl,
+        contractAddress,
+        symbol,
+        decimals,
+        priceUsd,
+        savedTo,
+        savedToRegistry,
+        tokenIconRegistryCount,
+      },
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ ok: false, message: error.message || '图标保存失败' });
+  }
+}));
+
+app.get(`${ADMIN_BASE_PATH}/token-icons`, adminRequireAuth, adminAsync(async (_req, res) => {
+  const runtimeSettings = await getRuntimeSettings();
+  const iconDir = path.resolve(runtimeSettings.tokenIconDir || BOOTSTRAP_TOKEN_ICON_DIR);
+  let entries = [];
+  try {
+    const filenames = await fs.promises.readdir(iconDir);
+    entries = (await Promise.all(filenames
+      .filter((filename) => /\.(?:png|jpe?g|webp|gif)$/i.test(filename))
+      .map(async (filename) => {
+        const stat = await fs.promises.stat(path.join(iconDir, filename)).catch(() => null);
+        return {
+          filename,
+          iconUrl: resolveTokenIconUrl(filename, runtimeSettings),
+          sizeBytes: stat?.size || 0,
+          updatedAt: stat?.mtimeMs ? Math.floor(stat.mtimeMs / 1000) : 0,
+        };
+      })));
+    entries.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+  } catch (_) {
+    entries = [];
+  }
+
+  return res.json({ ok: true, data: { rows: entries, total: entries.length } });
+}));
+
+
+app.get([`${ADMIN_BASE_PATH}/wallet/token-metadata`, `${ADMIN_BASE_PATH}/wallet/token-price`], adminRequireAuth, adminAsync(async (req, res) => {
+  const settings = await getRuntimeSettings();
+  const contractAddressRaw = String(req.query.contractAddress || req.query.tokenAddress || req.query.address || '').trim();
+  const symbol = String(req.query.symbol || req.query.tokenSymbol || '').trim().slice(0, 32);
+  const normalizedAddress = normalizeAddress(contractAddressRaw);
+  const isNativeBnb = normalizedAddress === ZERO_ADDRESS || symbol.toUpperCase() === 'BNB';
+
+  if (!normalizedAddress && contractAddressRaw && !isNativeBnb) {
+    return badRequest(res, 'contractAddress invalid');
+  }
+  if (!normalizedAddress && !symbol) {
+    return badRequest(res, 'contractAddress or symbol required');
+  }
+
+  const forcePrice = parseBooleanFlag(req.query.force, true);
+  const bnbPriceUsd = isNativeBnb ? await getBnbPriceUsdCached(forcePrice) : (tokenPriceCache.bnbPriceUsd || '0');
+  const metadata = await enrichTokenMetadata(
+    findWalletTokenMetadata(settings, normalizedAddress || contractAddressRaw, symbol, bnbPriceUsd),
+    settings,
+    { forcePrice },
+  );
+
+  return res.json({
+    ok: true,
+    data: {
+      ...metadata,
+      baseCurrency: 'USD',
+    },
+  });
+}));
+
 app.get(`${ADMIN_BASE_PATH}/settings`, adminRequireAuth, adminAsync(async (_req, res) => {
   const settings = await getRuntimeSettings(true);
   return res.json({
@@ -3030,6 +4195,14 @@ app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, r
         maxExpiresInSeconds: runtimeSettings.maxExpiresInSeconds,
         proxy: `${runtimeSettings.proxyAddress}:${runtimeSettings.proxyPort}${runtimeSettings.proxyUsername ? ` user=${runtimeSettings.proxyUsername}` : ''}`,
         walletTokens: Array.isArray(runtimeSettings.walletTokens) ? runtimeSettings.walletTokens.length : 0,
+        tokenIconRegistry: Array.isArray(runtimeSettings.tokenIconRegistry) ? runtimeSettings.tokenIconRegistry.length : 0,
+        tokenPriceRegistry: Array.isArray(runtimeSettings.tokenPriceRegistry) ? runtimeSettings.tokenPriceRegistry.length : 0,
+        tokenPriceAutoEnabled: Number(runtimeSettings.tokenPriceAutoEnabled ?? 1) === 1,
+        tokenPriceProviderOrder: Array.isArray(runtimeSettings.tokenPriceProviderOrder) ? runtimeSettings.tokenPriceProviderOrder.join(',') : '',
+        tokenPriceExternalTtlSeconds: runtimeSettings.tokenPriceExternalTtlSeconds,
+        tokenIconPublicPath: runtimeSettings.tokenIconPublicPath,
+        tokenIconDir: runtimeSettings.tokenIconDir,
+        bnbIconUrl: runtimeSettings.bnbIconUrl || '-',
         adminApiBasePath: ADMIN_BASE_PATH,
         adminWebBasePath: ADMIN_WEB_BASE_PATH,
       },
@@ -3534,6 +4707,7 @@ const port = Number(process.env.PORT || 8787);
 (async () => {
   await db.ensureSchema();
   await db.ensureSettingDefaults();
+  await ensureRuntimeDirectories();
   app.listen(port, () => {
     // eslint-disable-next-line no-console
     console.log(`red-packet service listening on http://127.0.0.1:${port}`);

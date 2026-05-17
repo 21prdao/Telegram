@@ -2,7 +2,14 @@ package org.telegram.wallet.ui;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -22,8 +29,13 @@ import android.widget.TextView;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Shared visual system for the Web3 wallet module. */
 public final class Web3Ui {
@@ -31,6 +43,7 @@ public final class Web3Ui {
     public static final int BRAND_ORANGE = 0xFFF08C22;
     public static final int BRAND_ORANGE_DARK = 0xFFD97813;
     public static final int ACTIVE_GREEN = 0xFF22C55E;
+    private static final Map<String, Bitmap> TOKEN_ICON_CACHE = new ConcurrentHashMap<>();
 
     // Keep wallet pages visually aligned with Telegram's own compact top bar.
     public static final int APP_BAR_HEIGHT_DP = 56;
@@ -392,11 +405,130 @@ public final class Web3Ui {
     public static TextView tokenBadge(Context context, String symbol, int sizeDp) {
         TextView tv = text(context, tokenLetter(symbol), Math.max(15, sizeDp / 2.2f), Color.WHITE, true);
         tv.setGravity(Gravity.CENTER);
+        GradientDrawable bg = tokenBadgeBackground(context);
+        tv.setBackground(bg);
+        return tv;
+    }
+
+    public static View tokenBadge(Context context, String symbol, String iconUrl, int sizeDp) {
+        if (TextUtils.isEmpty(iconUrl)) {
+            return tokenBadge(context, symbol, sizeDp);
+        }
+
+        FrameLayout wrap = new FrameLayout(context);
+        wrap.setBackground(tokenBadgeBackground(context));
+        if (Build.VERSION.SDK_INT >= 21) {
+            wrap.setClipToOutline(true);
+        }
+
+        TextView fallback = tokenBadge(context, symbol, sizeDp);
+        wrap.addView(fallback, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        ImageView image = new ImageView(context);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setVisibility(View.INVISIBLE);
+        wrap.addView(image, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        loadTokenIcon(iconUrl, image);
+        return wrap;
+    }
+
+    private static GradientDrawable tokenBadgeBackground(Context context) {
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFFFFB12B, 0xFFFF6A18});
         bg.setShape(GradientDrawable.OVAL);
         bg.setStroke(dp(context, 1), 0xFFFFD46B);
-        tv.setBackground(bg);
-        return tv;
+        return bg;
+    }
+
+    private static void loadTokenIcon(String iconUrl, ImageView imageView) {
+        final String url = normalizeTokenIconUrl(iconUrl);
+        if (TextUtils.isEmpty(url) || imageView == null) {
+            return;
+        }
+        Bitmap cached = TOKEN_ICON_CACHE.get(url);
+        if (cached != null && !cached.isRecycled()) {
+            imageView.setImageBitmap(cached);
+            imageView.setVisibility(View.VISIBLE);
+            return;
+        }
+        imageView.setTag(url);
+        new Thread(() -> {
+            Bitmap bitmap = downloadTokenIcon(url);
+            if (bitmap == null) {
+                return;
+            }
+            TOKEN_ICON_CACHE.put(url, bitmap);
+            imageView.post(() -> {
+                Object tag = imageView.getTag();
+                if (tag != null && url.equals(String.valueOf(tag))) {
+                    imageView.setImageBitmap(bitmap);
+                    imageView.setVisibility(View.VISIBLE);
+                }
+            });
+        }, "web3-token-icon").start();
+    }
+
+    private static String normalizeTokenIconUrl(String iconUrl) {
+        if (TextUtils.isEmpty(iconUrl)) {
+            return "";
+        }
+        String url = iconUrl.trim();
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            return "";
+        }
+        return url;
+    }
+
+    private static Bitmap downloadTokenIcon(String iconUrl) {
+        HttpURLConnection conn = null;
+        InputStream input = null;
+        try {
+            conn = (HttpURLConnection) new URL(iconUrl).openConnection();
+            conn.setConnectTimeout(6_000);
+            conn.setReadTimeout(8_000);
+            conn.setUseCaches(true);
+            conn.setInstanceFollowRedirects(true);
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) {
+                return null;
+            }
+            input = conn.getInputStream();
+            Bitmap decoded = BitmapFactory.decodeStream(input);
+            return circleCrop(decoded);
+        } catch (Throwable ignore) {
+            return null;
+        } finally {
+            try { if (input != null) input.close(); } catch (Throwable ignore) {}
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    private static Bitmap circleCrop(Bitmap source) {
+        if (source == null || source.isRecycled()) {
+            return null;
+        }
+        int width = source.getWidth();
+        int height = source.getHeight();
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        int size = Math.min(width, height);
+        int left = Math.max(0, (width - size) / 2);
+        int top = Math.max(0, (height - size) / 2);
+        Bitmap square = source;
+        if (width != size || height != size) {
+            square = Bitmap.createBitmap(source, left, top, size, size);
+        }
+        Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        RectF rect = new RectF(0, 0, size, size);
+        canvas.drawOval(rect, paint);
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(square, 0, 0, paint);
+        paint.setXfermode(null);
+        return output;
     }
 
     public static TextView statusBadge(Context context, String status) {

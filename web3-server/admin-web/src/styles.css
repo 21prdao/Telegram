@@ -34,7 +34,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top left, #e6f4ff 0, #f5f7fb 36%, #ffffff 100%);
+  background: radial-gradient(
+    circle at top left,
+    #e6f4ff 0,
+    #f5f7fb 36%,
+    #ffffff 100%
+  );
   padding: 24px;
   overflow-x: hidden;
 }
@@ -53,7 +58,13 @@ body {
   padding: 32px;
 }
 
-.login-card :where(.ant-pro-form-login-container, .ant-pro-form-login-main, .ant-form, .login-form) {
+.login-card
+  :where(
+    .ant-pro-form-login-container,
+    .ant-pro-form-login-main,
+    .ant-form,
+    .login-form
+  ) {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -80,9 +91,57 @@ body {
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
 }
 
 .wrap-anywhere {
+  word-break: break-all;
+}
+
+.token-icon-tools-card .ant-upload-list {
+  max-width: 100%;
+}
+
+.token-icon-result {
+  margin-top: 16px;
+}
+
+.token-icon-preview {
+  border-radius: 50%;
+  object-fit: cover;
+  background: #f5f7fb;
+}
+
+.json-preview {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.token-icon-tools-card .ant-upload-list {
+  max-width: 100%;
+}
+
+.token-icon-result {
+  margin-top: 16px;
+}
+
+.token-icon-preview {
+  object-fit: contain;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.json-preview {
+  max-height: 260px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
   word-break: break-all;
 }

@@ -232,6 +232,7 @@ public class RedPacketRepository {
             if (token.decimals <= 0) token.decimals = 18;
             token.favorite = true;
             token.priceUsd = firstNonEmpty(optString(item, "priceUsd", "usdPrice", "price", "price_usd"), "");
+            token.iconUrl = resolvePublicUrl(firstNonEmpty(optString(item, "iconUrl", "icon_url", "logoUrl", "logo", "imageUrl", "image"), ""));
             if (!TextUtils.isEmpty(token.contractAddress)) {
                 result.add(token);
             }
@@ -239,29 +240,117 @@ public class RedPacketRepository {
         return result;
     }
 
+    public static final class TokenMetadata {
+        public final Map<String, BigDecimal> prices = new HashMap<>();
+        public final Map<String, String> iconUrls = new HashMap<>();
+    }
+
     public Map<String, BigDecimal> getTokenPrices() throws Exception {
+        return getTokenMetadata().prices;
+    }
+
+    public TokenMetadata getTokenMetadata() throws Exception {
         JSONObject root = requestJson("GET", "/wallet/token-prices", null);
         JSONObject data = unwrapData(root);
         JSONArray list = data != null ? data.optJSONArray("prices") : null;
-        Map<String, BigDecimal> result = new HashMap<>();
+        TokenMetadata result = new TokenMetadata();
         if (list == null) {
             return result;
         }
         for (int i = 0; i < list.length(); i++) {
-            JSONObject item = list.optJSONObject(i);
-            if (item == null) continue;
-            BigDecimal price = parsePositiveDecimal(firstNonEmpty(optString(item, "priceUsd", "usdPrice", "price", "price_usd"), "0"));
-            if (price.compareTo(BigDecimal.ZERO) <= 0) continue;
-            String symbol = firstNonEmpty(optString(item, "symbol", "tokenSymbol"), "");
-            String contractAddress = firstNonEmpty(optString(item, "contractAddress", "tokenAddress"), "");
-            if (!TextUtils.isEmpty(symbol)) {
-                result.put(priceKeyForSymbol(symbol), price);
-            }
-            if (!TextUtils.isEmpty(contractAddress)) {
-                result.put(priceKeyForContract(contractAddress), price);
-            }
+            putTokenMetadataItem(result, list.optJSONObject(i));
         }
         return result;
+    }
+
+    public TokenMetadata getTokenMetadataForContracts(List<TokenAsset> tokens) throws Exception {
+        TokenMetadata result = new TokenMetadata();
+        if (tokens == null || tokens.isEmpty()) {
+            return result;
+        }
+
+        StringBuilder addresses = new StringBuilder();
+        Map<String, Boolean> seen = new HashMap<>();
+        for (TokenAsset token : tokens) {
+            if (token == null || TextUtils.isEmpty(token.contractAddress)) {
+                continue;
+            }
+            String address = token.contractAddress.trim().toLowerCase(Locale.US);
+            if (!address.matches("^0x[0-9a-f]{40}$") || seen.containsKey(address)) {
+                continue;
+            }
+            if (addresses.length() > 0) {
+                addresses.append(',');
+            }
+            addresses.append(address);
+            seen.put(address, true);
+            if (seen.size() >= 100) {
+                break;
+            }
+        }
+
+        if (addresses.length() == 0) {
+            return result;
+        }
+
+        JSONObject root = requestJson("GET", "/wallet/token-metadata?contractAddresses=" + Uri.encode(addresses.toString()), null);
+        JSONObject data = unwrapData(root);
+        JSONArray list = data != null ? data.optJSONArray("tokens") : null;
+        if (list != null) {
+            for (int i = 0; i < list.length(); i++) {
+                putTokenMetadataItem(result, list.optJSONObject(i));
+            }
+            return result;
+        }
+
+        JSONObject single = data != null ? data.optJSONObject("token") : null;
+        putTokenMetadataItem(result, single != null ? single : data);
+        return result;
+    }
+
+    public TokenMetadata getTokenMetadataForContract(String contractAddress, String symbol) throws Exception {
+        TokenMetadata result = new TokenMetadata();
+        if (TextUtils.isEmpty(contractAddress)) {
+            return result;
+        }
+
+        String path = "/wallet/token-metadata?contractAddress=" + Uri.encode(contractAddress.trim());
+        if (!TextUtils.isEmpty(symbol)) {
+            path += "&symbol=" + Uri.encode(symbol.trim());
+        }
+        JSONObject root = requestJson("GET", path, null);
+        JSONObject data = unwrapData(root);
+        JSONObject single = data != null ? data.optJSONObject("token") : null;
+        if (single != null) {
+            putTokenMetadataItem(result, single);
+        } else {
+            putTokenMetadataItem(result, data);
+        }
+        return result;
+    }
+
+    private void putTokenMetadataItem(TokenMetadata result, JSONObject item) {
+        if (result == null || item == null) return;
+        BigDecimal price = parsePositiveDecimal(firstNonEmpty(optString(item, "priceUsd", "usdPrice", "price", "price_usd"), "0"));
+        String symbol = firstNonEmpty(optString(item, "symbol", "tokenSymbol"), "");
+        String contractAddress = firstNonEmpty(optString(item, "contractAddress", "tokenAddress"), "");
+        String iconUrl = resolvePublicUrl(firstNonEmpty(optString(item, "iconUrl", "icon_url", "logoUrl", "logo", "imageUrl", "image"), ""));
+        if (price.compareTo(BigDecimal.ZERO) > 0) {
+            if (!TextUtils.isEmpty(symbol)) {
+                result.prices.put(priceKeyForSymbol(symbol), price);
+            }
+            if (!TextUtils.isEmpty(contractAddress)) {
+                result.prices.put(priceKeyForContract(contractAddress), price);
+            }
+        }
+        if (!TextUtils.isEmpty(iconUrl)) {
+            if (!TextUtils.isEmpty(symbol)) {
+                result.iconUrls.put(priceKeyForSymbol(symbol), iconUrl);
+            }
+            if (!TextUtils.isEmpty(contractAddress)) {
+                result.iconUrls.put(priceKeyForContract(contractAddress), iconUrl);
+            }
+        }
     }
 
     public CreateRedPacketPrepareResponse prepareCreate(
@@ -782,6 +871,30 @@ public class RedPacketRepository {
             }
         }
         return false;
+    }
+
+    private String resolvePublicUrl(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return "";
+        }
+        String raw = value.trim();
+        if (raw.startsWith("http://") || raw.startsWith("https://")) {
+            return raw;
+        }
+        try {
+            URL base = new URL(baseUrl);
+            StringBuilder origin = new StringBuilder();
+            origin.append(base.getProtocol()).append("://").append(base.getHost());
+            if (base.getPort() > 0) {
+                origin.append(":").append(base.getPort());
+            }
+            if (raw.startsWith("/")) {
+                return origin + raw;
+            }
+            return origin + "/" + raw.replaceFirst("^/+", "");
+        } catch (Throwable ignore) {
+            return raw;
+        }
     }
 
     private static String optString(JSONObject obj, String... keys) {
