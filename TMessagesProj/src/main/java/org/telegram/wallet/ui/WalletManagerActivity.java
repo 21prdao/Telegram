@@ -16,6 +16,7 @@ import android.widget.Toast;
 
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
+import org.telegram.wallet.proxy.TgProxySyncManager;
 
 public class WalletManagerActivity extends Activity implements WalletWorkflowCoordinator.Host {
 
@@ -46,6 +47,7 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        TgProxySyncManager.ensureStarted(this, false);
         Web3Ui.applySystemBars(this);
         coordinator = new WalletWorkflowCoordinator(this, this);
         setContentView(buildRootLayout());
@@ -164,6 +166,9 @@ public class WalletManagerActivity extends Activity implements WalletWorkflowCoo
     }
 
     private void setTabActive(LinearLayout tab, boolean active) {
+        if (tab == null) {
+            return;
+        }
         Web3Ui.Palette p = Web3Ui.palette();
         int color = active ? p.orange : p.mutedText;
         tab.setBackgroundColor(0x00000000);

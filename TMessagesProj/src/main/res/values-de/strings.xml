@@ -14155,7 +14155,7 @@ You can also view red packet records you sent.</string>
   <string name="WalletRedPacketRecordsLoading">Loading red packet send records...</string>
   <string name="WalletRedPacketRecordsEmpty">No red packet send records yet.</string>
   <string name="Web3RedPacketTitleDefault">HTL Red Packet</string>
-  <string name="Web3WalletTab">Wallet</string>
+  <string name="Web3WalletTab">Assets</string>
   <string name="Web3Wallet">Web3-Wallet</string>
   <string name="Web3WalletInfo">BNB-Chain-Wallet-Verwaltung</string>
   <string name="Web3RedPacketCreateTitle">Create Red Packet</string>

@@ -102,6 +102,12 @@ type RuntimeSettingsValues = {
   proxyUsername: string;
   proxyPassword: string;
   proxySecret: string;
+  browserProxyEnabled: number;
+  browserProxyAddress: string;
+  browserProxyPort: number;
+  browserProxyUsername: string;
+  browserProxyPassword: string;
+  browserProxySecret: string;
   bnbIconUrl: string;
   tokenIconPublicPath: string;
   tokenIconDir: string;
@@ -775,6 +781,12 @@ export default function SystemPage() {
       proxyUsername: values.proxyUsername,
       proxyPassword: values.proxyPassword,
       proxySecret: values.proxySecret,
+      browserProxyEnabled: values.browserProxyEnabled,
+      browserProxyAddress: values.browserProxyAddress,
+      browserProxyPort: values.browserProxyPort,
+      browserProxyUsername: values.browserProxyUsername,
+      browserProxyPassword: values.browserProxyPassword,
+      browserProxySecret: values.browserProxySecret,
       bnbIconUrl: values.bnbIconUrl,
       tokenIconPublicPath: values.tokenIconPublicPath,
       tokenIconDir: values.tokenIconDir,
@@ -914,6 +926,8 @@ export default function SystemPage() {
             maxApkUploadMB: 150,
             maxExpiresInSeconds: 2592000,
             proxyPort: 443,
+            browserProxyEnabled: 1,
+            browserProxyPort: 3128,
             tokenIconPublicPath: "/uploads/token-icons",
             tokenIconDir: "./uploads/token-icons",
             tokenIconRegistryText: "[]",
@@ -1058,6 +1072,13 @@ export default function SystemPage() {
           </Row>
 
           <Typography.Title level={5}>客户端代理参数</Typography.Title>
+          <Alert
+            type="info"
+            showIcon
+            message="这里是原 ETZone 客户端代理参数"
+            description="这些字段继续服务 /api/v1/client/proxy。Web3 钱包内置行情浏览器不要复用这里的代理，请使用下面的 Web3 浏览器代理参数。"
+            style={{ marginBottom: 16 }}
+          />
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item
@@ -1095,6 +1116,60 @@ export default function SystemPage() {
             <Col xs={24} md={12}>
               <Form.Item name="proxySecret" label="代理 Secret">
                 <Input.Password autoComplete="new-password" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Typography.Title level={5}>Web3 浏览器代理参数</Typography.Title>
+          <Alert
+            type="warning"
+            showIcon
+            message="Markets 行情浏览器专用代理"
+            description="客户端 Markets WebView 会请求 /api/v1/client/browser-proxy 获取这里的配置，然后通过本机 127.0.0.1 代理转发到该远程代理，再访问 https://pro.ave.ai。建议填写 Squid HTTP 代理，例如 www.etzone.io:3128。"
+            style={{ marginBottom: 16 }}
+          />
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="browserProxyEnabled"
+                label="浏览器代理开关"
+                tooltip="1=启用，0=关闭。关闭后客户端不会裸连 pro.ave.ai，会显示代理未启用。"
+                rules={[{ required: true, message: "请输入浏览器代理开关" }]}
+              >
+                <InputNumber min={0} max={1} precision={0} style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="browserProxyAddress"
+                label="浏览器代理地址"
+                rules={[{ required: true, message: "请输入浏览器代理地址" }]}
+              >
+                <Input placeholder="www.etzone.io" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="browserProxyPort"
+                label="浏览器代理端口"
+                rules={[{ required: true, message: "请输入浏览器代理端口" }]}
+              >
+                <InputNumber min={1} max={65535} precision={0} style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="browserProxyUsername" label="浏览器代理用户名">
+                <Input placeholder="web3wallet" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="browserProxyPassword" label="浏览器代理密码">
+                <Input.Password autoComplete="new-password" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="browserProxySecret" label="浏览器代理 Secret">
+                <Input.Password autoComplete="new-password" placeholder="openssl rand -hex 32" />
               </Form.Item>
             </Col>
           </Row>

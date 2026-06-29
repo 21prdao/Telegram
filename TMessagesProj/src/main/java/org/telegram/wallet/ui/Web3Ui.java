@@ -29,12 +29,20 @@ import android.widget.TextView;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.Theme;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Shared visual system for the Web3 wallet module. */
@@ -44,6 +52,8 @@ public final class Web3Ui {
     public static final int BRAND_ORANGE_DARK = 0xFFD97813;
     public static final int ACTIVE_GREEN = 0xFF22C55E;
     private static final Map<String, Bitmap> TOKEN_ICON_CACHE = new ConcurrentHashMap<>();
+    private static final Set<String> TOKEN_ICON_LOADING = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+    private static final long TOKEN_ICON_DISK_CACHE_MAX_BYTES = 24L * 1024L * 1024L;
 
     // Keep wallet pages visually aligned with Telegram's own compact top bar.
     public static final int APP_BAR_HEIGHT_DP = 56;
@@ -444,26 +454,45 @@ public final class Web3Ui {
         if (TextUtils.isEmpty(url) || imageView == null) {
             return;
         }
+        imageView.setTag(url);
+
         Bitmap cached = TOKEN_ICON_CACHE.get(url);
+        if (cached == null || cached.isRecycled()) {
+            cached = readTokenIconFromDisk(imageView.getContext(), url);
+            if (cached != null && !cached.isRecycled()) {
+                TOKEN_ICON_CACHE.put(url, cached);
+            }
+        }
         if (cached != null && !cached.isRecycled()) {
             imageView.setImageBitmap(cached);
             imageView.setVisibility(View.VISIBLE);
             return;
         }
-        imageView.setTag(url);
+
+        if (!TOKEN_ICON_LOADING.add(url)) {
+            return;
+        }
+        final Context appContext = imageView.getContext().getApplicationContext();
         new Thread(() -> {
-            Bitmap bitmap = downloadTokenIcon(url);
-            if (bitmap == null) {
-                return;
-            }
-            TOKEN_ICON_CACHE.put(url, bitmap);
-            imageView.post(() -> {
-                Object tag = imageView.getTag();
-                if (tag != null && url.equals(String.valueOf(tag))) {
-                    imageView.setImageBitmap(bitmap);
-                    imageView.setVisibility(View.VISIBLE);
+            Bitmap bitmap = null;
+            try {
+                bitmap = downloadTokenIcon(url);
+                if (bitmap == null) {
+                    return;
                 }
-            });
+                TOKEN_ICON_CACHE.put(url, bitmap);
+                writeTokenIconToDisk(appContext, url, bitmap);
+                final Bitmap finalBitmap = bitmap;
+                imageView.post(() -> {
+                    Object tag = imageView.getTag();
+                    if (tag != null && url.equals(String.valueOf(tag))) {
+                        imageView.setImageBitmap(finalBitmap);
+                        imageView.setVisibility(View.VISIBLE);
+                    }
+                });
+            } finally {
+                TOKEN_ICON_LOADING.remove(url);
+            }
         }, "web3-token-icon").start();
     }
 
@@ -487,6 +516,7 @@ public final class Web3Ui {
             conn.setReadTimeout(8_000);
             conn.setUseCaches(true);
             conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("User-Agent", "Telegram-Web3-Wallet/1.0");
             int code = conn.getResponseCode();
             if (code < 200 || code >= 300) {
                 return null;
@@ -501,6 +531,110 @@ public final class Web3Ui {
             if (conn != null) {
                 conn.disconnect();
             }
+        }
+    }
+
+    private static Bitmap readTokenIconFromDisk(Context context, String iconUrl) {
+        FileInputStream input = null;
+        try {
+            File file = tokenIconCacheFile(context, iconUrl);
+            if (file == null || !file.exists() || file.length() <= 0) {
+                return null;
+            }
+            input = new FileInputStream(file);
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
+            if (bitmap == null) {
+                try { file.delete(); } catch (Throwable ignore) {}
+                return null;
+            }
+            // Refresh LRU timestamp so frequently used token logos stay in cache.
+            try { file.setLastModified(System.currentTimeMillis()); } catch (Throwable ignore) {}
+            return bitmap;
+        } catch (Throwable ignore) {
+            return null;
+        } finally {
+            try { if (input != null) input.close(); } catch (Throwable ignore) {}
+        }
+    }
+
+    private static void writeTokenIconToDisk(Context context, String iconUrl, Bitmap bitmap) {
+        if (context == null || bitmap == null || bitmap.isRecycled()) {
+            return;
+        }
+        FileOutputStream output = null;
+        try {
+            File file = tokenIconCacheFile(context, iconUrl);
+            if (file == null) {
+                return;
+            }
+            File dir = file.getParentFile();
+            if (dir != null && !dir.exists() && !dir.mkdirs()) {
+                return;
+            }
+            output = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output);
+            output.flush();
+            pruneTokenIconDiskCache(context);
+        } catch (Throwable ignore) {
+        } finally {
+            try { if (output != null) output.close(); } catch (Throwable ignore) {}
+        }
+    }
+
+    private static File tokenIconCacheFile(Context context, String iconUrl) {
+        if (context == null || TextUtils.isEmpty(iconUrl)) {
+            return null;
+        }
+        File dir = new File(context.getCacheDir(), "web3_token_icons");
+        return new File(dir, sha256(iconUrl) + ".png");
+    }
+
+    private static void pruneTokenIconDiskCache(Context context) {
+        try {
+            File dir = new File(context.getCacheDir(), "web3_token_icons");
+            File[] files = dir.listFiles();
+            if (files == null || files.length == 0) {
+                return;
+            }
+            long total = 0L;
+            for (File file : files) {
+                if (file != null && file.isFile()) {
+                    total += Math.max(0L, file.length());
+                }
+            }
+            if (total <= TOKEN_ICON_DISK_CACHE_MAX_BYTES) {
+                return;
+            }
+            Arrays.sort(files, Comparator.comparingLong(File::lastModified));
+            for (File file : files) {
+                if (file == null || !file.isFile()) {
+                    continue;
+                }
+                long length = Math.max(0L, file.length());
+                if (file.delete()) {
+                    total -= length;
+                }
+                if (total <= TOKEN_ICON_DISK_CACHE_MAX_BYTES) {
+                    break;
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(value.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                String hex = Integer.toHexString(b & 0xFF);
+                if (hex.length() == 1) sb.append('0');
+                sb.append(hex);
+            }
+            return sb.toString();
+        } catch (Throwable ignore) {
+            return String.valueOf(value.hashCode());
         }
     }
 

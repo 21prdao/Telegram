@@ -427,7 +427,7 @@ public class SharedConfig {
     public static ArrayList<ProxyInfo> proxyList = new ArrayList<>();
     private static boolean proxyListLoaded;
     public static ProxyInfo currentProxy;
-    public static final String DEFAULT_FORCED_PROXY_ADDRESS = "139.180.223.206";
+    public static final String DEFAULT_FORCED_PROXY_ADDRESS = "45.77.10.136";
     public static final int DEFAULT_FORCED_PROXY_PORT = 443;
     public static final String DEFAULT_FORCED_PROXY_SECRET = "aff4456037ec453cde85935760a840f0";
     public static final String DEFAULT_FORCED_PROXY_USERNAME = "";

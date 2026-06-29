@@ -10,9 +10,10 @@ const crypto = require('crypto');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const https = require('https');
 const mysql = require('mysql2/promise');
-const { JsonRpcProvider, Interface, Wallet, getAddress, getBytes, isAddress, solidityPackedKeccak256 } = require('ethers');
+const { Interface, Wallet, getAddress, getBytes, isAddress, solidityPackedKeccak256 } = require('ethers');
 
 const app = express();
 app.disable('x-powered-by');
@@ -26,7 +27,18 @@ app.use((req, _res, next) => {
 
 const CHAIN_ID = Number(process.env.CHAIN_ID || 97);
 const DEFAULT_RED_PACKET_CONTRACT = '0x5a6361A5Af1c56eDF7E6e9e0B191a92BBf957fC3';
-const DEFAULT_RPC_URL = 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
+const DEFAULT_RPC_URLS_BY_CHAIN = CHAIN_ID === 56
+  ? [
+    { name: 'BNB Mainnet 1', url: 'https://bsc-dataseed.bnbchain.org', enabled: true },
+    { name: 'BNB Mainnet 2', url: 'https://bsc-dataseed1.defibit.io', enabled: true },
+    { name: 'BNB Mainnet 3', url: 'https://bsc-dataseed1.ninicoin.io', enabled: true },
+  ]
+  : [
+    { name: 'BNB Testnet 1', url: 'https://data-seed-prebsc-1-s1.bnbchain.org:8545', enabled: true },
+    { name: 'BNB Testnet 2', url: 'https://data-seed-prebsc-2-s1.bnbchain.org:8545', enabled: true },
+    { name: 'BNB Testnet 3', url: 'https://data-seed-prebsc-1-s2.bnbchain.org:8545', enabled: true },
+  ];
+const DEFAULT_RPC_URL = DEFAULT_RPC_URLS_BY_CHAIN[0].url;
 const MAX_PACKET_COUNT = 500;
 const CONTRACT_MAX_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -45,7 +57,7 @@ try {
 
 const BOOTSTRAP_RED_PACKET_CONTRACT = normalizeAddress(process.env.RED_PACKET_CONTRACT || DEFAULT_RED_PACKET_CONTRACT)
   || normalizeAddress(DEFAULT_RED_PACKET_CONTRACT);
-const BOOTSTRAP_RPC_URLS = normalizeRpcUrlsForBootstrap(process.env.RPC_URLS || process.env.RPC_URL || DEFAULT_RPC_URL);
+const BOOTSTRAP_RPC_URLS = normalizeRpcUrlsForBootstrap(process.env.RPC_URLS || process.env.RPC_URL || DEFAULT_RPC_URLS_BY_CHAIN);
 
 // Backward-compatible RPC name used only as startup/status fallback.
 const RPC_URL = BOOTSTRAP_RPC_URLS[0]?.url || DEFAULT_RPC_URL;
@@ -62,6 +74,53 @@ const BOOTSTRAP_DEFAULT_PROXY_PORT = Number(process.env.DEFAULT_PROXY_PORT || 44
 const BOOTSTRAP_DEFAULT_PROXY_USERNAME = process.env.DEFAULT_PROXY_USERNAME || '';
 const BOOTSTRAP_DEFAULT_PROXY_PASSWORD = process.env.DEFAULT_PROXY_PASSWORD || '';
 const BOOTSTRAP_DEFAULT_PROXY_SECRET = process.env.DEFAULT_PROXY_SECRET || 'aff4456037ec453cde85935760a840f0';
+// Dedicated remote forward-proxy config used only by the Web3 Markets in-app browser.
+// /api/v1/client/proxy is already used by the ETZone client proxy, so browser proxy
+// values intentionally do not fall back to DEFAULT_PROXY_*. Configure them separately.
+const BOOTSTRAP_BROWSER_PROXY_ENABLED = parseBooleanFlag(
+  process.env.BROWSER_PROXY_ENABLED ?? process.env.WEB3_BROWSER_PROXY_ENABLED ?? process.env.MARKETS_PROXY_ENABLED,
+  true,
+);
+const BOOTSTRAP_BROWSER_PROXY_ADDRESS = String(
+  process.env.BROWSER_PROXY_ADDRESS
+  ?? process.env.WEB3_BROWSER_PROXY_ADDRESS
+  ?? process.env.MARKETS_PROXY_ADDRESS
+  ?? process.env.MARKETS_BROWSER_PROXY_ADDRESS
+  ?? process.env.DEFAULT_BROWSER_PROXY_ADDRESS
+  ?? '',
+).trim();
+const BOOTSTRAP_BROWSER_PROXY_PORT = Number(
+  process.env.BROWSER_PROXY_PORT
+  ?? process.env.WEB3_BROWSER_PROXY_PORT
+  ?? process.env.MARKETS_PROXY_PORT
+  ?? process.env.MARKETS_BROWSER_PROXY_PORT
+  ?? process.env.DEFAULT_BROWSER_PROXY_PORT
+  ?? 3128,
+);
+const BOOTSTRAP_BROWSER_PROXY_USERNAME = String(
+  process.env.BROWSER_PROXY_USERNAME
+  ?? process.env.WEB3_BROWSER_PROXY_USERNAME
+  ?? process.env.MARKETS_PROXY_USERNAME
+  ?? process.env.MARKETS_BROWSER_PROXY_USERNAME
+  ?? process.env.DEFAULT_BROWSER_PROXY_USERNAME
+  ?? '',
+);
+const BOOTSTRAP_BROWSER_PROXY_PASSWORD = String(
+  process.env.BROWSER_PROXY_PASSWORD
+  ?? process.env.WEB3_BROWSER_PROXY_PASSWORD
+  ?? process.env.MARKETS_PROXY_PASSWORD
+  ?? process.env.MARKETS_BROWSER_PROXY_PASSWORD
+  ?? process.env.DEFAULT_BROWSER_PROXY_PASSWORD
+  ?? '',
+);
+const BOOTSTRAP_BROWSER_PROXY_SECRET = String(
+  process.env.BROWSER_PROXY_SECRET
+  ?? process.env.WEB3_BROWSER_PROXY_SECRET
+  ?? process.env.MARKETS_PROXY_SECRET
+  ?? process.env.MARKETS_BROWSER_PROXY_SECRET
+  ?? process.env.DEFAULT_BROWSER_PROXY_SECRET
+  ?? '',
+);
 const BOOTSTRAP_APP_VERSION_CODE = Number(process.env.APP_VERSION_CODE || 1);
 const BOOTSTRAP_APP_VERSION_NAME = process.env.APP_VERSION_NAME || '1.0.0';
 const BOOTSTRAP_APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || '';
@@ -279,6 +338,62 @@ const RUNTIME_SETTING_DEFINITIONS = [
     defaultValue: BOOTSTRAP_DEFAULT_PROXY_SECRET,
     maxLength: 255,
     description: '客户端 /api/v1/client/proxy 返回的 secret。',
+  },
+  {
+    key: 'browserProxyEnabled',
+    group: 'browserProxy',
+    label: 'Web3浏览器代理开关',
+    type: 'number',
+    defaultValue: BOOTSTRAP_BROWSER_PROXY_ENABLED ? 1 : 0,
+    min: 0,
+    max: 1,
+    description: '控制 /api/v1/client/browser-proxy 是否返回浏览器专用代理配置。1=启用，0=关闭。',
+  },
+  {
+    key: 'browserProxyAddress',
+    group: 'browserProxy',
+    label: 'Web3浏览器代理地址',
+    type: 'string',
+    defaultValue: BOOTSTRAP_BROWSER_PROXY_ADDRESS,
+    maxLength: 255,
+    description: 'Web3 Markets 内置浏览器专用代理地址；客户端 /api/v1/client/browser-proxy 返回的 address。',
+  },
+  {
+    key: 'browserProxyPort',
+    group: 'browserProxy',
+    label: 'Web3浏览器代理端口',
+    type: 'number',
+    defaultValue: Number.isFinite(BOOTSTRAP_BROWSER_PROXY_PORT) ? BOOTSTRAP_BROWSER_PROXY_PORT : 3128,
+    min: 1,
+    max: 65535,
+    description: 'Web3 Markets 内置浏览器专用代理端口；客户端 /api/v1/client/browser-proxy 返回的 port。',
+  },
+  {
+    key: 'browserProxyUsername',
+    group: 'browserProxy',
+    label: 'Web3浏览器代理用户名',
+    type: 'string',
+    defaultValue: BOOTSTRAP_BROWSER_PROXY_USERNAME,
+    maxLength: 255,
+    description: 'Web3 Markets 内置浏览器专用代理 username。',
+  },
+  {
+    key: 'browserProxyPassword',
+    group: 'browserProxy',
+    label: 'Web3浏览器代理密码',
+    type: 'string',
+    defaultValue: BOOTSTRAP_BROWSER_PROXY_PASSWORD,
+    maxLength: 255,
+    description: 'Web3 Markets 内置浏览器专用代理 password。',
+  },
+  {
+    key: 'browserProxySecret',
+    group: 'browserProxy',
+    label: 'Web3浏览器代理 Secret',
+    type: 'string',
+    defaultValue: BOOTSTRAP_BROWSER_PROXY_SECRET,
+    maxLength: 255,
+    description: 'Web3 Markets 内置浏览器专用代理 secret。',
   },
   {
     key: 'bnbIconUrl',
@@ -1123,6 +1238,15 @@ function buildRuntimeSettingsFromRows(rows = []) {
   }
   settings.publicHost = String(settings.publicHost || BOOTSTRAP_PUBLIC_HOST).replace(/\/+$/, '');
   settings.appUploadUrlBase = String(settings.appUploadUrlBase || '').trim().replace(/\/+$/, '');
+  settings.browserProxyEnabled = Number(settings.browserProxyEnabled ?? 1) === 1 ? 1 : 0;
+  // Browser proxy is dedicated to the Web3 Markets in-app browser.
+  // If the system_settings table already contains empty browserProxy* rows, fall back to
+  // BROWSER_PROXY_* env values so deployments can be repaired without wiping the table.
+  settings.browserProxyAddress = String(settings.browserProxyAddress || BOOTSTRAP_BROWSER_PROXY_ADDRESS || '').trim();
+  settings.browserProxyPort = Math.min(Math.max(Number(settings.browserProxyPort || BOOTSTRAP_BROWSER_PROXY_PORT || 0), 0), 65535);
+  settings.browserProxyUsername = String(settings.browserProxyUsername || BOOTSTRAP_BROWSER_PROXY_USERNAME || '').trim();
+  settings.browserProxyPassword = String(settings.browserProxyPassword || BOOTSTRAP_BROWSER_PROXY_PASSWORD || '');
+  settings.browserProxySecret = String(settings.browserProxySecret || BOOTSTRAP_BROWSER_PROXY_SECRET || '');
   try {
     settings.rpcUrls = normalizeRpcUrlsSetting(settings.rpcUrls);
   } catch (_) {
@@ -2664,7 +2788,6 @@ class MySqlDB {
 
 const db = new MySqlDB();
 
-const rpcProviderCache = new Map();
 const rpcHealthCache = {
   key: '',
   values: null,
@@ -2683,16 +2806,6 @@ function getRpcEndpointKey(endpoints) {
   return JSON.stringify((endpoints || []).map((endpoint) => ({ url: endpoint.url, enabled: endpoint.enabled !== false })));
 }
 
-function getProviderForRpcUrl(rpcUrl) {
-  const url = normalizeRpcUrl(rpcUrl);
-  let provider = rpcProviderCache.get(url);
-  if (!provider) {
-    provider = new JsonRpcProvider(url, CHAIN_ID);
-    rpcProviderCache.set(url, provider);
-  }
-  return provider;
-}
-
 function withTimeout(promise, timeoutMs, message = 'timeout') {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
@@ -2706,6 +2819,139 @@ function withTimeout(promise, timeoutMs, message = 'timeout') {
         reject(error);
       });
   });
+}
+
+function compactErrorMessage(error, fallback = 'rpc error') {
+  return String(error?.message || error || fallback)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240);
+}
+
+function createRpcErrorMessage(method, responseJson, responseText) {
+  const rpcError = responseJson?.error;
+  if (rpcError) {
+    const code = rpcError.code !== undefined ? `${rpcError.code} ` : '';
+    return `${method} RPC error ${code}${rpcError.message || 'unknown error'}`.trim();
+  }
+  const body = String(responseText || '').replace(/\s+/g, ' ').trim();
+  return body ? `${method} invalid RPC response: ${body.slice(0, 160)}` : `${method} invalid RPC response`;
+}
+
+function callJsonRpc(rpcUrl, method, params = [], timeoutMs = 5000) {
+  const endpointUrl = normalizeRpcUrl(rpcUrl);
+  const urlObj = new URL(endpointUrl);
+  const isHttps = urlObj.protocol === 'https:';
+  const payload = JSON.stringify({
+    jsonrpc: '2.0',
+    id: `${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+    method,
+    params: Array.isArray(params) ? params : [],
+  });
+  const transport = isHttps ? https : http;
+  const requestOptions = {
+    protocol: urlObj.protocol,
+    hostname: urlObj.hostname,
+    port: urlObj.port || (isHttps ? 443 : 80),
+    method: 'POST',
+    path: `${urlObj.pathname || '/'}${urlObj.search || ''}`,
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json',
+      'content-length': Buffer.byteLength(payload),
+      'user-agent': 'web3-red-packet-rpc/1.0',
+    },
+  };
+
+  if (urlObj.username || urlObj.password) {
+    requestOptions.auth = `${decodeURIComponent(urlObj.username)}:${decodeURIComponent(urlObj.password)}`;
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let req;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      if (req) req.destroy(new Error(`${method} timeout`));
+      reject(new Error(`${method} timeout`));
+    }, Math.max(Number(timeoutMs) || 5000, 500));
+
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(value);
+    };
+
+    try {
+      req = transport.request(requestOptions, (response) => {
+        const chunks = [];
+        let responseBytes = 0;
+        response.on('data', (chunk) => {
+          responseBytes += chunk.length;
+          if (responseBytes > 1024 * 1024) {
+            finish(new Error(`${method} RPC response too large`));
+            response.destroy();
+            return;
+          }
+          chunks.push(chunk);
+        });
+        response.on('end', () => {
+          if (settled) return;
+          const text = Buffer.concat(chunks).toString('utf8');
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            finish(new Error(`${method} HTTP ${response.statusCode}${text ? `: ${text.replace(/\s+/g, ' ').slice(0, 160)}` : ''}`));
+            return;
+          }
+
+          let json;
+          try {
+            json = JSON.parse(text);
+          } catch (_) {
+            finish(new Error(`${method} invalid JSON RPC response`));
+            return;
+          }
+
+          if (json?.error || !Object.prototype.hasOwnProperty.call(json || {}, 'result')) {
+            finish(new Error(createRpcErrorMessage(method, json, text)));
+            return;
+          }
+          finish(null, json.result);
+        });
+      });
+      req.on('error', (error) => finish(error));
+      req.setTimeout(Math.max(Number(timeoutMs) || 5000, 500), () => {
+        if (!settled) req.destroy(new Error(`${method} timeout`));
+      });
+      req.write(payload);
+      req.end();
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
+function normalizeReceiptStatus(status) {
+  if (typeof status === 'number') return status;
+  if (typeof status === 'boolean') return status ? 1 : 0;
+  const text = String(status ?? '').trim();
+  if (!text) return 0;
+  try {
+    return Number(text.startsWith('0x') || text.startsWith('0X') ? BigInt(text) : BigInt(text));
+  } catch (_) {
+    return 0;
+  }
+}
+
+function normalizeTransactionReceipt(receipt) {
+  if (!receipt || typeof receipt !== 'object') return null;
+  return {
+    ...receipt,
+    status: normalizeReceiptStatus(receipt.status),
+    logs: Array.isArray(receipt.logs) ? receipt.logs : [],
+  };
 }
 
 function parseRpcQuantity(value) {
@@ -2735,22 +2981,21 @@ async function probeRpcEndpoint(endpoint, timeoutMs = 3500) {
   };
 
   try {
-    const provider = getProviderForRpcUrl(endpoint.url);
-    const chainIdRaw = await withTimeout(provider.send('eth_chainId', []), timeoutMs, 'RPC chainId timeout');
+    const chainIdRaw = await callJsonRpc(endpoint.url, 'eth_chainId', [], timeoutMs);
     const actualChainId = parseRpcQuantity(chainIdRaw);
     result.chainId = actualChainId || null;
     if (actualChainId && actualChainId !== CHAIN_ID) {
-      throw new Error(`chainId mismatch: ${actualChainId}`);
+      throw new Error(`chainId mismatch: ${actualChainId}, expected ${CHAIN_ID}`);
     }
 
-    const blockRaw = await withTimeout(provider.send('eth_blockNumber', []), timeoutMs, 'RPC blockNumber timeout');
+    const blockRaw = await callJsonRpc(endpoint.url, 'eth_blockNumber', [], timeoutMs);
     result.blockNumber = parseRpcQuantity(blockRaw) || null;
     result.latencyMs = Date.now() - startedAt;
     result.ok = Boolean(result.blockNumber);
     if (!result.ok) result.error = 'empty blockNumber';
   } catch (error) {
     result.latencyMs = Date.now() - startedAt;
-    result.error = String(error?.message || error || 'rpc error').slice(0, 240);
+    result.error = compactErrorMessage(error);
   }
 
   return result;
@@ -2812,9 +3057,9 @@ async function getBestRpcHealth(force = false) {
   return selectBestRpcHealth(health, endpoints);
 }
 
-async function getBestProvider(force = false) {
+async function getBestRpcEndpoint(force = false) {
   const best = await getBestRpcHealth(force);
-  return getProviderForRpcUrl(best?.url || RPC_URL);
+  return best?.url ? best : { url: RPC_URL, name: 'RPC fallback', enabled: true };
 }
 
 async function ensurePacket(packetId, res) {
@@ -2830,12 +3075,12 @@ async function getTransactionReceipt(txHash) {
   const endpoints = await getOrderedRpcEndpointsByHealth(false);
   for (const endpoint of endpoints) {
     try {
-      const provider = getProviderForRpcUrl(endpoint.url);
-      const receipt = await withTimeout(provider.getTransactionReceipt(txHash), 8_000, 'receipt timeout');
-      if (receipt) return receipt;
+      const receipt = await callJsonRpc(endpoint.url, 'eth_getTransactionReceipt', [txHash], 8_000);
+      const normalized = normalizeTransactionReceipt(receipt);
+      if (normalized) return normalized;
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn('[receipt-rpc-error]', endpoint.url, error?.message || error);
+      console.warn('[receipt-rpc-error]', endpoint.url, compactErrorMessage(error));
     }
   }
   return null;
@@ -4194,6 +4439,9 @@ app.get(`${ADMIN_BASE_PATH}/system`, adminRequireAuth, adminAsync(async (_req, r
         maxApkUploadMB: runtimeSettings.maxApkUploadMB,
         maxExpiresInSeconds: runtimeSettings.maxExpiresInSeconds,
         proxy: `${runtimeSettings.proxyAddress}:${runtimeSettings.proxyPort}${runtimeSettings.proxyUsername ? ` user=${runtimeSettings.proxyUsername}` : ''}`,
+        browserProxy: Number(runtimeSettings.browserProxyEnabled ?? 1) === 1
+          ? `${runtimeSettings.browserProxyAddress || '-'}:${runtimeSettings.browserProxyPort || '-'}${runtimeSettings.browserProxyUsername ? ` user=${runtimeSettings.browserProxyUsername}` : ''}`
+          : 'disabled',
         walletTokens: Array.isArray(runtimeSettings.walletTokens) ? runtimeSettings.walletTokens.length : 0,
         tokenIconRegistry: Array.isArray(runtimeSettings.tokenIconRegistry) ? runtimeSettings.tokenIconRegistry.length : 0,
         tokenPriceRegistry: Array.isArray(runtimeSettings.tokenPriceRegistry) ? runtimeSettings.tokenPriceRegistry.length : 0,
@@ -4469,6 +4717,56 @@ app.get('/api/v1/client/proxy', async (_req, res) => {
       updatedAt: nowSeconds(),
     },
   });
+});
+
+function buildClientBrowserProxyPayload(runtimeSettings) {
+  // Browser proxy is independent from /api/v1/client/proxy.
+  // Values are normally read from system_settings, but we intentionally fall back
+  // to the BROWSER_PROXY_* environment bootstrap values when the DB rows are blank.
+  // This avoids "browser proxy not configured" after deploying new code to an
+  // existing database that was initialized before these settings existed.
+  const enabled = Number(runtimeSettings.browserProxyEnabled ?? (BOOTSTRAP_BROWSER_PROXY_ENABLED ? 1 : 0)) === 1;
+  const address = String(runtimeSettings.browserProxyAddress || BOOTSTRAP_BROWSER_PROXY_ADDRESS || '').trim();
+  const port = Number(runtimeSettings.browserProxyPort || BOOTSTRAP_BROWSER_PROXY_PORT || 0);
+  if (!enabled) {
+    return { ok: false, status: 503, message: 'browser proxy disabled' };
+  }
+  if (!address || !Number.isInteger(port) || port <= 0 || port > 65535) {
+    return { ok: false, status: 503, message: 'browser proxy not configured' };
+  }
+  return {
+    ok: true,
+    status: 200,
+    data: {
+      enabled: true,
+      type: 'http',
+      address,
+      port,
+      username: runtimeSettings.browserProxyUsername || BOOTSTRAP_BROWSER_PROXY_USERNAME || '',
+      password: runtimeSettings.browserProxyPassword || BOOTSTRAP_BROWSER_PROXY_PASSWORD || '',
+      secret: runtimeSettings.browserProxySecret || BOOTSTRAP_BROWSER_PROXY_SECRET || '',
+      updatedAt: nowSeconds(),
+    },
+  };
+}
+
+function sendClientBrowserProxyPayload(res, runtimeSettings) {
+  const payload = buildClientBrowserProxyPayload(runtimeSettings);
+  if (!payload.ok) {
+    return res.status(payload.status || 503).json({ ok: false, message: payload.message });
+  }
+  return res.json({ ok: true, data: payload.data });
+}
+
+app.get('/api/v1/client/browser-proxy', async (_req, res) => {
+  const runtimeSettings = await getRuntimeSettings();
+  return sendClientBrowserProxyPayload(res, runtimeSettings);
+});
+
+// Backward-compatible alias for the Web3 Markets browser.
+app.get('/api/v1/client/markets-proxy', async (_req, res) => {
+  const runtimeSettings = await getRuntimeSettings();
+  return sendClientBrowserProxyPayload(res, runtimeSettings);
 });
 
 app.get('/api/v1/client/version/check', async (req, res) => {

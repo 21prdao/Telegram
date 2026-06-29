@@ -108,9 +108,6 @@
 -dontoptimize
 -dontobfuscate
 
--dontwarn groovy.lang.GroovyShell
--dontwarn java.beans.ConstructorProperties
--dontwarn java.beans.Transient
 
 -dontwarn groovy.lang.GroovyShell
 -dontwarn java.beans.ConstructorProperties
@@ -122,6 +119,6 @@
 -keep class org.bouncycastle.** { *; }
 -keep class okhttp3.** { *; }
 -keep class okio.** { *; }
-
--dontwarn org.web3j.**
--dontwarn org.bouncycastle.**
+#
+#-dontwarn org.web3j.**
+#-dontwarn org.bouncycastle.**
